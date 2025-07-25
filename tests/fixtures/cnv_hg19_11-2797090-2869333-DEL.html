@@ -1,0 +1,274 @@
+
+
+<!doctype html>
+<!-- paulirish.com/2008/conditional-stylesheets-vs-css-hacks-answer-neither/ -->
+<!--[if lt IE 7]> <html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="en"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js lt-ie9 lt-ie8" lang="en"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+<!--  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">-->
+
+  <link rel="shortcut icon" href="https://autopvs1.bgi.com/static/favicon.ico">
+
+  <title>
+
+    AutoPVS1
+
+    
+  </title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <!-- Mobile viewport optimized: h5bp.com/viewport -->
+  <meta name="viewport" content="width=device-width">
+
+  <link rel="stylesheet" href="/static/build/main_css.2b7197da3d7be34c3cbc.css">
+
+  
+
+</head>
+<body class="">
+
+
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top" style="height:63px;">
+  <a class="navbar-brand" href="/">
+     AutoPVS1
+  </a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+    aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item active">
+        <a class="nav-link" href="https://autopvs1.bgi.com/" style="font-size:18px;">Home
+          <span class="sr-only">(current)</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="https://autopvs1.bgi.com/about" style="font-size:18px;">About</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="https://autopvs1.bgi.com/faq" style="font-size:18px;">FAQ</a>
+      </li>
+      <li class="nav-item">
+        <a class="navbar-brand" href="https://github.com/JiguangPeng/autopvs1" target="_blank"><i class="fa fa-github"></i></a>
+      </li>
+    </ul>
+    <!-- Search form -->
+    
+        <form class="mx-2 my-auto d-inline w-25" action="https://autopvs1.bgi.com/search" method="get">
+           <div class="input-group">
+               <select name="genome_version" class="form-select border">
+			       <option value="hg19" selected>hg19</option>
+		           <option value="hg38">hg38</option>
+		       </select>
+               <input name="q" type="text" class="form-control" placeholder="search...">
+               <span class="input-group-append">
+               <button type="submit" value=" Send" id="submit" class="btn btn-outline-secondary" style="border:1px solid #dcdfe6;border-radius:4px;">Search</button>
+               </span>
+            </div>
+        </form>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </div><!-- /.navbar-collapse -->
+
+</nav>
+
+
+<header></header>
+
+<main role="main" style="min-height: 790px;color: #000000;">
+
+    <br>
+    <br>
+<div class="container">
+  <div class="row">
+    <div class="col-lg-6">
+      <h2><i class="fa fa-id-card-o"></i> Variant Info - hg19 </h2>
+        <h3>11-2797090-2869333-DEL</h3>
+        <p><b>Gene:</b> <a href="https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:6294">
+            <i>KCNQ1</i></a></p>
+        <p><b>pLI:</b>  2.45e-05</p>
+        <p><b>Haploinsufficiency:</b>  3</p>
+        <p><b>Transcript:</b>  NM_181798.1</p>
+        <p><b>Exon:</b>  13-16/16</p>
+        <p><b>Intron:</b>  12-15/15</p>
+
+
+
+
+
+
+    </div>
+    <div class="col-lg-6">
+      <h2><i class="fa fa-sort-amount-asc"></i> PVS1 Flowchart </h2>
+        
+            
+
+<head>
+    <link rel="stylesheet" href="https://autopvs1.bgi.com/static/flowchart_tree.css">
+</head>
+
+<figure>
+  <figcaption>Preliminary Decision Path: DEL10</figcaption>
+  <ul class="tree">
+    <li><code>Deletion (single exon to full gene)</code>
+      <ul>
+        <li><code>Single to multi exon deletion <br>
+                  Preserves reading frame</code>
+          <ul>
+            <li><code>Role of region in protein <br>
+                      function is unknown <b style="color:#CD5C5C;">#1</b></code>
+              <ul>
+                <li><code>LoF variants in this exon are not frequent <br>
+                          in the general population <b style="color:#CD5C5C;">#2</b> and exon is <br>
+                          present in biologically-relevant transcript(s)</code>
+                  <ul>
+                    <li><code>Variant removes >10% of protein</code>
+                      <ul>
+                        <li><code>Strong</code></li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</figure>
+            
+                <b style="color:#CD5C5C;">#1</b> Neither mutational hotspot nor functional domain is found.<br>
+                
+                    <b style="color:#CD5C5C;">#2</b> Maximum LOF population frequency in exon 15 of NM_000218.3 is <a href="https://gnomad.broadinstitute.org/variant/11-2799255-AG-A">8.80e-06</a>, lower than the threshold (0.1%) we pre-defined.<br>
+                
+            
+        
+
+    </div>
+  </div><!-- /.row -->
+  <div class="row">
+          <div class="col-lg-12">
+            <h2><i class="fa fa-user-md"></i> Disease Mechanism </h2>
+          
+            <table class="table table-bordered">
+              <thead class="thead-light"><tr>
+                <th class="text-center">Gene</th>
+                <th class="text-center">Disease</th>
+                <th class="text-center">Clinical Validity</th>
+                <th class="text-center">Disease Mechanism Consideration</th>
+                <th class="text-center">Adjusted Strength</th>
+              </tr></thead>
+              <tbody>
+              
+                <tr>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/genes/HGNC:6294"><i>KCNQ1</i></a></td>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/conditions/MONDO_0009078">Jervell and Lange-Nielsen syndrome</a></td>
+                <td class="text-center">Definitive</td>
+                <td class="text-center">
+                    
+                        No Decrease
+                    </td>
+                <td class="text-center">Strong</td>
+                </tr>
+              
+                <tr>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/genes/HGNC:6294"><i>KCNQ1</i></a></td>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/conditions/MONDO_0000453">short QT syndrome</a></td>
+                <td class="text-center">Strong</td>
+                <td class="text-center">
+                    
+                        No Decrease
+                    </td>
+                <td class="text-center">Strong</td>
+                </tr>
+              
+                <tr>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/genes/HGNC:6294"><i>KCNQ1</i></a></td>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/conditions/MONDO_0005045">hypertrophic cardiomyopathy</a></td>
+                <td class="text-center">No Known Disease Relationship</td>
+                <td class="text-center">
+                    
+                        Not applicable
+                    </td>
+                <td class="text-center">Unmet</td>
+                </tr>
+              
+                <tr>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/genes/HGNC:6294"><i>KCNQ1</i></a></td>
+                <td class="text-center"><a href="https://search.clinicalgenome.org/kb/conditions/MONDO_0002442">long QT syndrome</a></td>
+                <td class="text-center">Definitive</td>
+                <td class="text-center">
+                    
+                        No Decrease
+                    </td>
+                <td class="text-center">Strong</td>
+                </tr>
+              
+              <tbody>
+            </table>
+          
+    </div>
+
+  </div>
+</div>
+
+</main>
+
+
+<footer>
+  <small>
+  <ul class="company">
+
+      <li>Address: Building NO.7, BGI Park, No.21 Hongan 3rd Street, Yantian District, Shenzhen</li>
+  </ul>
+
+    <ul class="footer-nav">
+
+      <li><a href="https://autopvs1.bgi.com/about">About</a></li>
+
+      <li><a href="mailto:pengjiguang@gmail.com">Contact</a></li>
+    </ul>
+  </small>
+</footer>
+
+<!-- JavaScript at the bottom for fast page loading -->
+<script src="/static/build/main_js.2b7197da3d7be34c3cbc.js"></script>
+
+<!-- end scripts -->
+
+</body>
+</html>

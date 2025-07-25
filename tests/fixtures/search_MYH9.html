@@ -1,0 +1,303 @@
+
+
+<!doctype html>
+<!-- paulirish.com/2008/conditional-stylesheets-vs-css-hacks-answer-neither/ -->
+<!--[if lt IE 7]> <html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="en"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js lt-ie9 lt-ie8" lang="en"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+<!--  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">-->
+
+  <link rel="shortcut icon" href="https://autopvs1.bgi.com/static/favicon.ico">
+
+  <title>
+
+    AutoPVS1
+
+    
+  </title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <!-- Mobile viewport optimized: h5bp.com/viewport -->
+  <meta name="viewport" content="width=device-width">
+
+  <link rel="stylesheet" href="/static/build/main_css.2b7197da3d7be34c3cbc.css">
+
+  
+
+</head>
+<body class="">
+
+
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top" style="height:63px;">
+  <a class="navbar-brand" href="/">
+     AutoPVS1
+  </a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+    aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item active">
+        <a class="nav-link" href="https://autopvs1.bgi.com/" style="font-size:18px;">Home
+          <span class="sr-only">(current)</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="https://autopvs1.bgi.com/about" style="font-size:18px;">About</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="https://autopvs1.bgi.com/faq" style="font-size:18px;">FAQ</a>
+      </li>
+      <li class="nav-item">
+        <a class="navbar-brand" href="https://github.com/JiguangPeng/autopvs1" target="_blank"><i class="fa fa-github"></i></a>
+      </li>
+    </ul>
+    <!-- Search form -->
+    
+        <form class="mx-2 my-auto d-inline w-25" action="https://autopvs1.bgi.com/search" method="get">
+           <div class="input-group">
+               <select name="genome_version" class="form-select border">
+			       <option value="hg19" selected>hg19</option>
+		           <option value="hg38">hg38</option>
+		       </select>
+               <input name="q" type="text" class="form-control" placeholder="search...">
+               <span class="input-group-append">
+               <button type="submit" value=" Send" id="submit" class="btn btn-outline-secondary" style="border:1px solid #dcdfe6;border-radius:4px;">Search</button>
+               </span>
+            </div>
+        </form>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </div><!-- /.navbar-collapse -->
+
+</nav>
+
+
+<header></header>
+
+<main role="main" style="min-height: 790px;color: #000000;">
+
+
+<head>
+
+    <link rel="stylesheet" href="https://autopvs1.bgi.com/static/css/bootstrap.css">
+    <link rel="stylesheet" href="https://autopvs1.bgi.com/static/css/dataTables.bootstrap4.min.css">
+    <script type="text/javascript" src="https://autopvs1.bgi.com/static/js/jquery-3.3.1.js"></script>
+    <script type="text/javascript" src="https://autopvs1.bgi.com/static/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="https://autopvs1.bgi.com/static/js/dataTables.bootstrap4.min.js"></script>
+
+    <link rel="stylesheet" href="https://autopvs1.bgi.com/static/custom.css">
+    <script type="text/javascript" src="https://autopvs1.bgi.com/static/custom.js"></script>
+</head>
+
+
+<!-- Main jumbotron for a primary marketing message or call to action -->
+<div class="jumbotron">
+    <div class="container">
+
+        <h5 class="display-4">Search Results for <i>MYH9</i></h5>
+
+      <p></p>
+    </div>
+</div><!-- /.jumbotron -->
+
+
+<div class="container-fluid"  >
+    <table id="dtBasicExample" class="table table-bordered table-striped">
+      <thead class="thead-light"><tr>
+        <th class="text-center">ClinVar ID</th>
+        <th class="text-center">Gene</th>
+        <th class="text-center">Transcript</th>
+        <th class="text-center">Consequence</th>
+        <th class="text-center">cHGVS</th>
+        <th class="text-center">pHGVS</th>
+        <th class="text-center">Variant ID (hg19)</th>
+        <th class="text-center">Variant ID (hg38)</th>
+      </tr></thead>
+      <tbody>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/14072">14072</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.5</td>
+        <td class="text-center">Nonsense</td>
+        <td class="text-center">c.5797C&gt;T</td>
+        <td class="text-center">p.Arg1933Ter</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36678800-G-A">22-36678800-G-A</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36282754-G-A">22-36282754-G-A</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/14080">14080</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.5</td>
+        <td class="text-center">Frameshift</td>
+        <td class="text-center">c.5821del</td>
+        <td class="text-center">p.Asp1941fs</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36678775-TC-T">22-36678775-TC-T</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36282729-TC-T">22-36282729-TC-T</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/164463">164463</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.6</td>
+        <td class="text-center">Nonsense</td>
+        <td class="text-center">c.637C&gt;T</td>
+        <td class="text-center">p.Gln213Ter</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36718542-G-A">22-36718542-G-A</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36322497-G-A">22-36322497-G-A</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/493342">493342</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.5</td>
+        <td class="text-center">Frameshift</td>
+        <td class="text-center">c.32_33del</td>
+        <td class="text-center">p.Tyr11fs</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36745248-CAT-C">22-36745248-CAT-C</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36349203-CAT-C">22-36349203-CAT-C</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/623096">623096</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.6</td>
+        <td class="text-center">Frameshift</td>
+        <td class="text-center">c.2668del</td>
+        <td class="text-center">p.Gln890fs</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36697066-TG-T">22-36697066-TG-T</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36301020-TG-T">22-36301020-TG-T</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/623104">623104</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.6</td>
+        <td class="text-center">Frameshift</td>
+        <td class="text-center">c.5808del</td>
+        <td class="text-center">p.Gly1938fs</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36678788-TC-T">22-36678788-TC-T</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36282742-TC-T">22-36282742-TC-T</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/623110">623110</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.5</td>
+        <td class="text-center">Frameshift</td>
+        <td class="text-center">c.5770_5779del</td>
+        <td class="text-center">p.Gly1924fs</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36678817-GGCAGGTCCCC-G">22-36678817-GGCAGGTCCCC-G</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36282771-GGCAGGTCCCC-G">22-36282771-GGCAGGTCCCC-G</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/623111">623111</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.6</td>
+        <td class="text-center">Frameshift</td>
+        <td class="text-center">c.5800del</td>
+        <td class="text-center">p.Met1934fs</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36678796-AT-A">22-36678796-AT-A</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36282750-AT-A">22-36282750-AT-A</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/631893">631893</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.5</td>
+        <td class="text-center">Nonsense</td>
+        <td class="text-center">c.5050C&gt;T</td>
+        <td class="text-center">p.Gln1684Ter</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36682775-G-A">22-36682775-G-A</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36286729-G-A">22-36286729-G-A</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/666868">666868</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.6</td>
+        <td class="text-center">Splice-3</td>
+        <td class="text-center">c.5766-13_5766-2dup</td>
+        <td class="text-center">na</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36678832-C-CTGGGGGCAGAGG">22-36678832-C-CTGGGGGCAGAGG</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36282786-C-CTGGGGGCAGAGG">22-36282786-C-CTGGGGGCAGAGG</a></td>
+        </tr>
+      
+        <tr>
+        <td class="text-center"><a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/871829">871829</a></td>
+        <td class="text-center"><i>MYH9</i></td>
+        <td class="text-center">NM_002473.6</td>
+        <td class="text-center">Frameshift</td>
+        <td class="text-center">c.5785del</td>
+        <td class="text-center">p.Val1929fs</td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg19/22-36678811-AC-A">22-36678811-AC-A</a></td>
+        <td class="text-center"><a href="https://autopvs1.bgi.com/variant/hg38/22-36282765-AC-A">22-36282765-AC-A</a></td>
+        </tr>
+      
+      <tbody>
+    </table>
+</div>
+
+
+</main>
+
+
+<footer>
+  <small>
+  <ul class="company">
+
+      <li>Address: Building NO.7, BGI Park, No.21 Hongan 3rd Street, Yantian District, Shenzhen</li>
+  </ul>
+
+    <ul class="footer-nav">
+
+      <li><a href="https://autopvs1.bgi.com/about">About</a></li>
+
+      <li><a href="mailto:pengjiguang@gmail.com">Contact</a></li>
+    </ul>
+  </small>
+</footer>
+
+<!-- JavaScript at the bottom for fast page loading -->
+<script src="/static/build/main_js.2b7197da3d7be34c3cbc.js"></script>
+
+<!-- end scripts -->
+
+</body>
+</html>
