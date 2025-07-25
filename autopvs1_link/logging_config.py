@@ -9,7 +9,7 @@ from structlog.types import Processor
 from autopvs1_link.config import settings
 
 
-def add_service_context(logger, method_name, event_dict):
+def add_service_context(logger, method_name, event_dict) -> dict:
     """Add service context to all log events."""
     event_dict["service"] = "autopvs1-link"
     event_dict["version"] = "1.0.0"
@@ -35,6 +35,7 @@ def configure_logging() -> None:
     if settings.LOG_JSON:
         try:
             import orjson
+
             processors.append(
                 structlog.processors.JSONRenderer(serializer=orjson.dumps)
             )
@@ -68,12 +69,12 @@ def configure_logging() -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
-def get_logger_for_module(module_name: str) -> structlog.BoundLogger:
+def get_logger_for_module(module_name: str) -> structlog.stdlib.BoundLogger:
     """Get a logger bound to a specific module.
-    
+
     Args:
         module_name: Name of the module requesting the logger
-        
+
     Returns:
         Bound logger with module context
     """

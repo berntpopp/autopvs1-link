@@ -1,9 +1,11 @@
 """Client manager for centralized AutoPVS1Client lifecycle management."""
+
 import asyncio
 import threading
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
+from typing import Optional
 
 import structlog
 
@@ -56,7 +58,7 @@ class ClientManager:
         """Get client instance with rate limiting and proper resource management."""
         # Implement basic rate limiting to be respectful
         await self._rate_limit()
-        
+
         client = await self.get_client()
         try:
             yield client
@@ -68,12 +70,12 @@ class ClientManager:
         """Simple rate limiting to be respectful to the AutoPVS1 service."""
         current_time = time.time()
         time_since_last = current_time - self._last_request_time
-        
+
         if time_since_last < self._request_delay:
             wait_time = self._request_delay - time_since_last
             logger.debug("Rate limiting: waiting", wait_time=wait_time)
             await asyncio.sleep(wait_time)
-        
+
         self._last_request_time = time.time()
 
     async def health_check(self) -> dict:
@@ -99,7 +101,7 @@ class ClientManager:
         """Shutdown the client manager and clean up resources."""
         logger.info("Shutting down ClientManager")
         self._shutdown_event.set()
-        
+
         if self._client:
             try:
                 await self._client.close()

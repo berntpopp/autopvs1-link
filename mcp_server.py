@@ -6,14 +6,12 @@ from contextlib import asynccontextmanager
 import structlog
 from fastmcp import FastMCP
 
-from autopvs1_link.api.autopvs1_client import AutoPVS1Client
 from autopvs1_link.logging_config import configure_logging
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
     AutoPVS1Data,
     AutoPVS1SearchResults,
 )
-from autopvs1_link.services.autopvs1_service import AutoPVS1Service
 
 configure_logging()
 logger = structlog.get_logger()
@@ -21,10 +19,12 @@ logger = structlog.get_logger()
 # Create MCP server
 mcp = FastMCP("AutoPVS1 Link")
 
+
 @asynccontextmanager
 async def get_service():
     """Get managed service instance."""
     from autopvs1_link.services.service_manager import get_managed_service
+
     service = await get_managed_service()
     try:
         yield service

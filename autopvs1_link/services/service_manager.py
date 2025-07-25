@@ -1,4 +1,5 @@
 """Service manager for centralized AutoPVS1Service lifecycle management."""
+
 import asyncio
 import threading
 from typing import Optional
@@ -54,7 +55,7 @@ class ServiceManager:
         try:
             service = await self.get_service()
             cache_info = await service.get_cache_info()
-            
+
             return {
                 "status": "healthy",
                 "service_initialized": service is not None,
@@ -73,7 +74,7 @@ class ServiceManager:
             service = await self.get_service()
             await service.clear_cache()
             logger.info("All service caches cleared")
-            
+
             return {
                 "status": "success",
                 "message": "All caches cleared successfully",
@@ -99,7 +100,7 @@ class ServiceManager:
     async def shutdown(self) -> None:
         """Shutdown the service manager and clean up resources."""
         logger.info("Shutting down ServiceManager")
-        
+
         if self._service:
             try:
                 # Clear caches before shutdown

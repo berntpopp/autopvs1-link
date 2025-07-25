@@ -4,13 +4,11 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
 from autopvs1_link.models.autopvs1_models import AutoPVS1CNVData
-from autopvs1_link.services.service_manager import get_managed_service
 from autopvs1_link.services.autopvs1_service import AutoPVS1Service
+from autopvs1_link.services.service_manager import get_managed_service
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/cnv", tags=["CNV"])
-
-
 
 
 @router.get(
