@@ -54,7 +54,7 @@ class ServiceManager:
         """Perform health check on the managed service."""
         try:
             service = await self.get_service()
-            cache_info = await service.get_cache_info()
+            cache_info = await service.get_cache_statistics()
 
             return {
                 "status": "healthy",
@@ -90,7 +90,7 @@ class ServiceManager:
         """Get cache statistics from the service."""
         try:
             service = await self.get_service()
-            return await service.get_cache_info()
+            return await service.get_cache_statistics()
         except Exception as e:
             logger.error("Error getting cache statistics", error=str(e))
             return {

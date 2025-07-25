@@ -148,22 +148,28 @@ class TestVariantEndpoints:
         data = response.json()
         assert "not found" in data["detail"].lower()
 
-    @pytest.mark.skip(reason="Dependency injection mocking needs improvement")
     @pytest.mark.asyncio
-    @patch("autopvs1_link.api.routes.variant.get_managed_service")
-    async def test_get_variant_server_error(self, mock_get_service, async_client):
-        """Test server error handling."""
-        # TODO: Fix dependency injection mocking for FastAPI
-        # Current mocking approach doesn't work with FastAPI's dependency injection
+    async def test_get_variant_server_error(self, async_client):
+        """Test server error handling using FastAPI dependency override."""
+        from autopvs1_link.services.service_manager import get_managed_service
+        from autopvs1_link.unified_server import app
+
+        # Create mock service that raises an exception
         mock_service = AsyncMock()
         mock_service.get_variant_data.side_effect = Exception("Internal error")
-        mock_get_service.return_value = mock_service
 
-        response = await async_client.get("http://test/variant/hg38/X-83508928-A-T")
+        # Override the dependency
+        app.dependency_overrides[get_managed_service] = lambda: mock_service
 
-        assert response.status_code == 500
-        data = response.json()
-        assert "Internal server error" in data["detail"]
+        try:
+            response = await async_client.get("http://test/variant/hg38/X-83508928-A-T")
+
+            assert response.status_code == 500
+            data = response.json()
+            assert "Internal server error" in data["detail"]
+        finally:
+            # Clean up the override
+            app.dependency_overrides.clear()
 
 
 class TestGeneEndpoints:

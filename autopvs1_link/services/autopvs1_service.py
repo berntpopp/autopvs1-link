@@ -174,33 +174,8 @@ class AutoPVS1Service:
 
         logger.info("Service caches and statistics cleared")
 
-    async def get_cache_info(self) -> dict:
-        """Get enhanced cache statistics with detailed metrics."""
-        # Get basic cache info
-        cache_info = {
-            "variant_cache": self.get_variant_data.cache_info()._asdict(),
-            "search_cache": self.search_variants.cache_info()._asdict(),
-            "enhanced_search_cache": self.search_with_redirect_detection.cache_info()._asdict(),
-            "hgvs_resolution_cache": self.resolve_hgvs_notation.cache_info()._asdict(),
-            "cnv_cache": self.get_cnv_data.cache_info()._asdict(),
-        }
-
-        # Get enhanced statistics
-        enhanced_stats = cache_manager.get_statistics()
-
-        # Merge both sets of statistics
-        for method_name in ["get_variant_data", "search_variants", "get_cnv_data"]:
-            if method_name in enhanced_stats:
-                cache_key = (
-                    f"{method_name.replace('get_', '').replace('_data', '_cache')}"
-                )
-                if cache_key in cache_info:
-                    cache_info[cache_key].update(enhanced_stats[method_name])
-
-        return cache_info
-
     async def get_cache_statistics(self, method_name: str = None) -> dict:
-        """Get detailed cache statistics for debugging and monitoring."""
+        """Get comprehensive cache statistics from cache manager (single source of truth)."""
         return cache_manager.get_statistics(method_name)
 
     async def clear_cache_statistics(self, method_name: str = None) -> None:
