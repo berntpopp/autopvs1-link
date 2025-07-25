@@ -10,6 +10,10 @@ from autopvs1_link.models.autopvs1_models import (
     AutoPVS1Data,
     AutoPVS1SearchResults,
 )
+from autopvs1_link.middleware.logging_middleware import (
+    PerformanceLogger,
+    log_cache_operation,
+)
 
 logger = structlog.get_logger()
 
@@ -25,24 +29,54 @@ class AutoPVS1Service:
         self, genome_build: str, variant_id: str
     ) -> AutoPVS1Data:
         """Get variant data with caching."""
-        logger.info(
-            "Fetching variant data", genome_build=genome_build, variant_id=variant_id
-        )
-        return await self.client.get_variant_data(genome_build, variant_id)
+        cache_key = f"variant:{genome_build}:{variant_id}"
+        
+        with PerformanceLogger("variant_data_fetch", genome_build=genome_build, variant_id=variant_id):
+            logger.info(
+                "Fetching variant data", genome_build=genome_build, variant_id=variant_id
+            )
+            
+            try:
+                result = await self.client.get_variant_data(genome_build, variant_id)
+                await log_cache_operation("fetch", cache_key)
+                return result
+            except Exception as e:
+                await log_cache_operation("error", cache_key, error=str(e))
+                raise
 
     @alru_cache(maxsize=settings.CACHE_SIZE)
     async def search_variants(
         self, query: str, genome_version: str = "hg19"
     ) -> AutoPVS1SearchResults:
         """Search variants with caching."""
-        logger.info("Searching variants", query=query, genome_version=genome_version)
-        return await self.client.search_variants(query, genome_version)
+        cache_key = f"search:{query}:{genome_version}"
+        
+        with PerformanceLogger("variant_search", query=query, genome_version=genome_version):
+            logger.info("Searching variants", query=query, genome_version=genome_version)
+            
+            try:
+                result = await self.client.search_variants(query, genome_version)
+                await log_cache_operation("fetch", cache_key, result_count=len(result.results))
+                return result
+            except Exception as e:
+                await log_cache_operation("error", cache_key, error=str(e))
+                raise
 
     @alru_cache(maxsize=settings.CACHE_SIZE)
     async def get_cnv_data(self, genome_build: str, cnv_id: str) -> AutoPVS1CNVData:
         """Get CNV data with caching."""
-        logger.info("Fetching CNV data", genome_build=genome_build, cnv_id=cnv_id)
-        return await self.client.get_cnv_data(genome_build, cnv_id)
+        cache_key = f"cnv:{genome_build}:{cnv_id}"
+        
+        with PerformanceLogger("cnv_data_fetch", genome_build=genome_build, cnv_id=cnv_id):
+            logger.info("Fetching CNV data", genome_build=genome_build, cnv_id=cnv_id)
+            
+            try:
+                result = await self.client.get_cnv_data(genome_build, cnv_id)
+                await log_cache_operation("fetch", cache_key)
+                return result
+            except Exception as e:
+                await log_cache_operation("error", cache_key, error=str(e))
+                raise
 
     async def clear_cache(self) -> None:
         """Clear all caches."""

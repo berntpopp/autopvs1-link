@@ -21,21 +21,15 @@ logger = structlog.get_logger()
 # Create MCP server
 mcp = FastMCP("AutoPVS1 Link")
 
-# Global service instance
-_service: AutoPVS1Service = None
-
-
 @asynccontextmanager
 async def get_service():
-    """Get or create the service instance."""
-    global _service
-    if _service is None:
-        client = AutoPVS1Client()
-        _service = AutoPVS1Service(client)
+    """Get managed service instance."""
+    from autopvs1_link.services.service_manager import get_managed_service
+    service = await get_managed_service()
     try:
-        yield _service
+        yield service
     finally:
-        # Don't close the service here as it's reused
+        # Service is managed by the singleton, no cleanup needed
         pass
 
 

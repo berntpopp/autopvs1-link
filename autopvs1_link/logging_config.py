@@ -1,5 +1,6 @@
 """Logging configuration for AutoPVS1 Link."""
 
+import logging
 import sys
 
 import structlog
@@ -8,23 +9,45 @@ from structlog.types import Processor
 from autopvs1_link.config import settings
 
 
+def add_service_context(logger, method_name, event_dict):
+    """Add service context to all log events."""
+    event_dict["service"] = "autopvs1-link"
+    event_dict["version"] = "1.0.0"
+    event_dict["environment"] = settings.ENVIRONMENT
+    return event_dict
+
+
 def configure_logging() -> None:
     """Configure structured logging for the application."""
     processors: list[Processor] = [
+        structlog.contextvars.merge_contextvars,
         structlog.stdlib.filter_by_level,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="iso"),
+        add_service_context,
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
     ]
 
     if settings.LOG_JSON:
-        processors.append(structlog.processors.JSONRenderer())
+        try:
+            import orjson
+            processors.append(
+                structlog.processors.JSONRenderer(serializer=orjson.dumps)
+            )
+        except ImportError:
+            # Fallback to standard JSON if orjson not available
+            processors.append(structlog.processors.JSONRenderer())
     else:
-        processors.append(structlog.dev.ConsoleRenderer())
+        processors.append(
+            structlog.dev.ConsoleRenderer(
+                colors=True,
+                exception_formatter=structlog.dev.plain_traceback,
+            )
+        )
 
     structlog.configure(
         processors=processors,
@@ -34,10 +57,24 @@ def configure_logging() -> None:
     )
 
     # Configure standard library logging
-    import logging
-
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
         level=getattr(logging, settings.LOG_LEVEL.upper()),
     )
+
+    # Suppress noisy third-party loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+def get_logger_for_module(module_name: str) -> structlog.BoundLogger:
+    """Get a logger bound to a specific module.
+    
+    Args:
+        module_name: Name of the module requesting the logger
+        
+    Returns:
+        Bound logger with module context
+    """
+    return structlog.get_logger().bind(module=module_name)

@@ -144,14 +144,39 @@ class AutoPVS1Client:
         )
 
     def _parse_pvs1_flowchart(self, soup: BeautifulSoup) -> PVS1Flowchart:
-        """Parse PVS1 flowchart information."""
-        flowchart_col = (
-            soup.select(".container .row .col-lg-6")[1]
-            if len(soup.select(".container .row .col-lg-6")) > 1
-            else None
-        )
+        """Parse PVS1 flowchart information.
+        
+        Extracts the PVS1 decision flowchart including the preliminary decision path,
+        final strength determination, decision tree steps, and explanatory notes.
+        
+        The parsing logic is designed to handle the specific HTML structure used by
+        AutoPVS1, but includes fallback mechanisms for robustness.
+        
+        Args:
+            soup: BeautifulSoup object of the variant page HTML
+            
+        Returns:
+            PVS1Flowchart object with parsed flowchart data
+            
+        Raises:
+            ValueError: If the flowchart section cannot be found
+        """
+        # Find the flowchart column (typically the second col-lg-6 div)
+        flowchart_columns = soup.select(".container .row .col-lg-6")
+        flowchart_col = None
+        
+        # Prefer the column that contains the flowchart tree structure
+        for col in flowchart_columns:
+            if col.select("ul.tree"):
+                flowchart_col = col
+                break
+        
+        # Fallback to second column if no tree found
+        if not flowchart_col and len(flowchart_columns) > 1:
+            flowchart_col = flowchart_columns[1]
+            
         if not flowchart_col:
-            raise ValueError("Could not find flowchart section")
+            raise ValueError("Could not find flowchart section in HTML")
 
         # Extract preliminary decision path
         figcaption = flowchart_col.find("figcaption")
@@ -162,15 +187,40 @@ class AutoPVS1Client:
             ).strip()
 
         # Extract final strength from the deepest nested code element
+        # NOTE: This heuristic searches for the PVS1 strength determination in reverse order
+        # through all <code> elements in the decision tree. This approach is somewhat brittle
+        # as it relies on the AutoPVS1 website's specific HTML structure where the final
+        # strength appears as the last relevant <code> tag. If the website structure changes
+        # (e.g., additional <code> tags are added elsewhere), this parsing may break.
+        # A more robust approach would traverse the ul.tree structure to find the leaf node
+        # of the longest decision path, but the current heuristic works reliably with the
+        # existing HTML format.
         final_strength = ""
         flowchart_codes = flowchart_col.select("ul.tree code")
         if flowchart_codes:
-            # The final strength is typically in the last/deepest code element
+            # Search in reverse order to find the final strength determination
+            # Valid PVS1 strengths: Strong, Moderate, Supporting, Not applicable
+            valid_strengths = ["Strong", "Moderate", "Supporting", "Not applicable"]
             for code in reversed(flowchart_codes):
                 text = code.text.strip()
-                if text in ["Strong", "Moderate", "Supporting", "Not applicable"]:
+                if text in valid_strengths:
                     final_strength = text
+                    logger.debug("Found final strength", strength=final_strength, method="reverse_search")
                     break
+        
+        # Fallback: If no strength found in reverse search, try alternative methods
+        if not final_strength:
+            # Try to find strength in the deepest nested list structure
+            deepest_li = flowchart_col.select("ul.tree li ul li ul li ul li")
+            if deepest_li:
+                for li in deepest_li:
+                    code = li.find("code")
+                    if code:
+                        text = code.text.strip()
+                        if text in valid_strengths:
+                            final_strength = text
+                            logger.debug("Found final strength", strength=final_strength, method="deepest_nesting")
+                            break
 
         # Parse decision tree steps
         decision_tree = []
@@ -250,9 +300,65 @@ class AutoPVS1Client:
         self, soup: BeautifulSoup, genome_version: str
     ) -> list[SearchResult]:
         """Parse search results from the search page."""
-        results = []
-        # This would need to be implemented based on the actual search results HTML structure
-        # For now, returning empty list as a placeholder
+        results: list[SearchResult] = []
+        
+        # Find the results table
+        table = soup.find("table", {"id": "dtBasicExample"})
+        if not table:
+            logger.warning("No search results table found")
+            return results
+        
+        tbody = table.find("tbody")
+        if not tbody:
+            logger.warning("No table body found in search results")
+            return results
+        
+        # Parse each result row
+        for row in tbody.find_all("tr"):
+            cols = row.find_all("td")
+            if len(cols) < 8:  # Need at least 8 columns
+                continue
+                
+            try:
+                # Extract gene symbol (column 1, inside <i> tag)
+                gene_cell = cols[1]
+                gene_i = gene_cell.find("i")
+                gene_symbol = gene_i.text.strip() if gene_i else gene_cell.text.strip()
+                
+                # Extract variant consequence/type (column 3)
+                variant_type = cols[3].text.strip()
+                
+                # Extract variant URLs for the requested genome version
+                if genome_version == "hg19":
+                    variant_cell = cols[6]  # hg19 variant ID column
+                elif genome_version == "hg38":
+                    variant_cell = cols[7]  # hg38 variant ID column
+                else:
+                    # Default to hg19
+                    variant_cell = cols[6]
+                
+                variant_link = variant_cell.find("a")
+                if not variant_link:
+                    continue
+                    
+                variant_url = variant_link.get("href", "")
+                variant_id = variant_link.text.strip()
+                
+                # Create SearchResult
+                result = SearchResult(
+                    variant_id=variant_id,
+                    gene=gene_symbol,
+                    variant_type=variant_type,
+                    genome_build=genome_version,
+                    url=variant_url,
+                )
+                results.append(result)
+                
+            except (AttributeError, IndexError) as e:
+                logger.warning("Error parsing search result row", error=str(e))
+                continue
+        
+        logger.info("Parsed search results", count=len(results), genome_version=genome_version)
         return results
 
     def _parse_cnv_info(self, soup: BeautifulSoup, cnv_id: str) -> CNVInfo:
