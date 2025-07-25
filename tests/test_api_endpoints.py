@@ -3,10 +3,10 @@
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-import pytest
 import httpx
-from httpx import AsyncClient
+import pytest
 from fastapi.testclient import TestClient
+from httpx import AsyncClient
 
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1Data,
@@ -35,10 +35,9 @@ def test_client():
 async def async_client():
     """Create async test client."""
     from httpx import ASGITransport
+
     async with AsyncClient(
-        transport=ASGITransport(app=app), 
-        base_url="http://test", 
-        follow_redirects=True
+        transport=ASGITransport(app=app), base_url="http://test", follow_redirects=True
     ) as client:
         yield client
 
@@ -112,11 +111,13 @@ class TestVariantEndpoints:
 
     @pytest.mark.asyncio
     @patch("autopvs1_link.api.autopvs1_client.AutoPVS1Client.get_variant_data")
-    async def test_get_variant_success(self, mock_get_variant, sample_variant_data, async_client):
+    async def test_get_variant_success(
+        self, mock_get_variant, sample_variant_data, async_client
+    ):
         """Test successful variant data retrieval."""
         mock_get_variant.return_value = sample_variant_data
 
-        response = await async_client.get("http://test/api/variant/hg38/X-83508928-A-T")
+        response = await async_client.get("http://test/variant/hg38/X-83508928-A-T")
 
         assert response.status_code == 200
         data = response.json()
@@ -139,7 +140,9 @@ class TestVariantEndpoints:
             message="Not Found", request=AsyncMock(), response=mock_response
         )
 
-        response = await async_client.get("http://test/api/variant/hg38/nonexistent-variant")
+        response = await async_client.get(
+            "http://test/variant/hg38/nonexistent-variant"
+        )
 
         assert response.status_code == 404
         data = response.json()
@@ -156,20 +159,20 @@ class TestVariantEndpoints:
         mock_service.get_variant_data.side_effect = Exception("Internal error")
         mock_get_service.return_value = mock_service
 
-        response = await async_client.get("http://test/api/variant/hg38/X-83508928-A-T")
+        response = await async_client.get("http://test/variant/hg38/X-83508928-A-T")
 
         assert response.status_code == 500
         data = response.json()
         assert "Internal server error" in data["detail"]
 
 
-class TestSearchEndpoints:
-    """Test search-related endpoints."""
+class TestGeneEndpoints:
+    """Test gene-related endpoints."""
 
     @pytest.mark.asyncio
     @patch("autopvs1_link.api.autopvs1_client.AutoPVS1Client.search_variants")
-    async def test_search_variants_success(self, mock_search, async_client):
-        """Test successful variant search."""
+    async def test_search_gene_variants_success(self, mock_search, async_client):
+        """Test successful gene variant search."""
         from autopvs1_link.models.autopvs1_models import (
             AutoPVS1SearchResults,
             SearchResult,
@@ -189,7 +192,9 @@ class TestSearchEndpoints:
             ],
         )
 
-        response = await async_client.get("http://test/api/search?q=MYH9&genome_version=hg19")
+        response = await async_client.get(
+            "http://test/gene/search?q=MYH9&genome_version=hg19"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -201,15 +206,15 @@ class TestSearchEndpoints:
 
     @pytest.mark.asyncio
     @patch("autopvs1_link.api.autopvs1_client.AutoPVS1Client.search_variants")
-    async def test_search_variants_empty_results(self, mock_search, async_client):
-        """Test search with no results."""
+    async def test_search_gene_variants_empty_results(self, mock_search, async_client):
+        """Test gene search with no results."""
         from autopvs1_link.models.autopvs1_models import AutoPVS1SearchResults
 
         mock_search.return_value = AutoPVS1SearchResults(
             query="NONEXISTENT", genome_version="hg19", results=[]
         )
 
-        response = await async_client.get("http://test/api/search?q=NONEXISTENT")
+        response = await async_client.get("http://test/gene/search?q=NONEXISTENT")
 
         assert response.status_code == 200
         data = response.json()
@@ -218,9 +223,9 @@ class TestSearchEndpoints:
         assert data["results"] == []
 
     @pytest.mark.asyncio
-    async def test_search_variants_missing_query(self, async_client):
-        """Test search without query parameter."""
-        response = await async_client.get("http://test/api/search")
+    async def test_search_gene_variants_missing_query(self, async_client):
+        """Test gene search without query parameter."""
+        response = await async_client.get("http://test/gene/search")
 
         assert response.status_code == 422  # Validation error
 
@@ -251,7 +256,7 @@ class TestCNVEndpoints:
             disease_mechanisms=[],
         )
 
-        response = await async_client.get("http://test/api/cnv/hg19/11-2797090-2869333-DEL")
+        response = await async_client.get("http://test/cnv/hg19/11-2797090-2869333-DEL")
 
         assert response.status_code == 200
         data = response.json()
@@ -267,7 +272,7 @@ class TestCNVEndpoints:
         """Test CNV error handling."""
         mock_get_cnv.side_effect = Exception("CNV parsing error")
 
-        response = await async_client.get("http://test/api/cnv/hg19/invalid-cnv")
+        response = await async_client.get("http://test/cnv/hg19/invalid-cnv")
 
         assert response.status_code == 500
         data = response.json()
@@ -286,7 +291,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_method_not_allowed(self, async_client):
         """Test unsupported HTTP method."""
-        response = await async_client.post("http://test/api/variant/hg38/test")
+        response = await async_client.post("http://test/variant/hg38/test")
         assert response.status_code == 405
 
 
@@ -298,7 +303,7 @@ class TestLiveAPIIntegration:
     async def test_live_variant_endpoint(self, async_client):
         """Test variant endpoint with live data."""
         try:
-            response = await async_client.get("http://test/api/variant/hg38/X-83508928-A-T")
+            response = await async_client.get("http://test/variant/hg38/X-83508928-A-T")
 
             if response.status_code == 200:
                 data = response.json()
@@ -316,7 +321,7 @@ class TestLiveAPIIntegration:
         """Test search endpoint with live data."""
         try:
             response = await async_client.get(
-                "http://test/api/search?q=POU3F4&genome_version=hg38"
+                "http://test/gene/search?q=POU3F4&genome_version=hg38"
             )
 
             if response.status_code == 200:
@@ -338,7 +343,7 @@ class TestResponseValidation:
         """Test that responses conform to Pydantic models."""
         mock_get_variant.return_value = sample_variant_data
 
-        response = await async_client.get("http://test/api/variant/hg38/X-83508928-A-T")
+        response = await async_client.get("http://test/variant/hg38/X-83508928-A-T")
 
         assert response.status_code == 200
         data = response.json()

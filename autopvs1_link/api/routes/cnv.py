@@ -10,7 +10,7 @@ from autopvs1_link.services.autopvs1_service import AutoPVS1Service
 from autopvs1_link.services.service_manager import get_managed_service
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/api", tags=["CNV"])
+router = APIRouter(tags=["CNV"])
 
 
 @router.get(

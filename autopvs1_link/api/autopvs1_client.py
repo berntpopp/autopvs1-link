@@ -27,13 +27,10 @@ logger = structlog.get_logger()
 
 # HGVS notation patterns for detection
 HGVS_PATTERNS = [
-    r"^NM_\d+\.\d+:c\.",     # NM_000128.3:c.1716+1G>A
-    r"^NR_\d+\.\d+:n\.",     # Non-coding RNA transcripts
-    r"^c\.\d+",              # c.123A>T (coding)
-    r"^n\.\d+",              # n.123A>T (non-coding)
-    r"^p\.\w+\d+",           # p.Arg123Ter (protein)
-    r"^g\.\d+",              # g.123A>T (genomic)
-    r"^m\.\d+",              # m.123A>T (mitochondrial)
+    r"^NM_\d+\.\d+:c\.",  # NM_000128.3:c.1716+1G>A
+    r"^NR_\d+\.\d+:n\.",  # Non-coding RNA transcripts
+    r"^g\.\d+",  # g.123A>T (genomic)
+    r"^m\.\d+",  # m.123A>T (mitochondrial)
 ]
 
 
@@ -150,28 +147,28 @@ class AutoPVS1Client:
         self, query: str, genome_version: str = "hg19"
     ) -> EnhancedSearchResults:
         """Enhanced search with automatic redirect detection.
-        
+
         This method mimics AutoPVS1's intelligent search behavior:
         - HGVS notation queries redirect to specific variant pages
         - Gene symbol queries return search results with multiple variants
-        
+
         Args:
             query: Search query (HGVS notation or gene symbol)
             genome_version: Genome version to search (default: hg19)
-            
+
         Returns:
             EnhancedSearchResults with either variant data (if redirected) or search results
         """
         url = f"{self.base_url}/search"
         params = {"q": query, "genome_version": genome_version}
         original_url = f"{url}?q={query}&genome_version={genome_version}"
-        
+
         logger.info(
             "Enhanced search with redirect detection",
             query=query,
             genome_version=genome_version,
             url=url,
-            hgvs_detected=self._detect_hgvs_pattern(query)
+            hgvs_detected=self._detect_hgvs_pattern(query),
         )
 
         try:
@@ -179,7 +176,7 @@ class AutoPVS1Client:
                 self.client, "GET", url, params=params
             )
             final_url = str(response.url)
-            
+
             # Check if we were redirected to a variant page
             if response.history and "/variant/" in final_url:
                 # Redirect detected - parse as variant page
@@ -188,24 +185,22 @@ class AutoPVS1Client:
                     query=query,
                     original_url=original_url,
                     final_url=final_url,
-                    redirect_count=len(response.history)
+                    redirect_count=len(response.history),
                 )
-                
+
                 return await self._handle_redirect_to_variant(
                     response, query, genome_version, original_url, final_url
                 )
             else:
                 # Normal search results page
                 logger.info(
-                    "Search returned normal results page",
-                    query=query,
-                    url=final_url
+                    "Search returned normal results page", query=query, url=final_url
                 )
-                
+
                 return await self._handle_search_results_page(
                     response, query, genome_version, original_url, final_url
                 )
-                
+
         except Exception as e:
             logger.error(
                 "Failed enhanced search",
@@ -220,25 +215,27 @@ class AutoPVS1Client:
         self, hgvs: str, genome_version: str = "hg19"
     ) -> AutoPVS1Data:
         """Direct HGVS notation resolution to variant data.
-        
+
         This method specifically handles HGVS notation and expects
         a redirect to a variant page.
-        
+
         Args:
             hgvs: HGVS notation (e.g., "NM_000128.3:c.1716+1G>A")
             genome_version: Genome version (default: hg19)
-            
+
         Returns:
             AutoPVS1Data for the resolved variant
-            
+
         Raises:
             ValueError: If HGVS notation doesn't resolve to a variant
         """
         if not self._detect_hgvs_pattern(hgvs):
             logger.warning("Query doesn't appear to be HGVS notation", query=hgvs)
-        
-        enhanced_result = await self.search_with_redirect_detection(hgvs, genome_version)
-        
+
+        enhanced_result = await self.search_with_redirect_detection(
+            hgvs, genome_version
+        )
+
         if enhanced_result.is_single_variant and enhanced_result.variant_data:
             return enhanced_result.variant_data
         else:
@@ -423,7 +420,13 @@ class AutoPVS1Client:
         if flowchart_codes:
             # Search in reverse order to find the final strength determination
             # Valid PVS1 strengths: Strong, Moderate, Supporting, Not applicable, Unmet
-            valid_strengths = ["Strong", "Moderate", "Supporting", "Not applicable", "Unmet"]
+            valid_strengths = [
+                "Strong",
+                "Moderate",
+                "Supporting",
+                "Not applicable",
+                "Unmet",
+            ]
             for code in reversed(flowchart_codes):
                 text = code.text.strip()
                 if text in valid_strengths:
@@ -444,7 +447,13 @@ class AutoPVS1Client:
                     code = li.find("code")
                     if code:
                         text = code.text.strip()
-                        if text in ["Strong", "Moderate", "Supporting", "Not applicable", "Unmet"]:
+                        if text in [
+                            "Strong",
+                            "Moderate",
+                            "Supporting",
+                            "Not applicable",
+                            "Unmet",
+                        ]:
                             final_strength = text
                             logger.debug(
                                 "Found final strength",
@@ -623,7 +632,7 @@ class AutoPVS1Client:
 
     def _extract_field_value(self, container: Tag, field_name: str) -> Optional[str]:
         """Extract field value from a container by field name.
-        
+
         Handles HTML structure like: <p><b>Field:</b> value</p>
         """
         # First try to find paragraph containing the field name in a <b> tag
@@ -634,7 +643,7 @@ class AutoPVS1Client:
                 full_text = p.get_text()
                 if ":" in full_text:
                     return full_text.split(":", 1)[1].strip()
-        
+
         # Fallback to original method
         field_p = container.find("p", string=re.compile(re.escape(field_name)))
         if field_p:
@@ -649,16 +658,16 @@ class AutoPVS1Client:
             b_tag = p.find("b")
             if b_tag and field_name in b_tag.text:
                 return p
-        
+
         # Fallback to string search
         return container.find("p", string=re.compile(re.escape(field_name)))
 
     def _detect_hgvs_pattern(self, query: str) -> bool:
         """Detect if query looks like HGVS notation.
-        
+
         Args:
             query: Search query to analyze
-            
+
         Returns:
             True if query matches HGVS patterns, False otherwise
         """
@@ -667,16 +676,18 @@ class AutoPVS1Client:
             if re.match(pattern, query, re.IGNORECASE):
                 logger.debug("HGVS pattern detected", query=query, pattern=pattern)
                 return True
-        
+
         logger.debug("No HGVS pattern detected", query=query)
         return False
 
-    def _extract_variant_from_redirect_url(self, url: str) -> tuple[Optional[str], Optional[str]]:
+    def _extract_variant_from_redirect_url(
+        self, url: str
+    ) -> tuple[Optional[str], Optional[str]]:
         """Extract genome_build and variant_id from redirect URL.
-        
+
         Args:
             url: AutoPVS1 variant URL (e.g., '/variant/hg19/4-187208978-G-A')
-            
+
         Returns:
             Tuple of (genome_build, variant_id) or (None, None) if parsing fails
         """
@@ -688,10 +699,10 @@ class AutoPVS1Client:
                 "Extracted variant info from URL",
                 url=url,
                 genome_build=genome_build,
-                variant_id=variant_id
+                variant_id=variant_id,
             )
             return genome_build, variant_id
-        
+
         logger.warning("Failed to extract variant info from URL", url=url)
         return None, None
 
@@ -701,35 +712,39 @@ class AutoPVS1Client:
         query: str,
         genome_version: str,
         original_url: str,
-        final_url: str
+        final_url: str,
     ) -> EnhancedSearchResults:
         """Handle redirect to variant page by parsing variant data.
-        
+
         Args:
             response: HTTP response object
             query: Original search query
             genome_version: Requested genome version
             original_url: Original search URL
             final_url: Final redirected URL
-            
+
         Returns:
             EnhancedSearchResults with variant data
         """
         # Extract variant info from URL
         genome_build, variant_id = self._extract_variant_from_redirect_url(final_url)
-        
+
         # Parse the variant page
         soup = BeautifulSoup(response.text, "lxml")
         variant_info = self._parse_variant_info(soup, variant_id or "unknown")
-        
+
         # Check if this variant is compatible with PVS1
-        incompatible_text = soup.find("p", string=re.compile(r"incompatible with.*PVS1"))
+        incompatible_text = soup.find(
+            "p", string=re.compile(r"incompatible with.*PVS1")
+        )
         if incompatible_text:
             pvs1_flowchart = PVS1Flowchart(
                 preliminary_decision_path="not_applicable",
                 final_strength="PVS1_Not_Applicable",
                 decision_tree=[],
-                notes={"note_1": "This variant type is incompatible with PVS1 criterion"},
+                notes={
+                    "note_1": "This variant type is incompatible with PVS1 criterion"
+                },
             )
             disease_mechanisms = []
         else:
@@ -776,17 +791,17 @@ class AutoPVS1Client:
         query: str,
         genome_version: str,
         original_url: str,
-        final_url: str
+        final_url: str,
     ) -> EnhancedSearchResults:
         """Handle normal search results page.
-        
+
         Args:
             response: HTTP response object
             query: Original search query
             genome_version: Requested genome version
             original_url: Original search URL
             final_url: Final URL (same as original for non-redirects)
-            
+
         Returns:
             EnhancedSearchResults with search results
         """
@@ -794,9 +809,7 @@ class AutoPVS1Client:
         results = self._parse_search_results(soup, genome_version)
 
         search_results = AutoPVS1SearchResults(
-            query=query, 
-            genome_version=genome_version, 
-            results=results
+            query=query, genome_version=genome_version, results=results
         )
 
         return EnhancedSearchResults(

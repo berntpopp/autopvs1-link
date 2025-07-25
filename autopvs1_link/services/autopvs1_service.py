@@ -88,21 +88,33 @@ class AutoPVS1Service:
             result = await self.client.search_with_redirect_detection(
                 query, genome_version
             )
-            
+
             if result.redirected:
                 logger.info(
                     "Search redirected to variant",
                     query=query,
-                    variant_id=result.redirect_info.variant_id_extracted if result.redirect_info else None,
-                    genome_build=result.redirect_info.genome_build_extracted if result.redirect_info else None,
+                    variant_id=(
+                        result.redirect_info.variant_id_extracted
+                        if result.redirect_info
+                        else None
+                    ),
+                    genome_build=(
+                        result.redirect_info.genome_build_extracted
+                        if result.redirect_info
+                        else None
+                    ),
                 )
             else:
                 logger.debug(
                     "Search returned multiple results",
                     query=query,
-                    result_count=len(result.search_results.results) if result.search_results else 0,
+                    result_count=(
+                        len(result.search_results.results)
+                        if result.search_results
+                        else 0
+                    ),
                 )
-            
+
             return result
 
     @cache_manager.enhanced_cache(
@@ -122,7 +134,7 @@ class AutoPVS1Service:
             )
 
             result = await self.client.resolve_hgvs_notation(hgvs, genome_version)
-            
+
             logger.info(
                 "HGVS resolution completed",
                 hgvs=hgvs,
@@ -130,7 +142,7 @@ class AutoPVS1Service:
                 gene=result.variant_info.gene_symbol,
                 final_strength=result.pvs1_flowchart.final_strength,
             )
-            
+
             return result
 
     @cache_manager.enhanced_cache(
