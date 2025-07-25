@@ -210,12 +210,24 @@ class AutoPVS1Client:
 
         # Extract other fields
         pli_text = self._extract_field_value(info_col, "pLI:")
-        pli_score = float(pli_text) if pli_text and pli_text != "-" else None
+        pli_score = None
+        if pli_text and pli_text not in ["-", "na"]:
+            try:
+                pli_score = float(pli_text)
+            except ValueError:
+                # Keep as string if it can't be converted to float
+                pass
 
-        haploinsuff_p = info_col.find("p", string=re.compile(r"Haploinsufficiency:"))
-        haploinsuff_link = haploinsuff_p.find("a") if haploinsuff_p else None
-        haploinsufficiency = haploinsuff_link.text.strip() if haploinsuff_link else None
-        haploinsuff_url = haploinsuff_link.get("href") if haploinsuff_link else None
+        haploinsuff_text = self._extract_field_value(info_col, "Haploinsufficiency:")
+        haploinsufficiency = haploinsuff_text
+        haploinsuff_url = None
+        # Try to find the haploinsufficiency link
+        haploinsuff_p = self._find_field_paragraph(info_col, "Haploinsufficiency:")
+        if haploinsuff_p:
+            haploinsuff_link = haploinsuff_p.find("a")
+            if haploinsuff_link:
+                haploinsufficiency = haploinsuff_link.text.strip()
+                haploinsuff_url = haploinsuff_link.get("href")
 
         # Extract external links
         external_links = {}
@@ -296,8 +308,8 @@ class AutoPVS1Client:
         flowchart_codes = flowchart_col.select("ul.tree code")
         if flowchart_codes:
             # Search in reverse order to find the final strength determination
-            # Valid PVS1 strengths: Strong, Moderate, Supporting, Not applicable
-            valid_strengths = ["Strong", "Moderate", "Supporting", "Not applicable"]
+            # Valid PVS1 strengths: Strong, Moderate, Supporting, Not applicable, Unmet
+            valid_strengths = ["Strong", "Moderate", "Supporting", "Not applicable", "Unmet"]
             for code in reversed(flowchart_codes):
                 text = code.text.strip()
                 if text in valid_strengths:
@@ -318,7 +330,7 @@ class AutoPVS1Client:
                     code = li.find("code")
                     if code:
                         text = code.text.strip()
-                        if text in valid_strengths:
+                        if text in ["Strong", "Moderate", "Supporting", "Not applicable", "Unmet"]:
                             final_strength = text
                             logger.debug(
                                 "Found final strength",
@@ -496,13 +508,36 @@ class AutoPVS1Client:
         )
 
     def _extract_field_value(self, container: Tag, field_name: str) -> Optional[str]:
-        """Extract field value from a container by field name."""
+        """Extract field value from a container by field name.
+        
+        Handles HTML structure like: <p><b>Field:</b> value</p>
+        """
+        # First try to find paragraph containing the field name in a <b> tag
+        for p in container.find_all("p"):
+            b_tag = p.find("b")
+            if b_tag and field_name in b_tag.text:
+                # Extract the text after the <b> tag
+                full_text = p.get_text()
+                if ":" in full_text:
+                    return full_text.split(":", 1)[1].strip()
+        
+        # Fallback to original method
         field_p = container.find("p", string=re.compile(re.escape(field_name)))
         if field_p:
             field_text = field_p.text
             if ":" in field_text:
                 return field_text.split(":", 1)[1].strip()
         return None
+
+    def _find_field_paragraph(self, container: Tag, field_name: str) -> Optional[Tag]:
+        """Find the paragraph containing a specific field name."""
+        for p in container.find_all("p"):
+            b_tag = p.find("b")
+            if b_tag and field_name in b_tag.text:
+                return p
+        
+        # Fallback to string search
+        return container.find("p", string=re.compile(re.escape(field_name)))
 
     async def close(self) -> None:
         """Close the HTTP client."""
