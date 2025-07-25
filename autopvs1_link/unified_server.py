@@ -20,6 +20,7 @@ from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
     AutoPVS1Data,
     AutoPVS1SearchResults,
+    EnhancedSearchResults,
 )
 from autopvs1_link.services.service_manager import get_managed_service
 from autopvs1_link.utils.retry_handler import retry_handler
@@ -350,6 +351,70 @@ async def clear_all_caches() -> dict:
             "message": "All caches and statistics cleared",
             "timestamp": asyncio.get_event_loop().time(),
         }
+
+
+@mcp.tool()
+async def search_variants_intelligent(
+    query: str, genome_version: str = "hg19"
+) -> EnhancedSearchResults:
+    """Intelligent search that handles both HGVS notation and gene queries.
+    
+    This tool automatically detects the query type and returns appropriate results:
+    - HGVS notation (e.g., "NM_000128.3:c.1716+1G>A") -> Returns specific variant data
+    - Gene symbols (e.g., "BRCA1") -> Returns search results with multiple variants
+    
+    The response includes metadata about whether a redirect occurred, making it
+    transparent when AutoPVS1 resolved HGVS notation to a specific variant.
+
+    Args:
+        query: Search query (HGVS notation or gene symbol)
+        genome_version: Genome version to search (default: 'hg19')
+
+    Returns:
+        Enhanced search results with redirect detection and appropriate data
+    """
+    with stdio_protection(settings.mcp.enable_stdio_protection):
+        logger.info(
+            "MCP tool: search_variants_intelligent",
+            query=query,
+            genome_version=genome_version,
+        )
+        service = await get_managed_service()
+        return await service.search_with_redirect_detection(query, genome_version)
+
+
+@mcp.tool()
+async def resolve_hgvs_variant(hgvs: str, genome_version: str = "hg19") -> AutoPVS1Data:
+    """Resolve HGVS notation to comprehensive PVS1 variant analysis.
+    
+    This tool is specifically designed for HGVS notation resolution.
+    It converts various HGVS formats directly to PVS1 analysis data.
+    
+    **Supported HGVS Formats:**
+    - Transcript-level: "NM_000128.3:c.1716+1G>A"
+    - Coding sequence: "c.123A>T", "c.123delA"
+    - Protein-level: "p.Arg123Ter", "p.Val234Met"
+    - Genomic: "g.123A>T"
+    
+    **Example Usage:**
+    - resolve_hgvs_variant("NM_000128.3:c.1716+1G>A") -> F11 splice variant
+    - resolve_hgvs_variant("p.Arg123Ter") -> Nonsense variant analysis
+
+    Args:
+        hgvs: HGVS notation to resolve
+        genome_version: Genome version for resolution (default: 'hg19')
+
+    Returns:
+        Complete PVS1 analysis data for the resolved variant
+    """
+    with stdio_protection(settings.mcp.enable_stdio_protection):
+        logger.info(
+            "MCP tool: resolve_hgvs_variant",
+            hgvs=hgvs,
+            genome_version=genome_version,
+        )
+        service = await get_managed_service()
+        return await service.resolve_hgvs_notation(hgvs, genome_version)
 
 
 # Create MCP app for HTTP transport

@@ -96,3 +96,34 @@ class AutoPVS1CNVData(BaseModel):
     cnv_info: CNVInfo
     pvs1_flowchart: PVS1Flowchart
     disease_mechanisms: list[DiseaseMechanism] = Field(default_factory=list)
+
+
+class RedirectInfo(BaseModel):
+    """Information about search redirects."""
+    
+    original_url: str
+    final_url: str
+    redirect_detected: bool = True
+    variant_id_extracted: Optional[str] = None
+    genome_build_extracted: Optional[str] = None
+
+
+class EnhancedSearchResults(BaseModel):
+    """Enhanced search results with redirect detection."""
+    
+    query: str
+    genome_version: str
+    redirected: bool = False
+    variant_data: Optional[AutoPVS1Data] = None
+    search_results: Optional[AutoPVS1SearchResults] = None
+    redirect_info: Optional[RedirectInfo] = None
+    
+    @property
+    def is_single_variant(self) -> bool:
+        """Check if result contains a single variant (redirected)."""
+        return self.redirected and self.variant_data is not None
+    
+    @property
+    def is_multiple_results(self) -> bool:
+        """Check if result contains multiple search results."""
+        return not self.redirected and self.search_results is not None
