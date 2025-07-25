@@ -7,9 +7,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from autopvs1_link.api.autopvs1_client import AutoPVS1Client
-from autopvs1_link.models.autopvs1_models import (
-    AutoPVS1Data,
-)
+from autopvs1_link.models.autopvs1_models import AutoPVS1Data
 
 
 def load_fixture(name: str) -> str:
