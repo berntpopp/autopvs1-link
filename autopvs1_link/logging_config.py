@@ -12,8 +12,8 @@ from autopvs1_link.config import settings
 def add_service_context(logger, method_name, event_dict) -> dict:
     """Add service context to all log events."""
     event_dict["service"] = "autopvs1-link"
-    event_dict["version"] = "1.0.0"
-    event_dict["environment"] = settings.ENVIRONMENT
+    event_dict["version"] = settings.version
+    event_dict["environment"] = settings.environment
     return event_dict
 
 
@@ -32,7 +32,7 @@ def configure_logging() -> None:
         structlog.processors.UnicodeDecoder(),
     ]
 
-    if settings.LOG_JSON:
+    if settings.logging.json_format:
         try:
             import orjson
 
@@ -61,12 +61,15 @@ def configure_logging() -> None:
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=getattr(logging, settings.LOG_LEVEL.upper()),
+        level=getattr(logging, settings.logging.level.upper()),
     )
 
-    # Suppress noisy third-party loggers
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # Suppress noisy third-party loggers if configured
+    if settings.logging.suppress_third_party:
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+        logging.getLogger("fastapi").setLevel(logging.WARNING)
 
 
 def get_logger_for_module(module_name: str) -> structlog.stdlib.BoundLogger:

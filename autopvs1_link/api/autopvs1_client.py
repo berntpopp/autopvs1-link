@@ -1,4 +1,4 @@
-"""Client for scraping AutoPVS1 data."""
+"""Enhanced client for scraping AutoPVS1 data with retry logic and circuit breaker."""
 
 import re
 from typing import Optional
@@ -19,6 +19,7 @@ from autopvs1_link.models.autopvs1_models import (
     SearchResult,
     VariantInfo,
 )
+from autopvs1_link.utils.retry_handler import retry_handler
 
 logger = structlog.get_logger()
 
@@ -27,22 +28,36 @@ class AutoPVS1Client:
     """A client for scraping data from autopvs1.bgi.com."""
 
     def __init__(self) -> None:
-        self.base_url = settings.AUTOPVS1_BASE_URL
-        headers = {"User-Agent": settings.USER_AGENT}
+        self.base_url = settings.api.base_url
+        headers = {"User-Agent": settings.api.user_agent}
         self.client = httpx.AsyncClient(
-            timeout=settings.REQUEST_TIMEOUT, headers=headers, follow_redirects=True
+            timeout=settings.api.request_timeout,
+            headers=headers,
+            follow_redirects=True,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
         )
 
     async def get_variant_data(
         self, genome_build: str, variant_id: str
     ) -> AutoPVS1Data:
-        """Scrape PVS1 data for a specific variant."""
+        """Scrape PVS1 data for a specific variant with enhanced error handling."""
         url = f"{self.base_url}/variant/{genome_build}/{variant_id}"
-        logger.info("Fetching variant data", url=url)
+        logger.info("Fetching variant data", url=url, genome_build=genome_build, variant_id=variant_id)
 
-        response = await self.client.get(url)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "lxml")
+        try:
+            response = await retry_handler.http_request_with_retry(
+                self.client, "GET", url
+            )
+            soup = BeautifulSoup(response.text, "lxml")
+        except Exception as e:
+            logger.error(
+                "Failed to fetch variant data",
+                url=url,
+                genome_build=genome_build,
+                variant_id=variant_id,
+                error=str(e)
+            )
+            raise
 
         variant_info = self._parse_variant_info(soup, variant_id)
         pvs1_flowchart = self._parse_pvs1_flowchart(soup)
@@ -58,14 +73,25 @@ class AutoPVS1Client:
     async def search_variants(
         self, query: str, genome_version: str = "hg19"
     ) -> AutoPVS1SearchResults:
-        """Search for variants by gene or other criteria."""
+        """Search for variants by gene or other criteria with enhanced error handling."""
         url = f"{self.base_url}/search"
         params = {"q": query, "genome_version": genome_version}
-        logger.info("Searching variants", query=query, genome_version=genome_version)
+        logger.info("Searching variants", query=query, genome_version=genome_version, url=url)
 
-        response = await self.client.get(url, params=params)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "lxml")
+        try:
+            response = await retry_handler.http_request_with_retry(
+                self.client, "GET", url, params=params
+            )
+            soup = BeautifulSoup(response.text, "lxml")
+        except Exception as e:
+            logger.error(
+                "Failed to search variants",
+                url=url,
+                query=query,
+                genome_version=genome_version,
+                error=str(e)
+            )
+            raise
 
         results = self._parse_search_results(soup, genome_version)
 
@@ -74,13 +100,24 @@ class AutoPVS1Client:
         )
 
     async def get_cnv_data(self, genome_build: str, cnv_id: str) -> AutoPVS1CNVData:
-        """Scrape PVS1 data for a CNV."""
+        """Scrape PVS1 data for a CNV with enhanced error handling."""
         url = f"{self.base_url}/cnv/{genome_build}/{cnv_id}"
-        logger.info("Fetching CNV data", url=url)
+        logger.info("Fetching CNV data", url=url, genome_build=genome_build, cnv_id=cnv_id)
 
-        response = await self.client.get(url)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "lxml")
+        try:
+            response = await retry_handler.http_request_with_retry(
+                self.client, "GET", url
+            )
+            soup = BeautifulSoup(response.text, "lxml")
+        except Exception as e:
+            logger.error(
+                "Failed to fetch CNV data",
+                url=url,
+                genome_build=genome_build,
+                cnv_id=cnv_id,
+                error=str(e)
+            )
+            raise
 
         cnv_info = self._parse_cnv_info(soup, cnv_id)
         pvs1_flowchart = self._parse_pvs1_flowchart(soup)

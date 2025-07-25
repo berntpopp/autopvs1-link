@@ -33,6 +33,9 @@ dependencies = [
     "lxml>=5.1.0",
     "structlog>=24.1.0",
     "orjson>=3.9.0",
+    "rich>=13.7.0",
+    "click>=8.1.0",
+    "tenacity>=8.2.0",
 ]
 
 [project.optional-dependencies]
@@ -48,8 +51,7 @@ dev = [
 ]
 
 [project.scripts]
-autopvs1-link-server = "server:main"
-autopvs1-link-mcp = "mcp_server:main"
+autopvs1-link = "autopvs1_link.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/your-username/autopvs1-link"
