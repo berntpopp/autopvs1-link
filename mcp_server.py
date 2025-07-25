@@ -1,34 +1,35 @@
 #!/usr/bin/env python
-"""Legacy MCP server entry point - redirects to unified server.
-
-NOTE: This file is maintained for backward compatibility.
-For the enhanced unified server with MCP support, use:
-    autopvs1-link mcp
-    or
-    python -m autopvs1_link.unified_server:run_mcp_stdio()
-"""
+"""MCP server entry point for AutoPVS1-Link."""
 
 import asyncio
-import warnings
+import os
+import sys
 
-# Issue deprecation warning
-warnings.warn(
-    "mcp_server.py is deprecated. Use 'autopvs1-link mcp' for enhanced features.",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from autopvs1_link.logging_config import configure_logging
 
 
-async def main():
-    """Legacy main function - redirects to unified MCP server."""
-    print("⚠️  Redirecting to unified MCP server...")
-    print("💡 For future use, run: autopvs1-link mcp")
-    print("")
+def main() -> None:
+    """Start MCP server."""
+    # Set transport mode and disable FastMCP banner/colors
+    os.environ["TRANSPORT"] = "stdio"
+    os.environ["FASTMCP_DISABLE_BANNER"] = "1"
+    os.environ["FASTMCP_LOG_LEVEL"] = "WARNING"
+    os.environ["NO_COLOR"] = "1"  # Disable ANSI colors
 
-    from autopvs1_link.unified_server import run_mcp_stdio
+    # Configure logging (will automatically use stderr for stdio mode)
+    configure_logging()
 
-    await run_mcp_stdio()
+    try:
+        from autopvs1_link.unified_server import run_mcp_stdio
+
+        asyncio.run(run_mcp_stdio())
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception as e:
+        # Log errors to stderr (won't interfere with STDIO protocol)
+        print(f"MCP server error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
