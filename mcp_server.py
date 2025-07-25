@@ -5,19 +5,30 @@ import asyncio
 import os
 import sys
 
-from autopvs1_link.logging_config import configure_logging
-
 
 def main() -> None:
     """Start MCP server."""
     # Set transport mode and disable FastMCP banner/colors
     os.environ["TRANSPORT"] = "stdio"
     os.environ["FASTMCP_DISABLE_BANNER"] = "1"
-    os.environ["FASTMCP_LOG_LEVEL"] = "WARNING"
+    os.environ["FASTMCP_LOG_LEVEL"] = "ERROR"  # Only errors
     os.environ["NO_COLOR"] = "1"  # Disable ANSI colors
 
-    # Configure logging (will automatically use stderr for stdio mode)
-    configure_logging()
+    # Configure minimal logging to stderr only for MCP mode
+    import logging
+
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stderr,  # Use stderr instead of stdout
+        level=logging.ERROR,  # Only log errors
+    )
+
+    # Suppress all third-party loggers
+    logging.getLogger("httpx").setLevel(logging.CRITICAL)
+    logging.getLogger("httpcore").setLevel(logging.CRITICAL)
+    logging.getLogger("uvicorn").setLevel(logging.CRITICAL)
+    logging.getLogger("fastapi").setLevel(logging.CRITICAL)
+    logging.getLogger("fastmcp").setLevel(logging.CRITICAL)
 
     try:
         from autopvs1_link.unified_server import run_mcp_stdio

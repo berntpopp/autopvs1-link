@@ -377,22 +377,22 @@ mcp_app = mcp
 # STDIO MCP runner with enhanced protection
 async def run_mcp_stdio():
     """Run MCP server with STDIO transport and comprehensive protection."""
-    with stdio_protection(settings.mcp.enable_stdio_protection):
-        # Initialize server manager
-        await server_manager.initialize()
+    # Don't use stdio_protection here as it might interfere with MCP communication
+    # Initialize server manager
+    await server_manager.initialize()
 
-        try:
-            logger.info("Starting MCP server with STDIO transport")
-            # Run MCP with STDIO
-            await mcp.run_stdio()
-        except KeyboardInterrupt:
-            logger.info("MCP server interrupted by user")
-        except Exception as e:
-            logger.error("MCP server error", error=str(e))
-            raise
-        finally:
-            # Ensure cleanup
-            await server_manager.shutdown()
+    try:
+        # Run MCP with STDIO - no logging to avoid interfering with JSON-RPC
+        await mcp.run_stdio_async()
+    except KeyboardInterrupt:
+        pass  # Silent exit on interrupt
+    except Exception as e:
+        # Only log to stderr
+        print(f"MCP server error: {e}", file=sys.stderr)
+        raise
+    finally:
+        # Ensure cleanup
+        await server_manager.shutdown()
 
 
 def main():
