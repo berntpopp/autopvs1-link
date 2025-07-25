@@ -1,7 +1,6 @@
 """Advanced configuration management for AutoPVS1 Link."""
 
-import os
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
@@ -13,36 +12,27 @@ class APIConfig(BaseSettings):
     model_config = {"env_prefix": "AUTOPVS1_API_", "env_file": ".env"}
 
     base_url: str = Field(
-        default="https://autopvs1.bgi.com",
-        description="Base URL for AutoPVS1 service"
+        default="https://autopvs1.bgi.com", description="Base URL for AutoPVS1 service"
     )
     request_timeout: int = Field(
-        default=30,
-        ge=1,
-        le=300,
-        description="HTTP request timeout in seconds"
+        default=30, ge=1, le=300, description="HTTP request timeout in seconds"
     )
     max_retries: int = Field(
-        default=3,
-        ge=0,
-        le=10,
-        description="Maximum number of HTTP retries"
+        default=3, ge=0, le=10, description="Maximum number of HTTP retries"
     )
     retry_delay: float = Field(
-        default=1.0,
-        ge=0.1,
-        le=60.0,
-        description="Delay between retries in seconds"
+        default=1.0, ge=0.1, le=60.0, description="Delay between retries in seconds"
     )
     rate_limit_delay: float = Field(
         default=1.0,
         ge=0.1,
         le=10.0,
-        description="Delay between requests for rate limiting"
+        description="Delay between requests for rate limiting",
     )
     user_agent: str = Field(
-        default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        description="User agent string for HTTP requests"
+        default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        description="User agent string for HTTP requests",
     )
 
 
@@ -51,29 +41,18 @@ class CacheConfig(BaseSettings):
 
     model_config = {"env_prefix": "AUTOPVS1_CACHE_", "env_file": ".env"}
 
-    enabled: bool = Field(
-        default=True,
-        description="Enable/disable caching"
-    )
+    enabled: bool = Field(default=True, description="Enable/disable caching")
     size: int = Field(
-        default=256,
-        ge=1,
-        le=10000,
-        description="Maximum number of cache entries"
+        default=256, ge=1, le=10000, description="Maximum number of cache entries"
     )
     ttl_hours: int = Field(
-        default=24,
-        ge=1,
-        le=168,  # 1 week max
-        description="Cache TTL in hours"
+        default=24, ge=1, le=168, description="Cache TTL in hours"  # 1 week max
     )
     statistics_enabled: bool = Field(
-        default=True,
-        description="Enable cache statistics collection"
+        default=True, description="Enable cache statistics collection"
     )
     event_logging: bool = Field(
-        default=False,
-        description="Enable detailed cache event logging"
+        default=False, description="Enable detailed cache event logging"
     )
 
     @property
@@ -87,29 +66,14 @@ class ServerConfig(BaseSettings):
 
     model_config = {"env_prefix": "AUTOPVS1_SERVER_", "env_file": ".env"}
 
-    host: str = Field(
-        default="0.0.0.0",
-        description="Server host address"
-    )
-    port: int = Field(
-        default=8000,
-        ge=1,
-        le=65535,
-        description="Server port"
-    )
-    reload: bool = Field(
-        default=False,
-        description="Enable auto-reload in development"
-    )
+    host: str = Field(default="0.0.0.0", description="Server host address")
+    port: int = Field(default=8000, ge=1, le=65535, description="Server port")
+    reload: bool = Field(default=False, description="Enable auto-reload in development")
     cors_origins: str = Field(
-        default="*",
-        description="CORS allowed origins (comma-separated)"
+        default="*", description="CORS allowed origins (comma-separated)"
     )
     workers: int = Field(
-        default=1,
-        ge=1,
-        le=32,
-        description="Number of worker processes"
+        default=1, ge=1, le=32, description="Number of worker processes"
     )
 
     @field_validator("cors_origins")
@@ -120,7 +84,11 @@ class ServerConfig(BaseSettings):
             origins = [origin.strip() for origin in v.split(",")]
             # Basic URL validation
             for origin in origins:
-                if not (origin.startswith("http://") or origin.startswith("https://") or origin == "localhost"):
+                if not (
+                    origin.startswith("http://")
+                    or origin.startswith("https://")
+                    or origin == "localhost"
+                ):
                     raise ValueError(f"Invalid CORS origin: {origin}")
         return v
 
@@ -131,28 +99,20 @@ class LoggingConfig(BaseSettings):
     model_config = {"env_prefix": "AUTOPVS1_LOG_", "env_file": ".env"}
 
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
-        default="INFO",
-        description="Logging level"
+        default="INFO", description="Logging level"
     )
-    json_format: bool = Field(
-        default=False,
-        description="Use JSON logging format"
-    )
+    json_format: bool = Field(default=False, description="Use JSON logging format")
     structured: bool = Field(
-        default=True,
-        description="Use structured logging with context"
+        default=True, description="Use structured logging with context"
     )
     correlation_ids: bool = Field(
-        default=True,
-        description="Include correlation IDs in logs"
+        default=True, description="Include correlation IDs in logs"
     )
     performance_logging: bool = Field(
-        default=True,
-        description="Enable performance logging"
+        default=True, description="Enable performance logging"
     )
     suppress_third_party: bool = Field(
-        default=True,
-        description="Suppress noisy third-party loggers"
+        default=True, description="Suppress noisy third-party loggers"
     )
 
 
@@ -161,31 +121,24 @@ class MCPConfig(BaseSettings):
 
     model_config = {"env_prefix": "AUTOPVS1_MCP_", "env_file": ".env"}
 
-    name: str = Field(
-        default="AutoPVS1 Link",
-        description="MCP server name"
-    )
-    version: str = Field(
-        default="1.0.0",
-        description="MCP server version"
-    )
+    name: str = Field(default="AutoPVS1 Link", description="MCP server name")
+    version: str = Field(default="1.0.0", description="MCP server version")
     description: str = Field(
         default="AutoPVS1 genetic variant analysis tools",
-        description="MCP server description"
+        description="MCP server description",
     )
     stdio_buffer_size: int = Field(
         default=8192,
         ge=1024,
         le=65536,
-        description="STDIO buffer size for MCP communication"
+        description="STDIO buffer size for MCP communication",
     )
     enable_stdio_protection: bool = Field(
         default=True,
-        description="Enable STDIO protection for reliable MCP communication"
+        description="Enable STDIO protection for reliable MCP communication",
     )
     custom_tool_names: bool = Field(
-        default=True,
-        description="Use custom tool names for better LLM experience"
+        default=True, description="Use custom tool names for better LLM experience"
     )
 
 
@@ -196,17 +149,10 @@ class Settings(BaseSettings):
 
     # Environment and deployment
     environment: Literal["development", "staging", "production"] = Field(
-        default="development",
-        description="Deployment environment"
+        default="development", description="Deployment environment"
     )
-    debug: bool = Field(
-        default=True,
-        description="Enable debug mode"
-    )
-    version: str = Field(
-        default="1.0.0",
-        description="Application version"
-    )
+    debug: bool = Field(default=True, description="Enable debug mode")
+    version: str = Field(default="1.0.0", description="Application version")
 
     # Configuration sections
     api: APIConfig = Field(default_factory=APIConfig)
@@ -234,7 +180,7 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         """Initialize settings with environment-specific defaults."""
         super().__init__(**kwargs)
-        
+
         # Override settings based on environment
         if self.is_production:
             self.debug = False

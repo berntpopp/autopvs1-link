@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 import structlog
 from async_lru import alru_cache
@@ -17,7 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class CacheStatistics:
     """Detailed cache statistics for a specific cache method."""
-    
+
     hits: int = 0
     misses: int = 0
     evictions: int = 0
@@ -26,27 +26,27 @@ class CacheStatistics:
     last_hit: Optional[float] = None
     last_miss: Optional[float] = None
     created_at: float = field(default_factory=time.time)
-    
+
     @property
     def total_requests(self) -> int:
         """Total number of cache requests."""
         return self.hits + self.misses
-    
+
     @property
     def hit_rate(self) -> float:
         """Cache hit rate as a percentage (0.0 to 1.0)."""
         if self.total_requests == 0:
             return 0.0
         return self.hits / self.total_requests
-    
+
     @property
     def average_time(self) -> float:
         """Average time per request in seconds."""
         if self.total_requests == 0:
             return 0.0
         return self.total_time / self.total_requests
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "hits": self.hits,
@@ -64,26 +64,23 @@ class CacheStatistics:
 
 class AdvancedCacheManager:
     """Advanced cache manager with detailed statistics and event logging."""
-    
-    def __init__(self):
-        self._statistics: Dict[str, CacheStatistics] = defaultdict(CacheStatistics)
+
+    def __init__(self) -> None:
+        self._statistics: dict[str, CacheStatistics] = defaultdict(CacheStatistics)
         self._enabled = settings.cache.enabled
         self._event_logging = settings.cache.event_logging
         self._statistics_enabled = settings.cache.statistics_enabled
-    
-    def get_statistics(self, method_name: Optional[str] = None) -> Dict[str, Any]:
+
+    def get_statistics(self, method_name: Optional[str] = None) -> dict[str, Any]:
         """Get cache statistics for a specific method or all methods."""
         if method_name:
             stats = self._statistics.get(method_name)
             if stats:
                 return {method_name: stats.to_dict()}
             return {method_name: {"error": "Method not found"}}
-        
-        return {
-            method: stats.to_dict() 
-            for method, stats in self._statistics.items()
-        }
-    
+
+        return {method: stats.to_dict() for method, stats in self._statistics.items()}
+
     def clear_statistics(self, method_name: Optional[str] = None) -> None:
         """Clear statistics for a specific method or all methods."""
         if method_name:
@@ -95,135 +92,130 @@ class AdvancedCacheManager:
             self._statistics.clear()
             if self._event_logging:
                 logger.info("All cache statistics cleared")
-    
+
     def _record_hit(self, method_name: str, key: str, execution_time: float) -> None:
         """Record a cache hit."""
         if not self._statistics_enabled:
             return
-            
+
         stats = self._statistics[method_name]
         stats.hits += 1
         stats.total_time += execution_time
         stats.last_hit = time.time()
-        
+
         if self._event_logging:
             logger.debug(
                 "Cache hit",
                 method=method_name,
                 key=key,
                 execution_time_ms=round(execution_time * 1000, 2),
-                hit_rate=round(stats.hit_rate, 4)
+                hit_rate=round(stats.hit_rate, 4),
             )
-    
+
     def _record_miss(self, method_name: str, key: str, execution_time: float) -> None:
         """Record a cache miss."""
         if not self._statistics_enabled:
             return
-            
+
         stats = self._statistics[method_name]
         stats.misses += 1
         stats.total_time += execution_time
         stats.last_miss = time.time()
-        
+
         if self._event_logging:
             logger.debug(
                 "Cache miss",
                 method=method_name,
                 key=key,
                 execution_time_ms=round(execution_time * 1000, 2),
-                hit_rate=round(stats.hit_rate, 4)
+                hit_rate=round(stats.hit_rate, 4),
             )
-    
+
     def _record_error(self, method_name: str, key: str, error: str) -> None:
         """Record a cache error."""
         if not self._statistics_enabled:
             return
-            
+
         stats = self._statistics[method_name]
         stats.errors += 1
-        
+
         if self._event_logging:
-            logger.error(
-                "Cache error",
-                method=method_name,
-                key=key,
-                error=error
-            )
-    
+            logger.error("Cache error", method=method_name, key=key, error=error)
+
     def _record_eviction(self, method_name: str) -> None:
         """Record a cache eviction."""
         if not self._statistics_enabled:
             return
-            
+
         stats = self._statistics[method_name]
         stats.evictions += 1
-        
+
         if self._event_logging:
             logger.debug("Cache eviction", method=method_name)
-    
+
     def enhanced_cache(
         self,
         maxsize: int = 128,
         ttl: Optional[int] = None,
-        key_func: Optional[Callable] = None
-    ):
+        key_func: Optional[Callable] = None,
+    ) -> Callable:
         """Enhanced cache decorator with detailed statistics and event logging."""
         if ttl is None:
             ttl = settings.cache.ttl_seconds
-        
+
         def decorator(func: Callable) -> Callable:
             # Create the base cache
             cached_func = alru_cache(maxsize=maxsize, ttl=ttl)(func)
             method_name = func.__name__
-            
+
             @wraps(func)
-            async def wrapper(*args, **kwargs):
+            async def wrapper(*args, **kwargs) -> Any:
                 if not self._enabled:
                     # Cache disabled, call function directly
                     return await func(*args, **kwargs)
-                
+
                 # Generate cache key
                 if key_func:
                     cache_key = key_func(*args, **kwargs)
                 else:
                     cache_key = f"{method_name}:{hash((args, tuple(kwargs.items())))}"
-                
+
                 start_time = time.time()
-                
+
                 try:
                     # Check if result is in cache
                     cache_info_before = cached_func.cache_info()
                     result = await cached_func(*args, **kwargs)
                     cache_info_after = cached_func.cache_info()
-                    
+
                     execution_time = time.time() - start_time
-                    
+
                     # Determine if this was a hit or miss
                     if cache_info_after.hits > cache_info_before.hits:
                         self._record_hit(method_name, cache_key, execution_time)
                     else:
                         self._record_miss(method_name, cache_key, execution_time)
-                    
+
                     # Check for evictions
                     if cache_info_after.misses > cache_info_before.misses + 1:
                         self._record_eviction(method_name)
-                    
+
                     return result
-                    
+
                 except Exception as e:
                     execution_time = time.time() - start_time
                     self._record_error(method_name, cache_key, str(e))
                     raise
-            
+
             # Add cache management methods to the wrapper
             wrapper.cache_info = cached_func.cache_info
             wrapper.cache_clear = cached_func.cache_clear
             wrapper.cache_parameters = cached_func.cache_parameters
             wrapper._cache_manager = self
             wrapper._method_name = method_name
-            
+
             return wrapper
-        
+
         return decorator
 
 
@@ -231,7 +223,7 @@ class AdvancedCacheManager:
 cache_manager = AdvancedCacheManager()
 
 
-def cache_key_generator(*args, **kwargs) -> str:
+def cache_key_generator(*args: Any, **kwargs: Any) -> str:
     """Generate a cache key from function arguments."""
     # Convert args and kwargs to a hashable representation
     args_str = "_".join(str(arg) for arg in args)
@@ -240,24 +232,16 @@ def cache_key_generator(*args, **kwargs) -> str:
 
 
 async def log_cache_event(
-    event_type: str,
-    method: str,
-    key: str,
-    **context
+    event_type: str, method: str, key: str, **context: Any
 ) -> None:
     """Log cache events with consistent formatting."""
     if not settings.cache.event_logging:
         return
-    
-    log_context = {
-        "cache_event": event_type,
-        "method": method,
-        "key": key,
-        **context
-    }
-    
+
+    log_context = {"cache_event": event_type, "method": method, "key": key, **context}
+
     bound_logger = logger.bind(**log_context)
-    
+
     if event_type == "hit":
         bound_logger.debug("Cache hit")
     elif event_type == "miss":

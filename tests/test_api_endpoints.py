@@ -4,7 +4,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import httpx
 from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1Data,
@@ -12,7 +14,7 @@ from autopvs1_link.models.autopvs1_models import (
     PVS1Flowchart,
     VariantInfo,
 )
-from server import app
+from autopvs1_link.unified_server import app
 
 
 def load_fixture(name: str) -> str:
@@ -21,6 +23,12 @@ def load_fixture(name: str) -> str:
     if not fixture_path.exists():
         pytest.skip(f"Fixture {name} not found")
     return fixture_path.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def test_client():
+    """Create test client."""
+    return TestClient(app)
 
 
 @pytest.fixture
@@ -71,15 +79,14 @@ def sample_variant_data():
 class TestVariantEndpoints:
     """Test variant-related endpoints."""
 
-    async def test_root_endpoint(self):
+    def test_root_endpoint(self, test_client):
         """Test the root endpoint."""
-        async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get("/")
-            assert response.status_code == 200
-            data = response.json()
-            assert data["message"] == "Welcome to the AutoPVS1 Link Server!"
-            assert "docs" in data
-            assert "version" in data
+        response = test_client.get("/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["message"] == "Welcome to the AutoPVS1 Link Server!"
+        assert "docs" in data
+        assert "version" in data
 
     async def test_health_endpoint(self):
         """Test the health check endpoint."""
@@ -110,8 +117,6 @@ class TestVariantEndpoints:
     @patch("autopvs1_link.api.autopvs1_client.AutoPVS1Client.get_variant_data")
     async def test_get_variant_not_found(self, mock_get_variant):
         """Test variant not found error."""
-        import httpx
-
         # Create a mock response for 404
         mock_response = AsyncMock()
         mock_response.status_code = 404

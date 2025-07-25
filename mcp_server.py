@@ -15,7 +15,7 @@ import warnings
 warnings.warn(
     "mcp_server.py is deprecated. Use 'autopvs1-link mcp' for enhanced features.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 
@@ -24,8 +24,9 @@ async def main():
     print("⚠️  Redirecting to unified MCP server...")
     print("💡 For future use, run: autopvs1-link mcp")
     print("")
-    
+
     from autopvs1_link.unified_server import run_mcp_stdio
+
     await run_mcp_stdio()
 
 

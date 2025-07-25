@@ -34,7 +34,7 @@ class AutoPVS1Client:
             timeout=settings.api.request_timeout,
             headers=headers,
             follow_redirects=True,
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
 
     async def get_variant_data(
@@ -42,7 +42,12 @@ class AutoPVS1Client:
     ) -> AutoPVS1Data:
         """Scrape PVS1 data for a specific variant with enhanced error handling."""
         url = f"{self.base_url}/variant/{genome_build}/{variant_id}"
-        logger.info("Fetching variant data", url=url, genome_build=genome_build, variant_id=variant_id)
+        logger.info(
+            "Fetching variant data",
+            url=url,
+            genome_build=genome_build,
+            variant_id=variant_id,
+        )
 
         try:
             response = await retry_handler.http_request_with_retry(
@@ -55,13 +60,40 @@ class AutoPVS1Client:
                 url=url,
                 genome_build=genome_build,
                 variant_id=variant_id,
-                error=str(e)
+                error=str(e),
             )
             raise
 
         variant_info = self._parse_variant_info(soup, variant_id)
-        pvs1_flowchart = self._parse_pvs1_flowchart(soup)
-        disease_mechanisms = self._parse_disease_mechanisms(soup)
+
+        # Check if this variant is compatible with PVS1
+        incompatible_text = soup.find(
+            "p", string=re.compile(r"incompatible with.*PVS1")
+        )
+        if incompatible_text:
+            # Create a simple "not applicable" flowchart
+            pvs1_flowchart = PVS1Flowchart(
+                preliminary_decision_path="not_applicable",
+                final_strength="PVS1_Not_Applicable",
+                decision_tree=[],
+                notes={
+                    "note_1": "This variant type is incompatible with PVS1 criterion"
+                },
+            )
+            disease_mechanisms = []
+        else:
+            try:
+                pvs1_flowchart = self._parse_pvs1_flowchart(soup)
+                disease_mechanisms = self._parse_disease_mechanisms(soup)
+            except ValueError:
+                # Fallback if flowchart parsing fails
+                pvs1_flowchart = PVS1Flowchart(
+                    preliminary_decision_path="unknown",
+                    final_strength="PVS1_Not_Determined",
+                    decision_tree=[],
+                    notes={"note_1": "Could not parse PVS1 flowchart"},
+                )
+                disease_mechanisms = []
 
         return AutoPVS1Data(
             genome_build=genome_build,
@@ -76,7 +108,9 @@ class AutoPVS1Client:
         """Search for variants by gene or other criteria with enhanced error handling."""
         url = f"{self.base_url}/search"
         params = {"q": query, "genome_version": genome_version}
-        logger.info("Searching variants", query=query, genome_version=genome_version, url=url)
+        logger.info(
+            "Searching variants", query=query, genome_version=genome_version, url=url
+        )
 
         try:
             response = await retry_handler.http_request_with_retry(
@@ -89,7 +123,7 @@ class AutoPVS1Client:
                 url=url,
                 query=query,
                 genome_version=genome_version,
-                error=str(e)
+                error=str(e),
             )
             raise
 
@@ -102,7 +136,9 @@ class AutoPVS1Client:
     async def get_cnv_data(self, genome_build: str, cnv_id: str) -> AutoPVS1CNVData:
         """Scrape PVS1 data for a CNV with enhanced error handling."""
         url = f"{self.base_url}/cnv/{genome_build}/{cnv_id}"
-        logger.info("Fetching CNV data", url=url, genome_build=genome_build, cnv_id=cnv_id)
+        logger.info(
+            "Fetching CNV data", url=url, genome_build=genome_build, cnv_id=cnv_id
+        )
 
         try:
             response = await retry_handler.http_request_with_retry(
@@ -115,7 +151,7 @@ class AutoPVS1Client:
                 url=url,
                 genome_build=genome_build,
                 cnv_id=cnv_id,
-                error=str(e)
+                error=str(e),
             )
             raise
 
@@ -132,21 +168,45 @@ class AutoPVS1Client:
 
     def _parse_variant_info(self, soup: BeautifulSoup, variant_id: str) -> VariantInfo:
         """Parse variant information from the HTML."""
+        # Try different column layouts
         info_col = soup.select_one(".container .row .col-lg-6")
+        if not info_col:
+            info_col = soup.select_one(".container .row .col-lg-12")
         if not info_col:
             raise ValueError("Could not find variant info section")
 
         # Extract variant type and name from h3
-        h3_text = info_col.find("h3").text.strip()
-        variant_type, variant_name = h3_text.split(": ", 1)
+        h3_element = info_col.find("h3")
+        if not h3_element:
+            raise ValueError("Could not find variant title")
+        h3_text = h3_element.get_text().strip()
+        # Remove the icon text and extract variant info
+        h3_text = h3_text.replace("🆔", "").strip()
+        if ": " in h3_text:
+            variant_type, variant_name = h3_text.split(": ", 1)
+        else:
+            # Fallback if format is different
+            variant_type = "Unknown"
+            variant_name = variant_id
 
         # Extract gene information
         gene_p = info_col.find("p", string=re.compile(r"Gene:"))
-        gene_link = gene_p.find("a") if gene_p else None
-        gene_symbol = (
-            gene_link.find("i").text if gene_link and gene_link.find("i") else ""
-        )
-        gene_url = gene_link.get("href") if gene_link else None
+        if not gene_p:
+            # Find p element containing Gene:
+            for p in info_col.find_all("p"):
+                if p.get_text().strip().startswith("Gene:"):
+                    gene_p = p
+                    break
+
+        if gene_p:
+            gene_i = gene_p.find("i")
+            gene_symbol = gene_i.text.strip() if gene_i else ""
+            # Try to find a link for the gene
+            gene_link = gene_p.find("a")
+            gene_url = gene_link.get("href") if gene_link else None
+        else:
+            gene_symbol = ""
+            gene_url = None
 
         # Extract other fields
         pli_text = self._extract_field_value(info_col, "pLI:")

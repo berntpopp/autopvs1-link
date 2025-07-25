@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "autopvs1-link": {
+      "command": "autopvs1-link",
+      "args": ["mcp"],
+      "env": {
+        "AUTOPVS1_CACHE_SIZE": "512",
+        "AUTOPVS1_LOG_LEVEL": "INFO",
+        "AUTOPVS1_CACHE_TTL_HOURS": "24",
+        "AUTOPVS1_API_REQUEST_TIMEOUT": "30",
+        "AUTOPVS1_MCP_ENABLE_STDIO_PROTECTION": "true"
+      }
+    }
+  }
+}

@@ -16,7 +16,7 @@ from autopvs1_link.unified_server import main as unified_main
 warnings.warn(
     "server.py is deprecated. Use 'autopvs1-link server' or autopvs1_link.unified_server for enhanced features.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 

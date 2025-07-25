@@ -50,6 +50,30 @@ cd autopvs1-link
 pip install -e ".[dev]"
 ```
 
+### 🎯 Quick Start for Claude Users
+
+**1. Install:**
+```bash
+pip install -e ".[dev]"
+```
+
+**2. Add to Claude Desktop config:**
+```json
+{
+  "mcpServers": {
+    "autopvs1-link": {
+      "command": "autopvs1-link",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**3. Ask Claude:**
+*"Analyze the PVS1 criteria for variant X:g.83508928A>T in hg19"*
+
+See [Claude Integration Guide](./CLAUDE_INTEGRATION.md) for complete setup instructions.
+
 ### Basic Usage
 
 #### CLI Interface (Recommended)
@@ -295,9 +319,9 @@ Shows:
 
 ## 🔌 MCP Integration
 
-### Claude Desktop
+### Claude Desktop Setup
 
-Add to your Claude Desktop configuration:
+**Quick Start:** Add to your Claude Desktop configuration:
 
 ```json
 {
@@ -314,16 +338,76 @@ Add to your Claude Desktop configuration:
 }
 ```
 
+**Configuration File Locations:**
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux:** `~/.config/claude/claude_desktop_config.json`
+
+### Example Claude Conversations
+
+Once configured, you can have natural conversations with Claude about genetic variants:
+
+#### **Variant Analysis**
+**You:** *"Analyze the PVS1 criteria for variant X:g.83508928A>T in the MYH9 gene using hg19 coordinates."*
+
+**Claude:** *I'll analyze that MYH9 variant for PVS1 criteria using the AutoPVS1 database.*
+
+*[Claude calls `get_variant_analysis(genome_build="hg19", variant_id="X-83508928-A-T")`]*
+
+**Result:** Comprehensive PVS1 analysis including flowchart decisions, pathogenicity assessment, and clinical interpretation.
+
+#### **Gene-Based Search**
+**You:** *"What PVS1-relevant variants are available for the BRCA1 gene?"*
+
+**Claude:** *I'll search for BRCA1 variants in the AutoPVS1 database.*
+
+*[Claude calls `search_genetic_variants(query="BRCA1", genome_version="hg19")`]*
+
+**Result:** List of variants with PVS1 analysis, including nonsense, frameshift, and splice variants.
+
+#### **CNV Analysis**
+**You:** *"Analyze this deletion for haploinsufficiency: chr11:2797090-2869333 in hg19."*
+
+**Claude:** *I'll analyze that deletion for PVS1 criteria and haploinsufficiency evidence.*
+
+*[Claude calls `get_cnv_analysis(genome_build="hg19", cnv_id="11-2797090-2869333-DEL")`]*
+
+**Result:** CNV analysis with gene dosage sensitivity, haploinsufficiency scores, and clinical significance.
+
+#### **Cache Management**
+**You:** *"Show me the current cache performance statistics."*
+
+**Claude:** *I'll check the AutoPVS1 service cache statistics.*
+
+*[Claude calls `get_cache_statistics()`]*
+
+**Result:** Detailed cache metrics including hit rates, performance timings, and memory usage.
+
+### Advanced Configuration
+
+For production or development use, see [CLAUDE_INTEGRATION.md](./CLAUDE_INTEGRATION.md) for:
+- Environment-specific configurations
+- Debugging and troubleshooting
+- Performance optimization
+- Complete usage examples
+
 ### Other MCP Clients
 
-For STDIO transport:
+For non-Claude MCP clients:
+
+**STDIO transport:**
 ```bash
 autopvs1-link mcp
 ```
 
-For HTTP transport:
+**HTTP transport:**
 ```bash
 autopvs1-link mcp --http --port 3000
+```
+
+**Direct Python:**
+```bash
+python -m autopvs1_link.unified_server:run_mcp_stdio
 ```
 
 ## 🤝 Contributing
@@ -350,8 +434,27 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - 📖 [Documentation](./CLAUDE.md)
+- 🔌 [Claude Integration Guide](./CLAUDE_INTEGRATION.md)
+- 🔧 [Claude Desktop Configuration](./claude-desktop-config.json)
 - 🐛 [Issue Tracker](https://github.com/your-username/autopvs1-link/issues)
 - 💬 [Discussions](https://github.com/your-username/autopvs1-link/discussions)
+
+### Quick Help
+
+**Installation Issues:**
+```bash
+# Verify installation
+autopvs1-link --version
+
+# Test basic functionality
+autopvs1-link health
+```
+
+**Claude Integration Issues:**
+- Check configuration file location and syntax
+- Enable debug logging: `"AUTOPVS1_LOG_LEVEL": "DEBUG"`
+- Test standalone: `autopvs1-link mcp` in terminal
+- See [troubleshooting guide](./CLAUDE_INTEGRATION.md#troubleshooting)
 
 ---
 
