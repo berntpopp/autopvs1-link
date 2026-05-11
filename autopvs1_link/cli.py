@@ -1,9 +1,14 @@
-"""Rich CLI interface for AutoPVS1 Link with enhanced developer experience."""
+"""Typer CLI for AutoPVS1-Link."""
+
+from __future__ import annotations
 
 import asyncio
+import json
 import sys
+from typing import Annotated
 
-import click
+import httpx
+import typer
 import uvicorn
 from rich.console import Console
 from rich.panel import Panel
@@ -13,6 +18,12 @@ from rich.text import Text
 from autopvs1_link.config import settings
 from autopvs1_link.logging_config import configure_logging
 
+app = typer.Typer(
+    name="autopvs1-link",
+    help="AutoPVS1 Link - Genetic variant analysis tool with MCP and REST API support.",
+    no_args_is_help=True,
+    add_completion=False,
+)
 console = Console()
 
 
@@ -25,11 +36,24 @@ def print_banner() -> None:
 
     banner = Panel(
         banner_text,
-        title="🧬 Genetic Variant Analysis Tool",
+        title="Genetic Variant Analysis Tool",
         subtitle=f"v{settings.version}",
         border_style="blue",
     )
     console.print(banner)
+
+
+def _settings_dict() -> dict[str, object]:
+    return {
+        "environment": settings.environment,
+        "debug": settings.debug,
+        "version": settings.version,
+        "api": settings.api.model_dump(),
+        "cache": settings.cache.model_dump(),
+        "server": settings.server.model_dump(),
+        "logging": settings.logging.model_dump(),
+        "mcp": settings.mcp.model_dump(),
+    }
 
 
 def print_config_table() -> None:
@@ -39,23 +63,19 @@ def print_config_table() -> None:
     table.add_column("Value", style="green")
     table.add_column("Description", style="dim")
 
-    # API Configuration
     table.add_row("API Base URL", settings.api.base_url, "AutoPVS1 service endpoint")
     table.add_row("Request Timeout", f"{settings.api.request_timeout}s", "HTTP request timeout")
     table.add_row("Max Retries", str(settings.api.max_retries), "Maximum HTTP retries")
     table.add_row("Rate Limit", f"{settings.api.rate_limit_delay}s", "Delay between requests")
 
-    # Cache Configuration
     table.add_row("Cache Enabled", str(settings.cache.enabled), "Cache functionality")
     table.add_row("Cache Size", str(settings.cache.size), "Maximum cache entries")
     table.add_row("Cache TTL", f"{settings.cache.ttl_hours}h", "Cache time-to-live")
 
-    # Server Configuration
     table.add_row("Server Host", settings.server.host, "Server bind address")
     table.add_row("Server Port", str(settings.server.port), "Server listen port")
     table.add_row("CORS Origins", settings.server.cors_origins, "Allowed CORS origins")
 
-    # Environment
     table.add_row("Environment", settings.environment, "Deployment environment")
     table.add_row("Debug Mode", str(settings.debug), "Debug mode status")
     table.add_row("Log Level", settings.logging.level, "Logging level")
@@ -63,63 +83,55 @@ def print_config_table() -> None:
     console.print(table)
 
 
-@click.group(invoke_without_command=True)
-@click.option("--version", is_flag=True, help="Show version and exit")
-@click.option("--config", is_flag=True, help="Show configuration and exit")
-@click.pass_context
-def main(ctx: click.Context, version: bool, config: bool) -> None:
+@app.callback()
+def main_callback(
+    version: Annotated[bool, typer.Option("--version", help="Show version and exit.")] = False,
+) -> None:
     """AutoPVS1 Link - Genetic variant analysis tool with MCP and REST API support."""
-    print_banner()
-
     if version:
-        console.print(f"Version: {settings.version}", style="bold green")
-        sys.exit(0)
-
-    if config:
-        print_config_table()
-        sys.exit(0)
-
-    if ctx.invoked_subcommand is None:
-        console.print(ctx.get_help())
+        console.print(f"AutoPVS1-Link v{settings.version}", style="bold green")
+        raise typer.Exit()
 
 
-@main.command()
-@click.option("--host", default=None, help="Host to bind the server to")
-@click.option("--port", default=None, type=int, help="Port to bind the server to")
-@click.option("--reload", is_flag=True, help="Enable auto-reload")
-@click.option("--workers", default=None, type=int, help="Number of workers")
-@click.option("--log-level", default=None, help="Log level")
+@app.command()
 def server(
-    host: str | None,
-    port: int | None,
-    reload: bool,
-    workers: int | None,
-    log_level: str | None,
+    host: Annotated[str | None, typer.Option(help="Host to bind the server to")] = None,
+    port: Annotated[int | None, typer.Option(help="Port to bind the server to")] = None,
+    transport: Annotated[str, typer.Option(help="Transport: stdio | http | unified")] = "unified",
+    reload: Annotated[bool, typer.Option(help="Enable auto-reload")] = False,
+    workers: Annotated[int | None, typer.Option(help="Number of workers")] = None,
+    log_level: Annotated[str | None, typer.Option("--log-level", help="Log level")] = None,
 ) -> None:
     """Start the unified FastAPI server with both REST API and MCP support."""
     configure_logging()
 
-    # Override settings with CLI options
     server_host = host or settings.server.host
     server_port = port or settings.server.port
     server_workers = workers or settings.server.workers
     server_reload = reload or settings.server.reload
     server_log_level = log_level or settings.logging.level.lower()
 
-    console.print("🚀 Starting AutoPVS1 Link Server...", style="bold green")
+    if transport == "stdio":
+        from autopvs1_link.unified_server import run_mcp_stdio
+
+        asyncio.run(run_mcp_stdio())
+        return
+
+    print_banner()
+    console.print("Starting AutoPVS1 Link Server...", style="bold green")
     console.print(f"   Host: {server_host}")
     console.print(f"   Port: {server_port}")
     console.print(f"   Workers: {server_workers}")
     console.print(f"   Reload: {server_reload}")
     console.print(f"   Log Level: {server_log_level}")
     console.print("")
-    console.print("📚 API Documentation: http://localhost:8000/docs", style="blue")
-    console.print("🔗 Health Check: http://localhost:8000/health", style="blue")
+    console.print(f"API docs: http://{server_host}:{server_port}/docs", style="blue")
+    console.print(f"Health: http://{server_host}:{server_port}/health", style="blue")
     console.print("")
 
     try:
         uvicorn.run(
-            "autopvs1_link.unified_server:app",
+            "autopvs1_link.server_manager:app",
             host=server_host,
             port=server_port,
             reload=server_reload,
@@ -127,92 +139,57 @@ def server(
             log_level=server_log_level,
         )
     except KeyboardInterrupt:
-        console.print("🛑 Server stopped by user", style="yellow")
+        console.print("Server stopped by user", style="yellow")
 
 
-@main.command()
-@click.option("--stdio", is_flag=True, help="Use STDIO transport (default)")
-@click.option("--http", is_flag=True, help="Use HTTP transport")
-@click.option("--port", default=3000, type=int, help="Port for HTTP transport")
-def mcp(stdio: bool, http: bool, port: int) -> None:
+@app.command()
+def mcp(
+    http: Annotated[bool, typer.Option(help="Use HTTP transport (Streamable HTTP)")] = False,
+    port: Annotated[int, typer.Option(help="Port for HTTP transport")] = 3000,
+) -> None:
     """Start the MCP (Model Context Protocol) server."""
     configure_logging()
 
     if http:
-        console.print("🔌 Starting MCP Server (HTTP transport)...", style="bold blue")
-        console.print(f"   Port: {port}")
-        console.print(f"   Endpoint: http://localhost:{port}")
-
-        import uvicorn
-
+        console.print("Starting MCP Server (Streamable HTTP)...", style="bold blue")
+        console.print(f"   Endpoint: http://localhost:{port}/mcp")
         uvicorn.run(
-            "autopvs1_link.unified_server:mcp_app",
-            host="localhost",
+            "autopvs1_link.server_manager:app",
+            host="127.0.0.1",
             port=port,
             log_level=settings.logging.level.lower(),
         )
     else:
-        console.print("🔌 Starting MCP Server (STDIO transport)...", style="bold blue")
-        console.print("   Ready for MCP client connections via STDIO")
-
+        console.print("Starting MCP Server (STDIO transport)...", style="bold blue")
         from autopvs1_link.unified_server import run_mcp_stdio
 
         asyncio.run(run_mcp_stdio())
 
 
-@main.command()
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["table", "json", "yaml"]),
-    default="table",
-    help="Output format",
-)
-def config(output_format: str) -> None:
+@app.command()
+def config(
+    output_format: Annotated[
+        str, typer.Option("--format", help="Output format: table | json")
+    ] = "table",
+) -> None:
     """Show current configuration settings."""
     if output_format == "table":
         print_config_table()
     elif output_format == "json":
-        import json
-
-        config_dict = {
-            "environment": settings.environment,
-            "debug": settings.debug,
-            "version": settings.version,
-            "api": settings.api.model_dump(),
-            "cache": settings.cache.model_dump(),
-            "server": settings.server.model_dump(),
-            "logging": settings.logging.model_dump(),
-            "mcp": settings.mcp.model_dump(),
-        }
-        console.print(json.dumps(config_dict, indent=2))
-    elif output_format == "yaml":
-        try:
-            import yaml
-
-            config_dict = {
-                "environment": settings.environment,
-                "debug": settings.debug,
-                "version": settings.version,
-                "api": settings.api.model_dump(),
-                "cache": settings.cache.model_dump(),
-                "server": settings.server.model_dump(),
-                "logging": settings.logging.model_dump(),
-                "mcp": settings.mcp.model_dump(),
-            }
-            console.print(yaml.dump(config_dict, default_flow_style=False))
-        except ImportError:
-            console.print("❌ PyYAML not installed. Use 'pip install pyyaml'", style="red")
+        console.print(json.dumps(_settings_dict(), indent=2))
+    else:
+        console.print(f"Unsupported format: {output_format}", style="red")
+        raise typer.Exit(code=2)
 
 
-@main.command()
-async def health() -> None:
+@app.command()
+def health() -> None:
     """Check the health status of all components."""
-    import httpx
+    asyncio.run(_health_async())
 
-    console.print("🔍 Checking component health...", style="bold blue")
 
-    # Check if server is running
+async def _health_async() -> None:
+    console.print("Checking component health...", style="bold blue")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -221,66 +198,54 @@ async def health() -> None:
             )
             health_data = response.json()
 
-            # Create health status table
             table = Table(title="Health Status", show_header=True, header_style="bold magenta")
             table.add_column("Component", style="cyan")
             table.add_column("Status", style="green")
             table.add_column("Details", style="dim")
 
             overall_status = health_data.get("status", "unknown")
-
             table.add_row(
                 "Overall",
                 overall_status,
                 f"Version: {health_data.get('version', 'unknown')}",
             )
 
-            # Client health
             client_health = health_data.get("client", {})
-            client_status = client_health.get("status", "unknown")
-            table.add_row("HTTP Client", client_status, client_health.get("base_url", ""))
-
-            # Service health
+            table.add_row(
+                "HTTP Client",
+                client_health.get("status", "unknown"),
+                client_health.get("base_url", ""),
+            )
             service_health = health_data.get("service_health", {})
-            service_status = service_health.get("status", "unknown")
-            table.add_row("Service", service_status, "AutoPVS1 Service Layer")
-
+            table.add_row(
+                "Service",
+                service_health.get("status", "unknown"),
+                "AutoPVS1 Service Layer",
+            )
             console.print(table)
 
-            # Cache information
-            if "cache_info" in service_health:
-                cache_info = service_health["cache_info"]
-                console.print("\n📊 Cache Statistics:", style="bold blue")
-                for method, stats in cache_info.items():
-                    if isinstance(stats, dict):
-                        hit_rate = stats.get("hit_rate", 0) * 100
-                        console.print(
-                            f"   {method}: {hit_rate:.1f}% hit rate "
-                            f"({stats.get('hits', 0)} hits, {stats.get('misses', 0)} misses)"
-                        )
-
     except httpx.ConnectError:
-        console.print("❌ Server is not running", style="red")
+        console.print("Server is not running", style="red")
         console.print("   Start the server with: autopvs1-link server", style="dim")
     except Exception as e:
-        console.print(f"❌ Health check failed: {e}", style="red")
+        console.print(f"Health check failed: {e}", style="red")
 
 
-@main.command()
-async def cache() -> None:
-    """Show cache statistics and manage cache."""
-    import httpx
+@app.command()
+def cache() -> None:
+    """Show cache statistics."""
+    asyncio.run(_cache_async())
 
+
+async def _cache_async() -> None:
     try:
         async with httpx.AsyncClient() as client:
-            # Get cache stats
             response = await client.get(
                 f"http://{settings.server.host}:{settings.server.port}/api/cache/stats",
                 timeout=5.0,
             )
             cache_stats = response.json()
 
-            # Create cache statistics table
             table = Table(title="Cache Statistics", show_header=True, header_style="bold magenta")
             table.add_column("Method", style="cyan")
             table.add_column("Hits", style="green")
@@ -294,23 +259,29 @@ async def cache() -> None:
                     misses = stats.get("misses", 0)
                     total = hits + misses
                     hit_rate = (hits / total * 100) if total > 0 else 0
-
                     table.add_row(method, str(hits), str(misses), f"{hit_rate:.1f}%", str(total))
 
             console.print(table)
-
     except httpx.ConnectError:
-        console.print("❌ Server is not running", style="red")
+        console.print("Server is not running", style="red")
     except Exception as e:
-        console.print(f"❌ Cache stats failed: {e}", style="red")
+        console.print(f"Cache stats failed: {e}", style="red")
 
 
-@main.command()
-@click.confirmation_option(prompt="Are you sure you want to clear all caches?")
-async def clear_cache() -> None:
-    """Clear all cache entries."""
-    import httpx
+@app.command(name="clear-cache")
+def clear_cache(
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+) -> None:
+    """Clear all service caches."""
+    if not yes:
+        confirm = typer.confirm("Are you sure you want to clear all caches?")
+        if not confirm:
+            console.print("Aborted.", style="yellow")
+            raise typer.Exit()
+    asyncio.run(_clear_cache_async())
 
+
+async def _clear_cache_async() -> None:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -318,33 +289,21 @@ async def clear_cache() -> None:
                 timeout=5.0,
             )
             result = response.json()
-
             if result.get("status") == "success":
-                console.print("✅ All caches cleared successfully", style="green")
+                console.print("All caches cleared successfully", style="green")
             else:
-                console.print(f"❌ Failed to clear caches: {result.get('error')}", style="red")
-
+                console.print(f"Failed to clear caches: {result.get('error')}", style="red")
     except httpx.ConnectError:
-        console.print("❌ Server is not running", style="red")
+        console.print("Server is not running", style="red")
     except Exception as e:
-        console.print(f"❌ Clear cache failed: {e}", style="red")
+        console.print(f"Clear cache failed: {e}", style="red")
 
 
-# Make async commands work with click
-def async_command(f):
-    """Decorator to make async commands work with click."""
-
-    def wrapper(*args, **kwargs):
-        return asyncio.run(f(*args, **kwargs))
-
-    return wrapper
-
-
-# Apply async decorator to async commands
-health = async_command(health)
-cache = async_command(cache)
-clear_cache = async_command(clear_cache)
+def main() -> None:
+    """Entry-point shim used by `[project.scripts] autopvs1-link`."""
+    app()
 
 
 if __name__ == "__main__":
     main()
+    sys.exit(0)
