@@ -1,0 +1,37 @@
+services:
+  autopvs1-link:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+
+    container_name: autopvs1_link_server
+
+    env_file:
+      - path: ../.env
+        required: false
+
+    environment:
+      AUTOPVS1_LINK_HOST: 0.0.0.0
+      AUTOPVS1_LINK_PORT: 8000
+      AUTOPVS1_LINK_TRANSPORT: unified
+      AUTOPVS1_LINK_LOG_LEVEL: INFO
+      AUTOPVS1_LINK_METRICS_ENABLED: "true"
+
+    ports:
+      - "${AUTOPVS1_LINK_PORT:-8000}:8000"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

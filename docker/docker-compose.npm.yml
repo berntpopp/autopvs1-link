@@ -1,0 +1,11 @@
+services:
+  autopvs1-link:
+    networks:
+      - npm
+    labels:
+      - "npm.proxy=true"
+
+networks:
+  npm:
+    external: true
+    name: nginx-proxy-manager_default
