@@ -140,7 +140,7 @@ class TestRedirectDetection:
 
         try:
             with patch(
-                "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
+                "httpx.AsyncClient.get",
                 return_value=mock_response,
             ):
                 result = await client.search_with_redirect_detection(
@@ -180,7 +180,7 @@ class TestRedirectDetection:
 
         try:
             with patch(
-                "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
+                "httpx.AsyncClient.get",
                 return_value=mock_response,
             ):
                 result = await client.search_with_redirect_detection("BRCA1", "hg19")
@@ -213,7 +213,7 @@ class TestRedirectDetection:
 
         try:
             with patch(
-                "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
+                "httpx.AsyncClient.get",
                 return_value=mock_response,
             ):
                 result = await client.resolve_hgvs_notation("NM_000128.3:c.1716+1G>A", "hg19")
@@ -241,7 +241,7 @@ class TestRedirectDetection:
         try:
             with (
                 patch(
-                    "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
+                    "httpx.AsyncClient.get",
                     return_value=mock_response,
                 ),
                 pytest.raises(ValueError, match="did not resolve to a single variant"),

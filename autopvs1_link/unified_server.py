@@ -22,7 +22,6 @@ from autopvs1_link.models.autopvs1_models import (
     AutoPVS1SearchResults,
 )
 from autopvs1_link.services.service_manager import get_managed_service
-from autopvs1_link.utils.retry_handler import retry_handler
 
 logger = structlog.get_logger()
 
@@ -117,7 +116,6 @@ class UnifiedServerManager:
 
         client_health = await self._client_manager.health_check()
         service_health = await self._service_manager.health_check()
-        circuit_breaker_status = retry_handler.get_all_circuit_breaker_status()
 
         overall_status = (
             "healthy"
@@ -132,7 +130,6 @@ class UnifiedServerManager:
             "environment": settings.environment,
             "client": client_health,
             "service_health": service_health,
-            "circuit_breakers": circuit_breaker_status,
             "cache_enabled": settings.cache.enabled,
         }
 
@@ -229,15 +226,6 @@ async def clear_cache():
 
     service_manager_inst = await get_service_manager()
     return await service_manager_inst.clear_all_caches()
-
-
-@app.get("/api/circuit-breakers", tags=["Management"])
-async def get_circuit_breaker_status():
-    """Get circuit breaker status for all services."""
-    return {
-        "circuit_breakers": retry_handler.get_all_circuit_breaker_status(),
-        "global_enabled": True,
-    }
 
 
 # MCP Tool definitions with STDIO protection

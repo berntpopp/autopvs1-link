@@ -32,7 +32,7 @@ class TestRealWebsiteParsing:
 
         try:
             with patch(
-                "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
+                "httpx.AsyncClient.get",
                 return_value=mock_response,
             ):
                 result = await client.get_variant_data("hg19", "2-48033984-G-GGATT")
@@ -122,7 +122,7 @@ class TestRealWebsiteParsing:
 
         try:
             with patch(
-                "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
+                "httpx.AsyncClient.get",
                 return_value=mock_response,
             ):
                 result = await client.get_variant_data("hg19", "X-82763936-A-T")

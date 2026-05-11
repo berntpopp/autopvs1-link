@@ -6,6 +6,7 @@ import httpx
 import structlog
 from bs4 import BeautifulSoup, Tag
 
+from autopvs1_link.api.retry import async_retry
 from autopvs1_link.config import settings
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
@@ -20,7 +21,6 @@ from autopvs1_link.models.autopvs1_models import (
     SearchResult,
     VariantInfo,
 )
-from autopvs1_link.utils.retry_handler import retry_handler
 
 logger = structlog.get_logger()
 
@@ -57,7 +57,17 @@ class AutoPVS1Client:
         )
 
         try:
-            response = await retry_handler.http_request_with_retry(self.client, "GET", url)
+
+            async def _fetch_variant() -> httpx.Response:
+                resp = await self.client.get(url)
+                resp.raise_for_status()
+                return resp
+
+            response = await async_retry(
+                _fetch_variant,
+                max_attempts=settings.api.max_retries,
+                base_delay=settings.api.retry_delay,
+            )
             soup = BeautifulSoup(response.text, "lxml")
         except Exception as e:
             logger.error(
@@ -112,8 +122,16 @@ class AutoPVS1Client:
         logger.info("Searching variants", query=query, genome_version=genome_version, url=url)
 
         try:
-            response = await retry_handler.http_request_with_retry(
-                self.client, "GET", url, params=params
+
+            async def _search_request() -> httpx.Response:
+                resp = await self.client.get(url, params=params)
+                resp.raise_for_status()
+                return resp
+
+            response = await async_retry(
+                _search_request,
+                max_attempts=settings.api.max_retries,
+                base_delay=settings.api.retry_delay,
             )
             soup = BeautifulSoup(response.text, "lxml")
         except Exception as e:
@@ -159,8 +177,16 @@ class AutoPVS1Client:
         )
 
         try:
-            response = await retry_handler.http_request_with_retry(
-                self.client, "GET", url, params=params
+
+            async def _enhanced_search_request() -> httpx.Response:
+                resp = await self.client.get(url, params=params)
+                resp.raise_for_status()
+                return resp
+
+            response = await async_retry(
+                _enhanced_search_request,
+                max_attempts=settings.api.max_retries,
+                base_delay=settings.api.retry_delay,
             )
             final_url = str(response.url)
 
@@ -231,7 +257,17 @@ class AutoPVS1Client:
         logger.info("Fetching CNV data", url=url, genome_build=genome_build, cnv_id=cnv_id)
 
         try:
-            response = await retry_handler.http_request_with_retry(self.client, "GET", url)
+
+            async def _fetch_cnv() -> httpx.Response:
+                resp = await self.client.get(url)
+                resp.raise_for_status()
+                return resp
+
+            response = await async_retry(
+                _fetch_cnv,
+                max_attempts=settings.api.max_retries,
+                base_delay=settings.api.retry_delay,
+            )
             soup = BeautifulSoup(response.text, "lxml")
         except Exception as e:
             logger.error(

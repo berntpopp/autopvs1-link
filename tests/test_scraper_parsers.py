@@ -162,16 +162,9 @@ class TestClientIntegration:
         assert result.pvs1_flowchart.final_strength == "Strong"
         assert len(result.disease_mechanisms) == 1
 
-    @pytest.mark.integration
     @patch("httpx.AsyncClient.get")
     async def test_get_variant_data_http_error(self, mock_get, client):
-        """Test handling of HTTP errors.
-
-        Marked integration because the retry_handler bypasses the
-        ``httpx.AsyncClient.get`` patch and falls through to a real HTTP
-        request. The mock-based assertion is rewritten when the retry layer
-        is replaced in Phase 3.
-        """
+        """Test handling of HTTP errors."""
         mock_get.side_effect = Exception("Network error")
 
         with pytest.raises(Exception, match="Network error"):
