@@ -192,9 +192,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-# Phase 1 ships fail_under=0 to avoid gating early commits before the test
-# restructure lands. Phase 7 raises this to 80 alongside the new tests.
-fail_under = 0
+fail_under = 80
 exclude_also = [
     "def __repr__",
     "if self.debug:",

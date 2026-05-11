@@ -19,7 +19,7 @@ from autopvs1_link.server_manager import app
 
 def load_fixture(name: str) -> str:
     """Load HTML fixture file."""
-    fixture_path = Path(__file__).parent / "fixtures" / name
+    fixture_path = Path(__file__).parent.parent / "fixtures" / name
     if not fixture_path.exists():
         pytest.skip(f"Fixture {name} not found")
     return fixture_path.read_text(encoding="utf-8")

@@ -86,7 +86,7 @@ class ClientManager:
             return {
                 "status": "healthy",
                 "client_initialized": client is not None,
-                "base_url": settings.AUTOPVS1_BASE_URL,
+                "base_url": settings.api.base_url,
                 "last_request": self._last_request_time,
             }
         except Exception as e:
@@ -94,7 +94,7 @@ class ClientManager:
             return {
                 "status": "unhealthy",
                 "error": str(e),
-                "base_url": settings.AUTOPVS1_BASE_URL,
+                "base_url": settings.api.base_url,
             }
 
     async def shutdown(self) -> None:
