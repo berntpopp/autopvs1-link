@@ -114,7 +114,7 @@ def server(
     if transport == "stdio":
         from autopvs1_link.unified_server import run_mcp_stdio
 
-        asyncio.run(run_mcp_stdio())  # type: ignore[no-untyped-call]
+        asyncio.run(run_mcp_stdio())
         return
 
     print_banner()
@@ -163,7 +163,7 @@ def mcp(
         console.print("Starting MCP Server (STDIO transport)...", style="bold blue")
         from autopvs1_link.unified_server import run_mcp_stdio
 
-        asyncio.run(run_mcp_stdio())  # type: ignore[no-untyped-call]
+        asyncio.run(run_mcp_stdio())
 
 
 @app.command()
