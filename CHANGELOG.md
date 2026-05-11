@@ -1,0 +1,48 @@
+# Changelog
+
+All notable changes to autopvs1-link are documented in this file. The format
+follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
+project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Changed
+
+- Python floor raised to 3.12.
+- Build backend migrated from setuptools to hatchling; project managed with
+  uv; `uv.lock` is committed.
+- Formatter consolidated to ruff (Black removed); ruff config widened to
+  include N, UP, B, C4, S, T20, SIM, RUF rule sets.
+- CLI ported from click to typer.
+- MCP stack bumped to fastmcp 3.2+ and mcp 1.27+; MCP layer refactored into
+  `autopvs1_link/mcp/` subpackage; Streamable HTTP transport (SSE retired).
+- Environment variable prefix renamed from `AUTOPVS1_*` to `AUTOPVS1_LINK_*`
+  with one-cycle dual-read backward-compat shim.
+- Observability stack: structlog plus asgi-correlation-id plus prometheus-client.
+- `get_cache_statistics` is now an MCP resource. `clear_cache` is gated
+  behind `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true` (default off).
+- HTML/XML parsing hardened with defusedxml.
+
+### Added
+
+- Multi-stage Dockerfile (python:3.14-slim) plus four Compose stacks (base,
+  dev, prod, NPM).
+- Gunicorn production CMD with uvicorn workers.
+- Five GitHub Actions workflows: ci, docker, release, security,
+  container-security.
+- Dependabot for uv, github-actions, docker, docker-compose.
+- `AGENTS.md` (canonical) plus thin `CLAUDE.md` pointer.
+- `docs/` split: `architecture.md`, `configuration.md`, `api.md`,
+  `MCP_CONNECTION_GUIDE.md`, generated `mcp-tool-catalog.md`.
+- pre-commit configuration.
+- `/metrics` endpoint (Prometheus) toggleable via `AUTOPVS1_LINK_METRICS_ENABLED`.
+
+### Removed
+
+- `tenacity` dependency (inline retry).
+- Black dependency.
+- Click dependency.
+- Checked-in `coverage.xml`, `*.egg-info/`, `htmlcov/`, `__pycache__/`,
+  `.mypy_cache/`, `.ruff_cache/`, `.pytest_cache/`.
+- Legacy `server.py` deprecation messages (entry kept as thin Typer-routed
+  shim).
