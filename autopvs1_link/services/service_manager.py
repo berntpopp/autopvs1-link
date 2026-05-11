@@ -32,7 +32,7 @@ class ServiceManager:
             return
 
         self._initialized = True
-        self._service: Optional[AutoPVS1Service] = None
+        self._service: AutoPVS1Service | None = None
         self._service_lock = asyncio.Lock()
 
         logger.info("ServiceManager initialized")
@@ -113,7 +113,7 @@ class ServiceManager:
 
 
 # Global service manager instance
-_service_manager: Optional[ServiceManager] = None
+_service_manager: ServiceManager | None = None
 
 
 async def get_service_manager() -> ServiceManager:

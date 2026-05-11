@@ -103,4 +103,4 @@ async def search_gene_variants(
         return result
     except Exception as e:
         logger.error("Error searching gene variants", gene=q, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e!s}")

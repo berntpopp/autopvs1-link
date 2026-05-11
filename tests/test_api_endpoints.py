@@ -111,9 +111,7 @@ class TestVariantEndpoints:
 
     @pytest.mark.asyncio
     @patch("autopvs1_link.api.autopvs1_client.AutoPVS1Client.get_variant_data")
-    async def test_get_variant_success(
-        self, mock_get_variant, sample_variant_data, async_client
-    ):
+    async def test_get_variant_success(self, mock_get_variant, sample_variant_data, async_client):
         """Test successful variant data retrieval."""
         mock_get_variant.return_value = sample_variant_data
 
@@ -140,9 +138,7 @@ class TestVariantEndpoints:
             message="Not Found", request=AsyncMock(), response=mock_response
         )
 
-        response = await async_client.get(
-            "http://test/variant/hg38/nonexistent-variant"
-        )
+        response = await async_client.get("http://test/variant/hg38/nonexistent-variant")
 
         assert response.status_code == 404
         data = response.json()
@@ -198,9 +194,7 @@ class TestGeneEndpoints:
             ],
         )
 
-        response = await async_client.get(
-            "http://test/gene/search?q=MYH9&genome_version=hg19"
-        )
+        response = await async_client.get("http://test/gene/search?q=MYH9&genome_version=hg19")
 
         assert response.status_code == 200
         data = response.json()

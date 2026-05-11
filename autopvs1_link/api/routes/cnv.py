@@ -78,4 +78,4 @@ async def get_cnv(
         return result
     except Exception as e:
         logger.error("Error fetching CNV", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e!s}")

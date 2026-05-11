@@ -1,9 +1,10 @@
 """Enhanced retry handling with exponential backoff and circuit breaker patterns."""
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import httpx
 import structlog
@@ -59,9 +60,7 @@ class CircuitBreaker:
             if time.time() - self.last_failure_time >= self.config.recovery_timeout:
                 self.state = CircuitState.HALF_OPEN
                 self.success_count = 0
-                logger.info(
-                    "Circuit breaker transitioning to half-open", name=self.name
-                )
+                logger.info("Circuit breaker transitioning to half-open", name=self.name)
                 return True
             return False
         else:  # HALF_OPEN
@@ -207,26 +206,21 @@ class EnhancedRetryHandler:
     def get_circuit_breaker(self, name: str) -> CircuitBreaker:
         """Get or create a circuit breaker for a service."""
         if name not in self.circuit_breakers:
-            self.circuit_breakers[name] = CircuitBreaker(
-                name, self.default_circuit_config
-            )
+            self.circuit_breakers[name] = CircuitBreaker(name, self.default_circuit_config)
         return self.circuit_breakers[name]
 
     def get_all_circuit_breaker_status(self) -> dict[str, Any]:
         """Get status of all circuit breakers."""
-        return {
-            name: breaker.get_status()
-            for name, breaker in self.circuit_breakers.items()
-        }
+        return {name: breaker.get_status() for name, breaker in self.circuit_breakers.items()}
 
     async def retry_with_backoff(
         self,
         func: Callable,
         *args: Any,
-        max_attempts: Optional[int] = None,
-        base_delay: Optional[float] = None,
-        max_delay: Optional[float] = None,
-        circuit_breaker_name: Optional[str] = None,
+        max_attempts: int | None = None,
+        base_delay: float | None = None,
+        max_delay: float | None = None,
+        circuit_breaker_name: str | None = None,
         **kwargs: Any,
     ) -> Any:
         """Execute function with retry logic and optional circuit breaker."""
@@ -263,10 +257,7 @@ class EnhancedRetryHandler:
             # Extract the original exception from the last attempt
             if e.last_attempt and e.last_attempt.exception():
                 original_exception = e.last_attempt.exception()
-                if (
-                    hasattr(original_exception, "__cause__")
-                    and original_exception.__cause__
-                ):
+                if hasattr(original_exception, "__cause__") and original_exception.__cause__:
                     raise original_exception.__cause__
                 raise original_exception
             raise
@@ -291,9 +282,7 @@ class EnhancedRetryHandler:
                 )
                 raise
             except httpx.RequestError as e:
-                logger.warning(
-                    "Request error occurred", method=method, url=url, error=str(e)
-                )
+                logger.warning("Request error occurred", method=method, url=url, error=str(e))
                 raise
 
         # Use domain as circuit breaker name

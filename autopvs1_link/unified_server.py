@@ -121,8 +121,7 @@ class UnifiedServerManager:
 
         overall_status = (
             "healthy"
-            if client_health["status"] == "healthy"
-            and service_health["status"] == "healthy"
+            if client_health["status"] == "healthy" and service_health["status"] == "healthy"
             else "unhealthy"
         )
 
@@ -332,9 +331,7 @@ async def get_cnv_analysis(genome_build: str, cnv_id: str) -> AutoPVS1CNVData:
         Complete PVS1 analysis for CNV including info, flowchart, and disease mechanisms
     """
     with stdio_protection(settings.mcp.enable_stdio_protection):
-        logger.info(
-            "MCP tool: get_cnv_analysis", genome_build=genome_build, cnv_id=cnv_id
-        )
+        logger.info("MCP tool: get_cnv_analysis", genome_build=genome_build, cnv_id=cnv_id)
         service = await get_managed_service()
         return await service.get_cnv_data(genome_build, cnv_id)
 
@@ -423,9 +420,7 @@ def print_startup_banner():
     print(f"Host: {settings.server.host}:{settings.server.port}")
     print(f"Debug: {settings.debug}")
     print(f"Cache: {'Enabled' if settings.cache.enabled else 'Disabled'}")
-    print(
-        f"STDIO Protection: {'Enabled' if settings.mcp.enable_stdio_protection else 'Disabled'}"
-    )
+    print(f"STDIO Protection: {'Enabled' if settings.mcp.enable_stdio_protection else 'Disabled'}")
     print("\nFeatures:")
     print("  ✓ REST API with OpenAPI documentation")
     print("  ✓ MCP (Model Context Protocol) support")

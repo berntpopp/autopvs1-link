@@ -67,10 +67,7 @@ class TestRealWebsiteParsing:
 
         # Test external links
         assert "OMIM" in variant_info.external_links
-        assert (
-            variant_info.external_links["OMIM"]
-            == "https://mirror.omim.org/entry/600678"
-        )
+        assert variant_info.external_links["OMIM"] == "https://mirror.omim.org/entry/600678"
         assert "gnomAD" in variant_info.external_links
         assert (
             variant_info.external_links["gnomAD"]
@@ -205,9 +202,7 @@ class TestRealWebsiteParsing:
             assert chgvs == "NM_001234.1:c.123A>T"
 
             # Test haploinsufficiency with link
-            haploinsuff_p = client._find_field_paragraph(
-                container, "Haploinsufficiency:"
-            )
+            haploinsuff_p = client._find_field_paragraph(container, "Haploinsufficiency:")
             assert haploinsuff_p is not None
             link = haploinsuff_p.find("a")
             assert link.text.strip() == "None"
@@ -253,9 +248,7 @@ class TestRealWebsiteParsing:
             client = AutoPVS1Client()
             try:
                 flowchart = client._parse_pvs1_flowchart(soup)
-                assert (
-                    flowchart.final_strength == expected
-                ), f"Failed to parse strength: {strength}"
+                assert flowchart.final_strength == expected, f"Failed to parse strength: {strength}"
             finally:
                 # Cleanup without async issues for sync test
                 pass

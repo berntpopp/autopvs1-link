@@ -1,7 +1,5 @@
 """Pydantic data models for AutoPVS1 Link."""
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -11,14 +9,14 @@ class VariantInfo(BaseModel):
     variant_id: str
     variant_type: str
     gene_symbol: str
-    gene_url: Optional[str] = None
-    pli_score: Optional[float] = None
-    haploinsufficiency: Optional[str] = None
-    haploinsufficiency_url: Optional[str] = None
-    chgvs: Optional[str] = None
-    phgvs: Optional[str] = None
-    exon: Optional[str] = None
-    intron: Optional[str] = None
+    gene_url: str | None = None
+    pli_score: float | None = None
+    haploinsufficiency: str | None = None
+    haploinsufficiency_url: str | None = None
+    chgvs: str | None = None
+    phgvs: str | None = None
+    exon: str | None = None
+    intron: str | None = None
     external_links: dict[str, str] = Field(default_factory=dict)
 
 
@@ -26,8 +24,8 @@ class FlowchartStep(BaseModel):
     """A step in the PVS1 decision flowchart."""
 
     code: str
-    description: Optional[str] = None
-    note_id: Optional[str] = None
+    description: str | None = None
+    note_id: str | None = None
 
 
 class PVS1Flowchart(BaseModel):
@@ -43,9 +41,9 @@ class DiseaseMechanism(BaseModel):
     """Disease mechanism information from the table."""
 
     gene: str
-    gene_url: Optional[str] = None
+    gene_url: str | None = None
     disease: str
-    disease_url: Optional[str] = None
+    disease_url: str | None = None
     inheritance: str
     clinical_validity: str
     consideration: str
@@ -69,7 +67,7 @@ class CNVInfo(BaseModel):
     cnv_type: str
     gene_symbol: str
     coordinates: str
-    size: Optional[str] = None
+    size: str | None = None
 
 
 class AutoPVS1Data(BaseModel):
@@ -104,8 +102,8 @@ class RedirectInfo(BaseModel):
     original_url: str
     final_url: str
     redirect_detected: bool = True
-    variant_id_extracted: Optional[str] = None
-    genome_build_extracted: Optional[str] = None
+    variant_id_extracted: str | None = None
+    genome_build_extracted: str | None = None
 
 
 class EnhancedSearchResults(BaseModel):
@@ -114,9 +112,9 @@ class EnhancedSearchResults(BaseModel):
     query: str
     genome_version: str
     redirected: bool = False
-    variant_data: Optional[AutoPVS1Data] = None
-    search_results: Optional[AutoPVS1SearchResults] = None
-    redirect_info: Optional[RedirectInfo] = None
+    variant_data: AutoPVS1Data | None = None
+    search_results: AutoPVS1SearchResults | None = None
+    redirect_info: RedirectInfo | None = None
 
     @property
     def is_single_variant(self) -> bool:

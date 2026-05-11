@@ -45,6 +45,10 @@ dependencies = [
     "typer>=0.25.1,<1.0.0",
     "mcp[cli]>=1.27.0,<2.0.0",
     "fastmcp>=3.2.0,<4.0.0",
+    # Removed in Phase 3 (Task 3.2) once retry_handler.py is replaced.
+    "tenacity>=8.2.0,<10.0.0",
+    # Removed in Phase 3 once cli.py drops yaml usage.
+    "pyyaml>=6.0,<7.0",
 ]
 
 [dependency-groups]
@@ -88,6 +92,21 @@ line-ending = "lf"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*" = ["S101", "T20"]
+# Entry point scripts and the CLI legitimately print to stdout.
+"server.py" = ["T20"]
+"mcp_server.py" = ["T20"]
+"autopvs1_link/cli.py" = ["T20"]
+# Pre-Phase-4 unified_server prints status to stdout; refactored away in Phase 4.
+"autopvs1_link/unified_server.py" = ["T20"]
+# Pre-Phase-3 retry_handler is replaced by autopvs1_link/api/retry.py.
+"autopvs1_link/utils/retry_handler.py" = ["B904", "SIM103"]
+# FastAPI dependency injection uses Depends() in argument defaults by design.
+# B904: legacy raise-from chains in route exception handlers, refactored later.
+"autopvs1_link/api/routes/*" = ["B008", "B904"]
+# Pre-Phase-3 code; targeted refactors land with Phase 3 dep bumps.
+"autopvs1_link/api/autopvs1_client.py" = ["SIM105"]
+"autopvs1_link/middleware/logging_middleware.py" = ["RUF013"]
+"autopvs1_link/services/autopvs1_service.py" = ["RUF013"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -123,10 +142,44 @@ module = [
     "uvicorn.*",
     "bs4.*",
     "lxml.*",
-    "asgi_correlation_id.*",
-    "prometheus_client.*",
+    "yaml.*",
 ]
 ignore_missing_imports = true
+
+# Transitional relaxation for legacy modules that predate strict typing.
+# These overrides come off as Phase 3 (config/cli/retry rewrites) and Phase 4
+# (MCP subpackage / unified_server split) replace each module.
+[[tool.mypy.overrides]]
+module = [
+    "autopvs1_link.api.autopvs1_client",
+    "autopvs1_link.api.client_manager",
+    "autopvs1_link.api.routes.cnv",
+    "autopvs1_link.api.routes.gene",
+    "autopvs1_link.api.routes.variant",
+    "autopvs1_link.cli",
+    "autopvs1_link.config",
+    "autopvs1_link.logging_config",
+    "autopvs1_link.middleware.logging_middleware",
+    "autopvs1_link.services.autopvs1_service",
+    "autopvs1_link.services.service_manager",
+    "autopvs1_link.unified_server",
+    "autopvs1_link.utils.cache_manager",
+    "autopvs1_link.utils.retry_handler",
+]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
+disallow_any_generics = false
+warn_return_any = false
+no_implicit_optional = false
+warn_unreachable = false
+ignore_errors = true
+
+# server.py and mcp_server.py are entry-point shims rewritten in Phase 4.
+[[tool.mypy.overrides]]
+module = ["server", "mcp_server"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

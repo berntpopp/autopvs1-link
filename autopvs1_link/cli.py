@@ -2,7 +2,6 @@
 
 import asyncio
 import sys
-from typing import Optional
 
 import click
 import uvicorn
@@ -42,13 +41,9 @@ def print_config_table() -> None:
 
     # API Configuration
     table.add_row("API Base URL", settings.api.base_url, "AutoPVS1 service endpoint")
-    table.add_row(
-        "Request Timeout", f"{settings.api.request_timeout}s", "HTTP request timeout"
-    )
+    table.add_row("Request Timeout", f"{settings.api.request_timeout}s", "HTTP request timeout")
     table.add_row("Max Retries", str(settings.api.max_retries), "Maximum HTTP retries")
-    table.add_row(
-        "Rate Limit", f"{settings.api.rate_limit_delay}s", "Delay between requests"
-    )
+    table.add_row("Rate Limit", f"{settings.api.rate_limit_delay}s", "Delay between requests")
 
     # Cache Configuration
     table.add_row("Cache Enabled", str(settings.cache.enabled), "Cache functionality")
@@ -95,11 +90,11 @@ def main(ctx: click.Context, version: bool, config: bool) -> None:
 @click.option("--workers", default=None, type=int, help="Number of workers")
 @click.option("--log-level", default=None, help="Log level")
 def server(
-    host: Optional[str],
-    port: Optional[int],
+    host: str | None,
+    port: int | None,
     reload: bool,
-    workers: Optional[int],
-    log_level: Optional[str],
+    workers: int | None,
+    log_level: str | None,
 ) -> None:
     """Start the unified FastAPI server with both REST API and MCP support."""
     configure_logging()
@@ -207,9 +202,7 @@ def config(output_format: str) -> None:
             }
             console.print(yaml.dump(config_dict, default_flow_style=False))
         except ImportError:
-            console.print(
-                "❌ PyYAML not installed. Use 'pip install pyyaml'", style="red"
-            )
+            console.print("❌ PyYAML not installed. Use 'pip install pyyaml'", style="red")
 
 
 @main.command()
@@ -229,9 +222,7 @@ async def health() -> None:
             health_data = response.json()
 
             # Create health status table
-            table = Table(
-                title="Health Status", show_header=True, header_style="bold magenta"
-            )
+            table = Table(title="Health Status", show_header=True, header_style="bold magenta")
             table.add_column("Component", style="cyan")
             table.add_column("Status", style="green")
             table.add_column("Details", style="dim")
@@ -247,9 +238,7 @@ async def health() -> None:
             # Client health
             client_health = health_data.get("client", {})
             client_status = client_health.get("status", "unknown")
-            table.add_row(
-                "HTTP Client", client_status, client_health.get("base_url", "")
-            )
+            table.add_row("HTTP Client", client_status, client_health.get("base_url", ""))
 
             # Service health
             service_health = health_data.get("service_health", {})
@@ -292,9 +281,7 @@ async def cache() -> None:
             cache_stats = response.json()
 
             # Create cache statistics table
-            table = Table(
-                title="Cache Statistics", show_header=True, header_style="bold magenta"
-            )
+            table = Table(title="Cache Statistics", show_header=True, header_style="bold magenta")
             table.add_column("Method", style="cyan")
             table.add_column("Hits", style="green")
             table.add_column("Misses", style="red")
@@ -308,9 +295,7 @@ async def cache() -> None:
                     total = hits + misses
                     hit_rate = (hits / total * 100) if total > 0 else 0
 
-                    table.add_row(
-                        method, str(hits), str(misses), f"{hit_rate:.1f}%", str(total)
-                    )
+                    table.add_row(method, str(hits), str(misses), f"{hit_rate:.1f}%", str(total))
 
             console.print(table)
 
@@ -337,9 +322,7 @@ async def clear_cache() -> None:
             if result.get("status") == "success":
                 console.print("✅ All caches cleared successfully", style="green")
             else:
-                console.print(
-                    f"❌ Failed to clear caches: {result.get('error')}", style="red"
-                )
+                console.print(f"❌ Failed to clear caches: {result.get('error')}", style="red")
 
     except httpx.ConnectError:
         console.print("❌ Server is not running", style="red")

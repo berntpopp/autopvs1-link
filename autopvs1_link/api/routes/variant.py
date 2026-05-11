@@ -26,10 +26,7 @@ HGVS_PATTERNS = [
 def _detect_hgvs_pattern(query: str) -> bool:
     """Detect if query looks like HGVS notation."""
     query = query.strip()
-    for pattern in HGVS_PATTERNS:
-        if re.match(pattern, query, re.IGNORECASE):
-            return True
-    return False
+    return any(re.match(pattern, query, re.IGNORECASE) for pattern in HGVS_PATTERNS)
 
 
 @router.get(
@@ -157,9 +154,7 @@ async def get_variant(
 
     except ValueError as e:
         # HGVS resolution failed or invalid format
-        logger.warning(
-            "Invalid variant identifier", variant_id=variant_id, error=str(e)
-        )
+        logger.warning("Invalid variant identifier", variant_id=variant_id, error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -168,10 +163,8 @@ async def get_variant(
             status_code=e.response.status_code,
         )
         if e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404, detail=f"Variant {variant_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Variant {variant_id} not found")
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
     except Exception as e:
         logger.error("Error fetching variant", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e!s}")

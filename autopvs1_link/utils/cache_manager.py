@@ -2,9 +2,10 @@
 
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 import structlog
 from async_lru import alru_cache
@@ -23,8 +24,8 @@ class CacheStatistics:
     evictions: int = 0
     errors: int = 0
     total_time: float = 0.0
-    last_hit: Optional[float] = None
-    last_miss: Optional[float] = None
+    last_hit: float | None = None
+    last_miss: float | None = None
     created_at: float = field(default_factory=time.time)
 
     @property
@@ -71,7 +72,7 @@ class AdvancedCacheManager:
         self._event_logging = settings.cache.event_logging
         self._statistics_enabled = settings.cache.statistics_enabled
 
-    def get_statistics(self, method_name: Optional[str] = None) -> dict[str, Any]:
+    def get_statistics(self, method_name: str | None = None) -> dict[str, Any]:
         """Get cache statistics for a specific method or all methods."""
         if method_name:
             stats = self._statistics.get(method_name)
@@ -81,7 +82,7 @@ class AdvancedCacheManager:
 
         return {method: stats.to_dict() for method, stats in self._statistics.items()}
 
-    def clear_statistics(self, method_name: Optional[str] = None) -> None:
+    def clear_statistics(self, method_name: str | None = None) -> None:
         """Clear statistics for a specific method or all methods."""
         if method_name:
             if method_name in self._statistics:
@@ -156,8 +157,8 @@ class AdvancedCacheManager:
     def enhanced_cache(
         self,
         maxsize: int = 128,
-        ttl: Optional[int] = None,
-        key_func: Optional[Callable] = None,
+        ttl: int | None = None,
+        key_func: Callable | None = None,
     ) -> Callable:
         """Enhanced cache decorator with detailed statistics and event logging."""
         if ttl is None:
@@ -231,9 +232,7 @@ def cache_key_generator(*args: Any, **kwargs: Any) -> str:
     return f"{args_str}_{kwargs_str}" if kwargs_str else args_str
 
 
-async def log_cache_event(
-    event_type: str, method: str, key: str, **context: Any
-) -> None:
+async def log_cache_event(event_type: str, method: str, key: str, **context: Any) -> None:
     """Log cache events with consistent formatting."""
     if not settings.cache.event_logging:
         return

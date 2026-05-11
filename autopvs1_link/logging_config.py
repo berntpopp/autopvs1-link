@@ -36,9 +36,7 @@ def configure_logging() -> None:
         try:
             import orjson
 
-            processors.append(
-                structlog.processors.JSONRenderer(serializer=orjson.dumps)
-            )
+            processors.append(structlog.processors.JSONRenderer(serializer=orjson.dumps))
         except ImportError:
             # Fallback to standard JSON if orjson not available
             processors.append(structlog.processors.JSONRenderer())

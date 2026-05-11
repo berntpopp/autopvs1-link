@@ -17,9 +17,7 @@ class APIConfig(BaseSettings):
     request_timeout: int = Field(
         default=30, ge=1, le=300, description="HTTP request timeout in seconds"
     )
-    max_retries: int = Field(
-        default=3, ge=0, le=10, description="Maximum number of HTTP retries"
-    )
+    max_retries: int = Field(default=3, ge=0, le=10, description="Maximum number of HTTP retries")
     retry_delay: float = Field(
         default=1.0, ge=0.1, le=60.0, description="Delay between retries in seconds"
     )
@@ -42,18 +40,15 @@ class CacheConfig(BaseSettings):
     model_config = {"env_prefix": "AUTOPVS1_CACHE_", "env_file": ".env"}
 
     enabled: bool = Field(default=True, description="Enable/disable caching")
-    size: int = Field(
-        default=256, ge=1, le=10000, description="Maximum number of cache entries"
-    )
+    size: int = Field(default=256, ge=1, le=10000, description="Maximum number of cache entries")
     ttl_hours: int = Field(
-        default=24, ge=1, le=168, description="Cache TTL in hours"  # 1 week max
+        default=24,
+        ge=1,
+        le=168,
+        description="Cache TTL in hours",  # 1 week max
     )
-    statistics_enabled: bool = Field(
-        default=True, description="Enable cache statistics collection"
-    )
-    event_logging: bool = Field(
-        default=False, description="Enable detailed cache event logging"
-    )
+    statistics_enabled: bool = Field(default=True, description="Enable cache statistics collection")
+    event_logging: bool = Field(default=False, description="Enable detailed cache event logging")
 
     @property
     def ttl_seconds(self) -> int:
@@ -66,15 +61,11 @@ class ServerConfig(BaseSettings):
 
     model_config = {"env_prefix": "AUTOPVS1_SERVER_", "env_file": ".env"}
 
-    host: str = Field(default="0.0.0.0", description="Server host address")
+    host: str = Field(default="0.0.0.0", description="Server host address")  # noqa: S104
     port: int = Field(default=8000, ge=1, le=65535, description="Server port")
     reload: bool = Field(default=False, description="Enable auto-reload in development")
-    cors_origins: str = Field(
-        default="*", description="CORS allowed origins (comma-separated)"
-    )
-    workers: int = Field(
-        default=1, ge=1, le=32, description="Number of worker processes"
-    )
+    cors_origins: str = Field(default="*", description="CORS allowed origins (comma-separated)")
+    workers: int = Field(default=1, ge=1, le=32, description="Number of worker processes")
 
     @field_validator("cors_origins")
     @classmethod
@@ -102,15 +93,9 @@ class LoggingConfig(BaseSettings):
         default="INFO", description="Logging level"
     )
     json_format: bool = Field(default=False, description="Use JSON logging format")
-    structured: bool = Field(
-        default=True, description="Use structured logging with context"
-    )
-    correlation_ids: bool = Field(
-        default=True, description="Include correlation IDs in logs"
-    )
-    performance_logging: bool = Field(
-        default=True, description="Enable performance logging"
-    )
+    structured: bool = Field(default=True, description="Use structured logging with context")
+    correlation_ids: bool = Field(default=True, description="Include correlation IDs in logs")
+    performance_logging: bool = Field(default=True, description="Enable performance logging")
     suppress_third_party: bool = Field(
         default=True, description="Suppress noisy third-party loggers"
     )

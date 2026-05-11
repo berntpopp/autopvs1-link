@@ -1,7 +1,6 @@
 """Enhanced client for scraping AutoPVS1 data with retry logic and circuit breaker."""
 
 import re
-from typing import Optional
 
 import httpx
 import structlog
@@ -47,9 +46,7 @@ class AutoPVS1Client:
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
 
-    async def get_variant_data(
-        self, genome_build: str, variant_id: str
-    ) -> AutoPVS1Data:
+    async def get_variant_data(self, genome_build: str, variant_id: str) -> AutoPVS1Data:
         """Scrape PVS1 data for a specific variant with enhanced error handling."""
         url = f"{self.base_url}/variant/{genome_build}/{variant_id}"
         logger.info(
@@ -60,9 +57,7 @@ class AutoPVS1Client:
         )
 
         try:
-            response = await retry_handler.http_request_with_retry(
-                self.client, "GET", url
-            )
+            response = await retry_handler.http_request_with_retry(self.client, "GET", url)
             soup = BeautifulSoup(response.text, "lxml")
         except Exception as e:
             logger.error(
@@ -77,18 +72,14 @@ class AutoPVS1Client:
         variant_info = self._parse_variant_info(soup, variant_id)
 
         # Check if this variant is compatible with PVS1
-        incompatible_text = soup.find(
-            "p", string=re.compile(r"incompatible with.*PVS1")
-        )
+        incompatible_text = soup.find("p", string=re.compile(r"incompatible with.*PVS1"))
         if incompatible_text:
             # Create a simple "not applicable" flowchart
             pvs1_flowchart = PVS1Flowchart(
                 preliminary_decision_path="not_applicable",
                 final_strength="PVS1_Not_Applicable",
                 decision_tree=[],
-                notes={
-                    "note_1": "This variant type is incompatible with PVS1 criterion"
-                },
+                notes={"note_1": "This variant type is incompatible with PVS1 criterion"},
             )
             disease_mechanisms = []
         else:
@@ -118,9 +109,7 @@ class AutoPVS1Client:
         """Search for variants by gene or other criteria with enhanced error handling."""
         url = f"{self.base_url}/search"
         params = {"q": query, "genome_version": genome_version}
-        logger.info(
-            "Searching variants", query=query, genome_version=genome_version, url=url
-        )
+        logger.info("Searching variants", query=query, genome_version=genome_version, url=url)
 
         try:
             response = await retry_handler.http_request_with_retry(
@@ -139,9 +128,7 @@ class AutoPVS1Client:
 
         results = self._parse_search_results(soup, genome_version)
 
-        return AutoPVS1SearchResults(
-            query=query, genome_version=genome_version, results=results
-        )
+        return AutoPVS1SearchResults(query=query, genome_version=genome_version, results=results)
 
     async def search_with_redirect_detection(
         self, query: str, genome_version: str = "hg19"
@@ -193,9 +180,7 @@ class AutoPVS1Client:
                 )
             else:
                 # Normal search results page
-                logger.info(
-                    "Search returned normal results page", query=query, url=final_url
-                )
+                logger.info("Search returned normal results page", query=query, url=final_url)
 
                 return await self._handle_search_results_page(
                     response, query, genome_version, original_url, final_url
@@ -211,9 +196,7 @@ class AutoPVS1Client:
             )
             raise
 
-    async def resolve_hgvs_notation(
-        self, hgvs: str, genome_version: str = "hg19"
-    ) -> AutoPVS1Data:
+    async def resolve_hgvs_notation(self, hgvs: str, genome_version: str = "hg19") -> AutoPVS1Data:
         """Direct HGVS notation resolution to variant data.
 
         This method specifically handles HGVS notation and expects
@@ -232,9 +215,7 @@ class AutoPVS1Client:
         if not self._detect_hgvs_pattern(hgvs):
             logger.warning("Query doesn't appear to be HGVS notation", query=hgvs)
 
-        enhanced_result = await self.search_with_redirect_detection(
-            hgvs, genome_version
-        )
+        enhanced_result = await self.search_with_redirect_detection(hgvs, genome_version)
 
         if enhanced_result.is_single_variant and enhanced_result.variant_data:
             return enhanced_result.variant_data
@@ -247,14 +228,10 @@ class AutoPVS1Client:
     async def get_cnv_data(self, genome_build: str, cnv_id: str) -> AutoPVS1CNVData:
         """Scrape PVS1 data for a CNV with enhanced error handling."""
         url = f"{self.base_url}/cnv/{genome_build}/{cnv_id}"
-        logger.info(
-            "Fetching CNV data", url=url, genome_build=genome_build, cnv_id=cnv_id
-        )
+        logger.info("Fetching CNV data", url=url, genome_build=genome_build, cnv_id=cnv_id)
 
         try:
-            response = await retry_handler.http_request_with_retry(
-                self.client, "GET", url
-            )
+            response = await retry_handler.http_request_with_retry(self.client, "GET", url)
             soup = BeautifulSoup(response.text, "lxml")
         except Exception as e:
             logger.error(
@@ -402,9 +379,7 @@ class AutoPVS1Client:
         figcaption = flowchart_col.find("figcaption")
         preliminary_path = ""
         if figcaption:
-            preliminary_path = figcaption.text.replace(
-                "Preliminary Decision Path: ", ""
-            ).strip()
+            preliminary_path = figcaption.text.replace("Preliminary Decision Path: ", "").strip()
 
         # Extract final strength from the deepest nested code element
         # NOTE: This heuristic searches for the PVS1 strength determination in reverse order
@@ -514,11 +489,7 @@ class AutoPVS1Client:
                 # Extract disease info
                 disease_cell = cols[1]
                 disease_link = disease_cell.find("a")
-                disease = (
-                    disease_link.text.strip()
-                    if disease_link
-                    else disease_cell.text.strip()
-                )
+                disease = disease_link.text.strip() if disease_link else disease_cell.text.strip()
                 disease_url = disease_link.get("href") if disease_link else None
 
                 disease_mechanisms.append(
@@ -536,9 +507,7 @@ class AutoPVS1Client:
 
         return disease_mechanisms
 
-    def _parse_search_results(
-        self, soup: BeautifulSoup, genome_version: str
-    ) -> list[SearchResult]:
+    def _parse_search_results(self, soup: BeautifulSoup, genome_version: str) -> list[SearchResult]:
         """Parse search results from the search page."""
         results: list[SearchResult] = []
 
@@ -598,9 +567,7 @@ class AutoPVS1Client:
                 logger.warning("Error parsing search result row", error=str(e))
                 continue
 
-        logger.info(
-            "Parsed search results", count=len(results), genome_version=genome_version
-        )
+        logger.info("Parsed search results", count=len(results), genome_version=genome_version)
         return results
 
     def _parse_cnv_info(self, soup: BeautifulSoup, cnv_id: str) -> CNVInfo:
@@ -630,7 +597,7 @@ class AutoPVS1Client:
             coordinates=cnv_id,  # Use the ID as coordinates for now
         )
 
-    def _extract_field_value(self, container: Tag, field_name: str) -> Optional[str]:
+    def _extract_field_value(self, container: Tag, field_name: str) -> str | None:
         """Extract field value from a container by field name.
 
         Handles HTML structure like: <p><b>Field:</b> value</p>
@@ -652,7 +619,7 @@ class AutoPVS1Client:
                 return field_text.split(":", 1)[1].strip()
         return None
 
-    def _find_field_paragraph(self, container: Tag, field_name: str) -> Optional[Tag]:
+    def _find_field_paragraph(self, container: Tag, field_name: str) -> Tag | None:
         """Find the paragraph containing a specific field name."""
         for p in container.find_all("p"):
             b_tag = p.find("b")
@@ -680,9 +647,7 @@ class AutoPVS1Client:
         logger.debug("No HGVS pattern detected", query=query)
         return False
 
-    def _extract_variant_from_redirect_url(
-        self, url: str
-    ) -> tuple[Optional[str], Optional[str]]:
+    def _extract_variant_from_redirect_url(self, url: str) -> tuple[str | None, str | None]:
         """Extract genome_build and variant_id from redirect URL.
 
         Args:
@@ -734,17 +699,13 @@ class AutoPVS1Client:
         variant_info = self._parse_variant_info(soup, variant_id or "unknown")
 
         # Check if this variant is compatible with PVS1
-        incompatible_text = soup.find(
-            "p", string=re.compile(r"incompatible with.*PVS1")
-        )
+        incompatible_text = soup.find("p", string=re.compile(r"incompatible with.*PVS1"))
         if incompatible_text:
             pvs1_flowchart = PVS1Flowchart(
                 preliminary_decision_path="not_applicable",
                 final_strength="PVS1_Not_Applicable",
                 decision_tree=[],
-                notes={
-                    "note_1": "This variant type is incompatible with PVS1 criterion"
-                },
+                notes={"note_1": "This variant type is incompatible with PVS1 criterion"},
             )
             disease_mechanisms = []
         else:

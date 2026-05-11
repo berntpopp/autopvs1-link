@@ -35,7 +35,7 @@ class ClientManager:
             return
 
         self._initialized = True
-        self._client: Optional[AutoPVS1Client] = None
+        self._client: AutoPVS1Client | None = None
         self._client_lock = asyncio.Lock()
         self._shutdown_event = asyncio.Event()
         self._last_request_time = 0.0
@@ -113,7 +113,7 @@ class ClientManager:
 
 
 # Global client manager instance
-_client_manager: Optional[ClientManager] = None
+_client_manager: ClientManager | None = None
 
 
 async def get_client_manager() -> ClientManager:

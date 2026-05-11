@@ -27,9 +27,7 @@ class AutoPVS1Service:
         ttl=settings.cache.ttl_seconds,
         key_func=lambda self, genome_build, variant_id: f"variant:{genome_build}:{variant_id}",
     )
-    async def get_variant_data(
-        self, genome_build: str, variant_id: str
-    ) -> AutoPVS1Data:
+    async def get_variant_data(self, genome_build: str, variant_id: str) -> AutoPVS1Data:
         """Get variant data with enhanced caching and error handling."""
         with PerformanceLogger(
             "variant_data_fetch", genome_build=genome_build, variant_id=variant_id
@@ -51,12 +49,8 @@ class AutoPVS1Service:
         self, query: str, genome_version: str = "hg19"
     ) -> AutoPVS1SearchResults:
         """Search variants with enhanced caching and error handling."""
-        with PerformanceLogger(
-            "variant_search", query=query, genome_version=genome_version
-        ):
-            logger.info(
-                "Searching variants", query=query, genome_version=genome_version
-            )
+        with PerformanceLogger("variant_search", query=query, genome_version=genome_version):
+            logger.info("Searching variants", query=query, genome_version=genome_version)
 
             result = await self.client.search_variants(query, genome_version)
             logger.debug(
@@ -70,33 +64,29 @@ class AutoPVS1Service:
     @cache_manager.enhanced_cache(
         maxsize=settings.cache.size,
         ttl=settings.cache.ttl_seconds,
-        key_func=lambda self, query, genome_version="hg19": f"enhanced_search:{query}:{genome_version}",
+        key_func=lambda self, query, genome_version="hg19": (
+            f"enhanced_search:{query}:{genome_version}"
+        ),
     )
     async def search_with_redirect_detection(
         self, query: str, genome_version: str = "hg19"
     ) -> EnhancedSearchResults:
         """Enhanced search with redirect detection and caching."""
-        with PerformanceLogger(
-            "enhanced_search", query=query, genome_version=genome_version
-        ):
+        with PerformanceLogger("enhanced_search", query=query, genome_version=genome_version):
             logger.info(
                 "Enhanced search with redirect detection",
                 query=query,
                 genome_version=genome_version,
             )
 
-            result = await self.client.search_with_redirect_detection(
-                query, genome_version
-            )
+            result = await self.client.search_with_redirect_detection(query, genome_version)
 
             if result.redirected:
                 logger.info(
                     "Search redirected to variant",
                     query=query,
                     variant_id=(
-                        result.redirect_info.variant_id_extracted
-                        if result.redirect_info
-                        else None
+                        result.redirect_info.variant_id_extracted if result.redirect_info else None
                     ),
                     genome_build=(
                         result.redirect_info.genome_build_extracted
@@ -109,9 +99,7 @@ class AutoPVS1Service:
                     "Search returned multiple results",
                     query=query,
                     result_count=(
-                        len(result.search_results.results)
-                        if result.search_results
-                        else 0
+                        len(result.search_results.results) if result.search_results else 0
                     ),
                 )
 
@@ -122,16 +110,10 @@ class AutoPVS1Service:
         ttl=settings.cache.ttl_seconds,
         key_func=lambda self, hgvs, genome_version="hg19": f"hgvs:{hgvs}:{genome_version}",
     )
-    async def resolve_hgvs_notation(
-        self, hgvs: str, genome_version: str = "hg19"
-    ) -> AutoPVS1Data:
+    async def resolve_hgvs_notation(self, hgvs: str, genome_version: str = "hg19") -> AutoPVS1Data:
         """Direct HGVS notation resolution with caching."""
-        with PerformanceLogger(
-            "hgvs_resolution", hgvs=hgvs, genome_version=genome_version
-        ):
-            logger.info(
-                "Resolving HGVS notation", hgvs=hgvs, genome_version=genome_version
-            )
+        with PerformanceLogger("hgvs_resolution", hgvs=hgvs, genome_version=genome_version):
+            logger.info("Resolving HGVS notation", hgvs=hgvs, genome_version=genome_version)
 
             result = await self.client.resolve_hgvs_notation(hgvs, genome_version)
 
@@ -152,9 +134,7 @@ class AutoPVS1Service:
     )
     async def get_cnv_data(self, genome_build: str, cnv_id: str) -> AutoPVS1CNVData:
         """Get CNV data with enhanced caching and statistics."""
-        with PerformanceLogger(
-            "cnv_data_fetch", genome_build=genome_build, cnv_id=cnv_id
-        ):
+        with PerformanceLogger("cnv_data_fetch", genome_build=genome_build, cnv_id=cnv_id):
             logger.info("Fetching CNV data", genome_build=genome_build, cnv_id=cnv_id)
             return await self.client.get_cnv_data(genome_build, cnv_id)
 

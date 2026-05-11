@@ -41,9 +41,7 @@ class TestHGVSPatternDetection:
             ]
 
             for hgvs in hgvs_cases:
-                assert client._detect_hgvs_pattern(
-                    hgvs
-                ), f"Failed to detect HGVS: {hgvs}"
+                assert client._detect_hgvs_pattern(hgvs), f"Failed to detect HGVS: {hgvs}"
 
             # Test cases that should NOT be detected as HGVS
             non_hgvs_cases = [
@@ -62,9 +60,9 @@ class TestHGVSPatternDetection:
             ]
 
             for non_hgvs in non_hgvs_cases:
-                assert not client._detect_hgvs_pattern(
-                    non_hgvs
-                ), f"Incorrectly detected as HGVS: {non_hgvs}"
+                assert not client._detect_hgvs_pattern(non_hgvs), (
+                    f"Incorrectly detected as HGVS: {non_hgvs}"
+                )
 
         finally:
             await client.close()
@@ -175,9 +173,7 @@ class TestRedirectDetection:
         # Mock response for normal search results (no redirect)
         mock_response = AsyncMock()
         mock_response.text = self._get_brca1_search_results_html()
-        mock_response.url = (
-            "https://autopvs1.bgi.com/search?q=BRCA1&genome_version=hg19"
-        )
+        mock_response.url = "https://autopvs1.bgi.com/search?q=BRCA1&genome_version=hg19"
         mock_response.history = []  # No redirect history
 
         client = AutoPVS1Client()
@@ -220,9 +216,7 @@ class TestRedirectDetection:
                 "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
                 return_value=mock_response,
             ):
-                result = await client.resolve_hgvs_notation(
-                    "NM_000128.3:c.1716+1G>A", "hg19"
-                )
+                result = await client.resolve_hgvs_notation("NM_000128.3:c.1716+1G>A", "hg19")
 
             # Verify we get variant data directly
             assert isinstance(result, AutoPVS1Data)
@@ -239,22 +233,20 @@ class TestRedirectDetection:
         # Mock response for search results (no redirect)
         mock_response = AsyncMock()
         mock_response.text = self._get_brca1_search_results_html()
-        mock_response.url = (
-            "https://autopvs1.bgi.com/search?q=invalid&genome_version=hg19"
-        )
+        mock_response.url = "https://autopvs1.bgi.com/search?q=invalid&genome_version=hg19"
         mock_response.history = []
 
         client = AutoPVS1Client()
 
         try:
-            with patch(
-                "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
-                return_value=mock_response,
+            with (
+                patch(
+                    "autopvs1_link.utils.retry_handler.retry_handler.http_request_with_retry",
+                    return_value=mock_response,
+                ),
+                pytest.raises(ValueError, match="did not resolve to a single variant"),
             ):
-                with pytest.raises(
-                    ValueError, match="did not resolve to a single variant"
-                ):
-                    await client.resolve_hgvs_notation("invalid_hgvs", "hg19")
+                await client.resolve_hgvs_notation("invalid_hgvs", "hg19")
 
         finally:
             await client.close()
@@ -356,9 +348,7 @@ class TestServiceIntegration:
 
         service = AutoPVS1Service(mock_client)
 
-        result = await service.search_with_redirect_detection(
-            "NM_000128.3:c.1716+1G>A", "hg19"
-        )
+        result = await service.search_with_redirect_detection("NM_000128.3:c.1716+1G>A", "hg19")
 
         assert isinstance(result, EnhancedSearchResults)
         assert result.redirected is True
@@ -384,9 +374,7 @@ class TestServiceIntegration:
         assert result == mock_variant_data
 
         # Verify client was called correctly
-        mock_client.resolve_hgvs_notation.assert_called_once_with(
-            "NM_000128.3:c.1716+1G>A", "hg19"
-        )
+        mock_client.resolve_hgvs_notation.assert_called_once_with("NM_000128.3:c.1716+1G>A", "hg19")
 
 
 class TestDataModels:
@@ -430,9 +418,7 @@ class TestDataModels:
             query="test",
             genome_version="hg19",
             redirected=False,
-            search_results=AutoPVS1SearchResults(
-                query="test", genome_version="hg19", results=[]
-            ),
+            search_results=AutoPVS1SearchResults(query="test", genome_version="hg19", results=[]),
         )
 
         assert search_result.is_single_variant is False
@@ -472,9 +458,7 @@ class TestEdgeCases:
             ]
 
             for url in test_cases:
-                genome_build, variant_id = client._extract_variant_from_redirect_url(
-                    url
-                )
+                genome_build, variant_id = client._extract_variant_from_redirect_url(url)
                 assert genome_build is None or genome_build == ""
                 assert variant_id is None or variant_id == ""
 
