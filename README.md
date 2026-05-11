@@ -1,461 +1,181 @@
-# AutoPVS1 Link 🧬
+# AutoPVS1 Link
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
-[![MCP](https://img.shields.io/badge/MCP-2.2+-orange.svg)](https://spec.modelcontextprotocol.io/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
+[![FastMCP](https://img.shields.io/badge/FastMCP-3.2+-orange.svg)](https://github.com/jlowin/fastmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A production-ready unified server providing both REST API and MCP (Model Context Protocol) interfaces for accessing PVS1 variant classification data from [AutoPVS1](https://autopvs1.bgi.com). Built with FastAPI and FastMCP for seamless integration with AI assistants and web applications.
+A unified server providing both REST API and MCP (Model Context Protocol)
+interfaces for accessing PVS1 variant classification data from
+[AutoPVS1](https://autopvs1.bgi.com). Built with FastAPI and FastMCP for
+seamless integration with AI assistants and web applications.
 
-## ✨ Advanced Features
+## Modern stack (May 2026)
 
-### 🏗️ Architecture
-- **Unified Server**: Single server supporting both REST API and MCP protocols
-- **Multi-Transport Support**: HTTP, STDIO, and unified transport modes
-- **Singleton Managers**: Thread-safe resource management with proper lifecycle
-- **STDIO Protection**: Reliable MCP communication with output suppression
-- **Circuit Breaker**: Resilient external service calls with automatic recovery
+- Python 3.12+ (3.13 / 3.14 supported)
+- `uv` for dependency management with committed `uv.lock`
+- `hatchling` build backend
+- `ruff` for both lint and format (Black removed)
+- `mypy` strict
+- FastAPI + Pydantic 2.11+
+- FastMCP 3.2+ with Streamable HTTP transport (SSE retired)
+- Observability: `structlog` + `asgi-correlation-id` + `prometheus-client`
+- `defusedxml` for XML/HTML hardening
+- `gunicorn` + `uvicorn` workers in production (Docker)
+- Multi-stage Dockerfile on `python:3.14-slim`
 
-### 🚀 Performance & Reliability
-- **Advanced Caching**: Enhanced async LRU caching with detailed statistics and event logging
-- **Retry Logic**: Exponential backoff with configurable retries and circuit breaker
-- **Rate Limiting**: Respectful request handling to avoid service overload
-- **Connection Pooling**: Efficient HTTP connection management
-- **Health Monitoring**: Comprehensive health checks and status reporting
-
-### 🔧 Developer Experience
-- **Rich CLI**: Beautiful command-line interface with colors and progress indicators
-- **Advanced Configuration**: Multi-level configuration with validation and environment support
-- **Structured Logging**: Correlation IDs, performance metrics, and JSON output
-- **Type Safety**: Full type hints with Pydantic models and mypy compliance
-- **Hot Reload**: Development mode with automatic code reloading
-
-### 📊 Observability
-- **Request Correlation**: Unique IDs for tracking requests across components
-- **Performance Logging**: Detailed timing and cache statistics
-- **Cache Analytics**: Hit rates, miss counts, and performance metrics
-- **Circuit Breaker Status**: Real-time service health monitoring
-- **Error Tracking**: Comprehensive error logging with context
-
-## 🚀 Quick Start
+## Quick start
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/autopvs1-link.git
+git clone https://github.com/berntpopp/autopvs1-link.git
 cd autopvs1-link
 
 # Install with development dependencies
-pip install -e ".[dev]"
+uv sync --group dev
 ```
 
-### 🎯 Quick Start for Claude Users
-
-**1. Install:**
-```bash
-pip install -e ".[dev]"
-```
-
-**2. Add to Claude Desktop config:**
-```json
-{
-  "mcpServers": {
-    "autopvs1-link": {
-      "command": "autopvs1-link",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-**3. Ask Claude:**
-*"Analyze the PVS1 criteria for variant X:g.83508928A>T in hg19"*
-
-See [Claude Integration Guide](./CLAUDE_INTEGRATION.md) for complete setup instructions.
-
-### Basic Usage
-
-#### CLI Interface (Recommended)
+### Run
 
 ```bash
-# Start the unified server (REST + MCP)
-autopvs1-link server
+# Unified server (REST + MCP) on http://127.0.0.1:8000
+make dev
 
-# Start MCP server only (STDIO)
-autopvs1-link mcp
+# Or via the CLI
+uv run autopvs1-link server
 
-# Start MCP server (HTTP transport)
-autopvs1-link mcp --http --port 3000
+# MCP stdio (for Claude Desktop and similar)
+uv run autopvs1-link mcp
 
-# Show configuration
-autopvs1-link config
-
-# Check health status
-autopvs1-link health
-
-# View cache statistics
-autopvs1-link cache
-
-# Clear all caches
-autopvs1-link clear-cache
+# MCP over Streamable HTTP
+uv run autopvs1-link mcp --http --port 3000
 ```
 
-#### Direct Python
+### Claude Desktop integration
 
-```bash
-# Unified server
-python -m autopvs1_link.unified_server
-
-# MCP STDIO mode
-python -m autopvs1_link.cli mcp
-
-# Legacy compatibility (redirects to unified server)
-python server.py
-python mcp_server.py
-```
-
-## 🌐 API Endpoints
-
-### REST API
-
-The server provides a comprehensive REST API with OpenAPI documentation:
-
-- **Documentation**: `http://localhost:8000/docs`
-- **Health Check**: `http://localhost:8000/health`
-- **Cache Stats**: `http://localhost:8000/api/cache/stats`
-- **Circuit Breakers**: `http://localhost:8000/api/circuit-breakers`
-
-#### Core Endpoints
-
-```bash
-# Get variant PVS1 analysis
-GET /api/variant/{genome_build}/{variant_id}
-
-# Search variants by gene
-GET /api/search?q={gene_name}&genome_version={version}
-
-# Get CNV PVS1 analysis
-GET /api/cnv/{genome_build}/{cnv_id}
-
-# Management endpoints
-GET /api/cache/stats
-POST /api/cache/clear
-GET /api/circuit-breakers
-```
-
-### MCP Tools
-
-The server exposes the following tools via MCP:
-
-- `get_variant_analysis` - Get comprehensive PVS1 analysis for variants
-- `search_genetic_variants` - Search for variants by gene or criteria
-- `get_cnv_analysis` - Get PVS1 analysis for copy number variants
-- `get_cache_statistics` - View cache performance metrics
-- `clear_all_caches` - Clear all service caches
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-The server supports comprehensive configuration via environment variables:
-
-```bash
-# API Configuration
-AUTOPVS1_API_BASE_URL=https://autopvs1.bgi.com
-AUTOPVS1_API_REQUEST_TIMEOUT=30
-AUTOPVS1_API_MAX_RETRIES=3
-AUTOPVS1_API_RETRY_DELAY=1.0
-AUTOPVS1_API_RATE_LIMIT_DELAY=1.0
-
-# Cache Configuration
-AUTOPVS1_CACHE_ENABLED=true
-AUTOPVS1_CACHE_SIZE=256
-AUTOPVS1_CACHE_TTL_HOURS=24
-AUTOPVS1_CACHE_STATISTICS_ENABLED=true
-AUTOPVS1_CACHE_EVENT_LOGGING=false
-
-# Server Configuration
-AUTOPVS1_SERVER_HOST=0.0.0.0
-AUTOPVS1_SERVER_PORT=8000
-AUTOPVS1_SERVER_RELOAD=false
-AUTOPVS1_SERVER_CORS_ORIGINS=*
-AUTOPVS1_SERVER_WORKERS=1
-
-# Logging Configuration
-AUTOPVS1_LOG_LEVEL=INFO
-AUTOPVS1_LOG_JSON_FORMAT=false
-AUTOPVS1_LOG_STRUCTURED=true
-AUTOPVS1_LOG_CORRELATION_IDS=true
-AUTOPVS1_LOG_PERFORMANCE_LOGGING=true
-
-# MCP Configuration
-AUTOPVS1_MCP_NAME="AutoPVS1 Link"
-AUTOPVS1_MCP_ENABLE_STDIO_PROTECTION=true
-AUTOPVS1_MCP_CUSTOM_TOOL_NAMES=true
-
-# Environment
-ENVIRONMENT=development  # development, staging, production
-DEBUG=true
-```
-
-### Configuration File
-
-Create a `.env` file in the project root:
-
-```env
-# Example .env file
-ENVIRONMENT=development
-DEBUG=true
-AUTOPVS1_API_REQUEST_TIMEOUT=30
-AUTOPVS1_CACHE_SIZE=512
-AUTOPVS1_LOG_LEVEL=DEBUG
-```
-
-## 🧪 Development
-
-### Code Quality
-
-```bash
-# Run linting
-ruff check . --fix
-
-# Format code
-black .
-
-# Type checking
-mypy autopvs1_link/
-
-# Run all checks
-ruff check . --fix && black . && mypy autopvs1_link/
-```
-
-### Testing
-
-```bash
-# Run tests
-pytest
-
-# Run with coverage
-pytest --cov=autopvs1_link --cov-report=html
-
-# Run specific test
-pytest tests/test_service.py::test_variant_caching
-```
-
-### Architecture
-
-The project follows a clean, modular architecture:
-
-```
-autopvs1_link/
-├── api/                    # API layer
-│   ├── autopvs1_client.py # HTTP client with retry logic
-│   ├── client_manager.py  # Singleton client management
-│   └── routes/            # FastAPI route definitions
-├── services/              # Business logic layer
-│   ├── autopvs1_service.py # Core service with caching
-│   └── service_manager.py  # Singleton service management
-├── models/                # Data models (Pydantic)
-├── middleware/           # Custom middleware
-├── utils/                # Utilities
-│   ├── cache_manager.py  # Advanced cache management
-│   └── retry_handler.py  # Retry logic and circuit breaker
-├── config.py             # Configuration management
-├── logging_config.py     # Logging setup
-├── cli.py               # Rich CLI interface
-└── unified_server.py    # Main server implementation
-```
-
-## 📊 Monitoring & Observability
-
-### Health Checks
-
-```bash
-# CLI health check
-autopvs1-link health
-
-# HTTP health check
-curl http://localhost:8000/health
-```
-
-Response includes:
-- Overall service status
-- Client connection health
-- Service layer status
-- Circuit breaker states
-- Cache configuration
-- Environment information
-
-### Cache Statistics
-
-```bash
-# View cache stats via CLI
-autopvs1-link cache
-
-# HTTP endpoint
-curl http://localhost:8000/api/cache/stats
-```
-
-Provides detailed metrics:
-- Hit/miss rates per method
-- Average response times
-- Error counts
-- Cache evictions
-- Total requests
-
-### Circuit Breaker Status
-
-```bash
-# View circuit breaker status
-curl http://localhost:8000/api/circuit-breakers
-```
-
-Shows:
-- Current state (closed/open/half-open)
-- Failure counts
-- Recovery timeouts
-- Success thresholds
-
-## 🔌 MCP Integration
-
-### Claude Desktop Setup
-
-**Quick Start:** Add to your Claude Desktop configuration:
+Add to your Claude Desktop config:
 
 ```json
 {
   "mcpServers": {
     "autopvs1-link": {
-      "command": "autopvs1-link",
-      "args": ["mcp"],
-      "env": {
-        "AUTOPVS1_CACHE_SIZE": "512",
-        "AUTOPVS1_LOG_LEVEL": "INFO"
-      }
+      "command": "python",
+      "args": ["-m", "autopvs1_link.cli", "mcp"]
     }
   }
 }
 ```
 
-**Configuration File Locations:**
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux:** `~/.config/claude/claude_desktop_config.json`
+Then ask Claude:
 
-### Example Claude Conversations
+> Analyze the PVS1 criteria for variant X:g.83508928A>T in hg19.
 
-Once configured, you can have natural conversations with Claude about genetic variants:
+## API
 
-#### **Variant Analysis**
-**You:** *"Analyze the PVS1 criteria for variant X:g.83508928A>T in the MYH9 gene using hg19 coordinates."*
+### REST endpoints
 
-**Claude:** *I'll analyze that MYH9 variant for PVS1 criteria using the AutoPVS1 database.*
+OpenAPI docs at `http://localhost:8000/docs`.
 
-*[Claude calls `get_variant_analysis(genome_build="hg19", variant_id="X-83508928-A-T")`]*
-
-**Result:** Comprehensive PVS1 analysis including flowchart decisions, pathogenicity assessment, and clinical interpretation.
-
-#### **Gene-Based Search**
-**You:** *"What PVS1-relevant variants are available for the BRCA1 gene?"*
-
-**Claude:** *I'll search for BRCA1 variants in the AutoPVS1 database.*
-
-*[Claude calls `search_genetic_variants(query="BRCA1", genome_version="hg19")`]*
-
-**Result:** List of variants with PVS1 analysis, including nonsense, frameshift, and splice variants.
-
-#### **CNV Analysis**
-**You:** *"Analyze this deletion for haploinsufficiency: chr11:2797090-2869333 in hg19."*
-
-**Claude:** *I'll analyze that deletion for PVS1 criteria and haploinsufficiency evidence.*
-
-*[Claude calls `get_cnv_analysis(genome_build="hg19", cnv_id="11-2797090-2869333-DEL")`]*
-
-**Result:** CNV analysis with gene dosage sensitivity, haploinsufficiency scores, and clinical significance.
-
-#### **Cache Management**
-**You:** *"Show me the current cache performance statistics."*
-
-**Claude:** *I'll check the AutoPVS1 service cache statistics.*
-
-*[Claude calls `get_cache_statistics()`]*
-
-**Result:** Detailed cache metrics including hit rates, performance timings, and memory usage.
-
-### Advanced Configuration
-
-For production or development use, see [CLAUDE_INTEGRATION.md](./CLAUDE_INTEGRATION.md) for:
-- Environment-specific configurations
-- Debugging and troubleshooting
-- Performance optimization
-- Complete usage examples
-
-### Other MCP Clients
-
-For non-Claude MCP clients:
-
-**STDIO transport:**
-```bash
-autopvs1-link mcp
+```
+GET  /variant/{genome_build}/{variant_id}              # PVS1 analysis for a variant
+GET  /variant/search?q={gene}&genome_version={build}   # Variant search
+GET  /cnv/{genome_build}/{cnv_id}                      # PVS1 analysis for a CNV
+GET  /health                                           # Health probe
+GET  /metrics                                          # Prometheus metrics
+GET  /api/cache/stats                                  # Cache stats
+POST /api/cache/clear                                  # Clear caches
 ```
 
-**HTTP transport:**
+See [`docs/api.md`](docs/api.md) for the full reference.
+
+### MCP tools and resources
+
+Tools (4):
+
+- `get_variant_pvs1_data(genome_build, variant_id)`
+- `get_cnv_pvs1_data(genome_build, cnv_id)`
+- `search_variants(query, genome_version)`
+- `clear_cache()` - **gated** behind `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`
+
+Resources (1):
+
+- `autopvs1-link://cache/statistics` - read-only cache stats snapshot
+
+The auto-generated tool catalog with full schemas lives in
+[`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md).
+
+## Configuration
+
+Settings are read from the `AUTOPVS1_LINK_*` env-var family (or a local
+`.env` file). The legacy `AUTOPVS1_*` prefix is still accepted for one
+release with a `DeprecationWarning`. See
+[`docs/configuration.md`](docs/configuration.md) for the full migration
+table and tunable knobs.
+
 ```bash
-autopvs1-link mcp --http --port 3000
+AUTOPVS1_LINK_API_BASE_URL=https://autopvs1.bgi.com
+AUTOPVS1_LINK_API_REQUEST_TIMEOUT=30
+AUTOPVS1_LINK_CACHE_SIZE=256
+AUTOPVS1_LINK_LOG_LEVEL=INFO
+AUTOPVS1_LINK_METRICS_ENABLED=true
+AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=false
 ```
 
-**Direct Python:**
+## Development
+
 ```bash
-python -m autopvs1_link.unified_server:run_mcp_stdio
+make install         # Install + sync dev deps
+make format          # Run ruff format
+make lint            # Run ruff check
+make typecheck       # Run mypy strict
+make test            # Run tests
+make test-cov        # Run tests with coverage report
+make ci-local        # format-check + lint + typecheck + test (the CI gate)
 ```
 
-## 🤝 Contributing
+Pre-commit hooks ship in `.pre-commit-config.yaml`:
+
+```bash
+uv run pre-commit install
+```
+
+## Docker
+
+Multi-stage Dockerfile on `python:3.14-slim` and four Compose stacks (base,
+dev, prod, npm) live under `docker/`. See
+[`docker/README.md`](docker/README.md) for usage.
+
+```bash
+make docker-build    # Build image
+make docker-up       # Start dev stack
+make docker-down     # Stop
+make docker-logs     # Follow logs
+```
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md) - layered architecture
+- [`docs/configuration.md`](docs/configuration.md) - env-var reference
+- [`docs/api.md`](docs/api.md) - REST + MCP surface
+- [`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md) - generated tool schemas
+- [`AGENTS.md`](AGENTS.md) - shared instructions for agentic coding tools
+- [`CHANGELOG.md`](CHANGELOG.md) - release notes
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests and linting (`pytest && ruff check . --fix && black .`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+3. Run `make ci-local` and make sure it passes
+4. Open a Pull Request
 
-## 📝 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT - see [LICENSE](LICENSE).
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [AutoPVS1](https://autopvs1.bgi.com) for providing the PVS1 variant classification service
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
-- [FastMCP](https://github.com/modelcontextprotocol/fast-mcp) for MCP integration
-- [Pydantic](https://docs.pydantic.dev/) for data validation and settings management
-
-## 📞 Support
-
-- 📖 [Documentation](./CLAUDE.md)
-- 🔌 [Claude Integration Guide](./CLAUDE_INTEGRATION.md)
-- 🔧 [Claude Desktop Configuration](./claude-desktop-config.json)
-- 🐛 [Issue Tracker](https://github.com/your-username/autopvs1-link/issues)
-- 💬 [Discussions](https://github.com/your-username/autopvs1-link/discussions)
-
-### Quick Help
-
-**Installation Issues:**
-```bash
-# Verify installation
-autopvs1-link --version
-
-# Test basic functionality
-autopvs1-link health
-```
-
-**Claude Integration Issues:**
-- Check configuration file location and syntax
-- Enable debug logging: `"AUTOPVS1_LOG_LEVEL": "DEBUG"`
-- Test standalone: `autopvs1-link mcp` in terminal
-- See [troubleshooting guide](./CLAUDE_INTEGRATION.md#troubleshooting)
-
----
-
-Built with ❤️ for the genomics and AI community.
+- [FastAPI](https://fastapi.tiangolo.com/) for the web framework
+- [FastMCP](https://github.com/jlowin/fastmcp) for MCP integration
+- [Pydantic](https://docs.pydantic.dev/) for data validation and settings
