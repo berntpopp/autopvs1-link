@@ -4,6 +4,7 @@ import logging
 import sys
 
 import structlog
+from asgi_correlation_id.context import correlation_id
 from structlog.types import Processor
 
 from autopvs1_link.config import settings
@@ -17,6 +18,14 @@ def add_service_context(logger, method_name, event_dict) -> dict:
     return event_dict
 
 
+def bind_correlation_id(logger, method_name, event_dict) -> dict:
+    """Bind the active asgi-correlation-id into every log event."""
+    cid = correlation_id.get()
+    if cid:
+        event_dict["correlation_id"] = cid
+    return event_dict
+
+
 def configure_logging() -> None:
     """Configure structured logging for the application."""
     processors: list[Processor] = [
@@ -27,6 +36,7 @@ def configure_logging() -> None:
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="iso"),
         add_service_context,
+        bind_correlation_id,
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),

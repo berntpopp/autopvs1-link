@@ -13,6 +13,8 @@ from autopvs1_link.api.routes import cnv, gene, variant
 from autopvs1_link.config import settings
 from autopvs1_link.mcp.facade import build_mcp_server
 from autopvs1_link.middleware.logging_middleware import RequestLoggingMiddleware
+from autopvs1_link.observability.correlation import install as install_correlation
+from autopvs1_link.observability.prometheus import install as install_metrics
 from autopvs1_link.services.service_manager import shutdown_services
 
 
@@ -39,6 +41,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.add_middleware(RequestLoggingMiddleware)
+    install_metrics(app)
+    # Correlation middleware added LAST so it runs FIRST on requests, binding
+    # the X-Request-ID before downstream middleware logs the request.
+    install_correlation(app)
     app.include_router(variant.router)
     app.include_router(cnv.router)
     app.include_router(gene.router)
