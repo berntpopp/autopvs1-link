@@ -14,7 +14,7 @@ from autopvs1_link.models.autopvs1_models import (
     PVS1Flowchart,
     VariantInfo,
 )
-from autopvs1_link.unified_server import app
+from autopvs1_link.server_manager import app
 
 
 def load_fixture(name: str) -> str:
@@ -89,25 +89,13 @@ def sample_variant_data():
 class TestVariantEndpoints:
     """Test variant-related endpoints."""
 
-    def test_root_endpoint(self, test_client):
-        """Test the root endpoint."""
-        response = test_client.get("/")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == "Welcome to the AutoPVS1 Link Unified Server!"
-        assert "docs" in data
-        assert "version" in data
-
     @pytest.mark.asyncio
     async def test_health_endpoint(self, async_client):
         """Test the health check endpoint."""
         response = await async_client.get("http://test/health")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] in ["healthy", "unhealthy", "not_initialized"]
-        # Service field only present when properly initialized
-        if "service" in data:
-            assert data["service"] == "autopvs1-link"
+        assert data["status"] == "ok"
 
     @pytest.mark.asyncio
     @patch("autopvs1_link.api.autopvs1_client.AutoPVS1Client.get_variant_data")
@@ -147,8 +135,8 @@ class TestVariantEndpoints:
     @pytest.mark.asyncio
     async def test_get_variant_server_error(self, async_client):
         """Test server error handling using FastAPI dependency override."""
+        from autopvs1_link.server_manager import app
         from autopvs1_link.services.service_manager import get_managed_service
-        from autopvs1_link.unified_server import app
 
         # Create mock service that raises an exception
         mock_service = AsyncMock()
