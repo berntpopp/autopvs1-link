@@ -1,15 +1,56 @@
 """Advanced configuration management for AutoPVS1 Link."""
 
+import os
+import warnings
 from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
+# ---------------------------------------------------------------------------
+# Backward-compat shim: copy AUTOPVS1_* env vars to AUTOPVS1_LINK_* when the
+# new-prefixed variable is unset. Emits one DeprecationWarning naming each
+# migrated variable. Runs at import time so subsequent Settings(...) reads
+# observe the migrated values.
+# ---------------------------------------------------------------------------
+
+_OLD_TO_NEW_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("AUTOPVS1_API_", "AUTOPVS1_LINK_API_"),
+    ("AUTOPVS1_CACHE_", "AUTOPVS1_LINK_CACHE_"),
+    ("AUTOPVS1_SERVER_", "AUTOPVS1_LINK_SERVER_"),
+    ("AUTOPVS1_LOG_", "AUTOPVS1_LINK_LOG_"),
+    ("AUTOPVS1_MCP_", "AUTOPVS1_LINK_MCP_"),
+)
+
+
+def _migrate_legacy_env() -> None:
+    migrated: list[str] = []
+    for old_prefix, new_prefix in _OLD_TO_NEW_PREFIXES:
+        for key, value in list(os.environ.items()):
+            if key.startswith(old_prefix):
+                suffix = key[len(old_prefix) :]
+                new_key = new_prefix + suffix
+                if new_key not in os.environ:
+                    os.environ[new_key] = value
+                    migrated.append(key)
+    if migrated:
+        warnings.warn(
+            "Detected legacy AUTOPVS1_* env vars: "
+            + ", ".join(sorted(migrated))
+            + ". Rename to AUTOPVS1_LINK_*. Compat shim will be removed in a "
+            "future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+
+_migrate_legacy_env()
+
 
 class APIConfig(BaseSettings):
     """API-specific configuration settings."""
 
-    model_config = {"env_prefix": "AUTOPVS1_API_", "env_file": ".env"}
+    model_config = {"env_prefix": "AUTOPVS1_LINK_API_", "env_file": ".env"}
 
     base_url: str = Field(
         default="https://autopvs1.bgi.com", description="Base URL for AutoPVS1 service"
@@ -37,7 +78,7 @@ class APIConfig(BaseSettings):
 class CacheConfig(BaseSettings):
     """Cache configuration settings."""
 
-    model_config = {"env_prefix": "AUTOPVS1_CACHE_", "env_file": ".env"}
+    model_config = {"env_prefix": "AUTOPVS1_LINK_CACHE_", "env_file": ".env"}
 
     enabled: bool = Field(default=True, description="Enable/disable caching")
     size: int = Field(default=256, ge=1, le=10000, description="Maximum number of cache entries")
@@ -45,7 +86,7 @@ class CacheConfig(BaseSettings):
         default=24,
         ge=1,
         le=168,
-        description="Cache TTL in hours",  # 1 week max
+        description="Cache TTL in hours",
     )
     statistics_enabled: bool = Field(default=True, description="Enable cache statistics collection")
     event_logging: bool = Field(default=False, description="Enable detailed cache event logging")
@@ -59,7 +100,7 @@ class CacheConfig(BaseSettings):
 class ServerConfig(BaseSettings):
     """Server configuration settings."""
 
-    model_config = {"env_prefix": "AUTOPVS1_SERVER_", "env_file": ".env"}
+    model_config = {"env_prefix": "AUTOPVS1_LINK_SERVER_", "env_file": ".env"}
 
     host: str = Field(default="0.0.0.0", description="Server host address")  # noqa: S104
     port: int = Field(default=8000, ge=1, le=65535, description="Server port")
@@ -73,7 +114,6 @@ class ServerConfig(BaseSettings):
         """Validate CORS origins format."""
         if v and v != "*":
             origins = [origin.strip() for origin in v.split(",")]
-            # Basic URL validation
             for origin in origins:
                 if not (
                     origin.startswith("http://")
@@ -87,7 +127,7 @@ class ServerConfig(BaseSettings):
 class LoggingConfig(BaseSettings):
     """Logging configuration settings."""
 
-    model_config = {"env_prefix": "AUTOPVS1_LOG_", "env_file": ".env"}
+    model_config = {"env_prefix": "AUTOPVS1_LINK_LOG_", "env_file": ".env"}
 
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO", description="Logging level"
@@ -104,7 +144,7 @@ class LoggingConfig(BaseSettings):
 class MCPConfig(BaseSettings):
     """MCP (Model Context Protocol) configuration settings."""
 
-    model_config = {"env_prefix": "AUTOPVS1_MCP_", "env_file": ".env"}
+    model_config = {"env_prefix": "AUTOPVS1_LINK_MCP_", "env_file": ".env"}
 
     name: str = Field(default="AutoPVS1 Link", description="MCP server name")
     version: str = Field(default="1.0.0", description="MCP server version")
@@ -132,14 +172,12 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
-    # Environment and deployment
     environment: Literal["development", "staging", "production"] = Field(
         default="development", description="Deployment environment"
     )
     debug: bool = Field(default=True, description="Enable debug mode")
     version: str = Field(default="1.0.0", description="Application version")
 
-    # Configuration sections
     api: APIConfig = Field(default_factory=APIConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -166,7 +204,6 @@ class Settings(BaseSettings):
         """Initialize settings with environment-specific defaults."""
         super().__init__(**kwargs)
 
-        # Override settings based on environment
         if self.is_production:
             self.debug = False
             self.server.reload = False
@@ -181,14 +218,3 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
-
-# Legacy compatibility - these will be deprecated
-AUTOPVS1_BASE_URL = settings.api.base_url
-CACHE_SIZE = settings.cache.size
-CACHE_TTL_HOURS = settings.cache.ttl_hours
-LOG_LEVEL = settings.logging.level
-LOG_JSON = settings.logging.json_format
-ENVIRONMENT = settings.environment
-CORS_ORIGINS = settings.server.cors_origins
-REQUEST_TIMEOUT = settings.api.request_timeout
-USER_AGENT = settings.api.user_agent
