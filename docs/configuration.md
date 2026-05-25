@@ -12,6 +12,7 @@ to a sub-config (`AUTOPVS1_LINK_API_*`, `AUTOPVS1_LINK_CACHE_*`,
 ```bash
 AUTOPVS1_LINK_HOST=127.0.0.1
 AUTOPVS1_LINK_PORT=8000
+AUTOPVS1_LINK_HOST_PORT=8012              # Docker host port only
 AUTOPVS1_LINK_TRANSPORT=unified            # stdio | http | unified
 AUTOPVS1_LINK_SERVER_CORS_ORIGINS=*
 ```

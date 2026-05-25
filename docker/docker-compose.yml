@@ -19,7 +19,7 @@ services:
       AUTOPVS1_LINK_METRICS_ENABLED: "true"
 
     ports:
-      - "${AUTOPVS1_LINK_PORT:-8000}:8000"
+      - "${AUTOPVS1_LINK_HOST_PORT:-8012}:8000"
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

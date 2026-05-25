@@ -1,16 +1,28 @@
 services:
   autopvs1-link:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: builder
+
     environment:
       AUTOPVS1_LINK_LOG_LEVEL: DEBUG
+      PYTHONPATH: /home/app/web
+
     volumes:
-      - ../autopvs1_link:/home/app/web/autopvs1_link:ro
-    command:
-      [
-        "uvicorn",
-        "autopvs1_link.server_manager:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "8000",
-        "--reload",
-      ]
+      - ../autopvs1_link:/home/app/web/autopvs1_link:delegated
+      - ../server.py:/home/app/web/server.py:ro
+      - ../mcp_server.py:/home/app/web/mcp_server.py:ro
+      - ../pyproject.toml:/home/app/web/pyproject.toml:ro
+      - ../README.md:/home/app/web/README.md:ro
+
+    command: >
+      sh -c "
+        cd /home/app/web &&
+        pip install -e . &&
+        uvicorn autopvs1_link.server_manager:app --host 0.0.0.0 --port 8000 --reload --reload-dir autopvs1_link
+      "
+
+    user: root
+
+    working_dir: /home/app/web

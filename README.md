@@ -75,7 +75,9 @@ Then ask Claude:
 
 ### REST endpoints
 
-OpenAPI docs at `http://localhost:8000/docs`.
+OpenAPI docs at `http://localhost:8000/docs` for local `make dev`.
+The Docker development stack publishes the container on
+`http://localhost:8012` by default to avoid collisions with sibling projects.
 
 ```
 GET  /variant/{genome_build}/{variant_id}              # PVS1 analysis for a variant

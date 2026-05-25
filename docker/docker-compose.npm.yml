@@ -1,5 +1,8 @@
 services:
   autopvs1-link:
+    ports: !reset []
+    expose:
+      - "8000"
     networks:
       - npm
     labels:
