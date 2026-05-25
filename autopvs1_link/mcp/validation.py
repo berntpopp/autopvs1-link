@@ -1,0 +1,147 @@
+"""MCP-specific input normalization and validation."""
+
+from __future__ import annotations
+
+import re
+
+from autopvs1_link.mcp.envelope import MCPWarning
+from autopvs1_link.mcp.errors import MCPInputError
+
+VALID_GENOME_BUILDS = {"hg19", "hg38"}
+VARIANT_ID_RE = re.compile(r"^(?:[1-9]|1[0-9]|2[0-2]|X|Y|MT)-[1-9][0-9]*-[ACGTN]+-[ACGTN]+$")
+CNV_ID_RE = re.compile(
+    r"^(?P<chrom>[1-9]|1[0-9]|2[0-2]|X|Y|MT)-(?P<start>[1-9][0-9]*)-"
+    r"(?P<end>[1-9][0-9]*)-(?P<type>DEL|DUP)$"
+)
+COLON_CNV_RE = re.compile(
+    r"^(?:chr)?(?P<chrom>[1-9]|1[0-9]|2[0-2]|X|Y|MT):"
+    r"(?P<start>[1-9][0-9]*)-(?P<end>[1-9][0-9]*):(?P<type>DEL|DUP)$",
+    re.IGNORECASE,
+)
+CNV_FORMAT_SUGGESTION = "Use AutoPVS1 CNV format such as 17-15000000-20000000-DEL."
+
+
+def normalize_genome_build(value: str) -> str:
+    normalized = value.strip()
+    if normalized not in VALID_GENOME_BUILDS:
+        raise MCPInputError(
+            code="invalid_genome_build",
+            message="Genome build must be hg19 or hg38.",
+            suggestions=["Use genome_build='hg38' unless the source variant coordinates are hg19."],
+        )
+    return normalized
+
+
+def normalize_genome_builds(
+    genome_build: str | None,
+    genome_version: str | None,
+) -> tuple[str, list[MCPWarning]]:
+    warnings: list[MCPWarning] = []
+    canonical = normalize_genome_build(genome_build) if genome_build is not None else None
+    deprecated = normalize_genome_build(genome_version) if genome_version is not None else None
+
+    if canonical and deprecated and canonical != deprecated:
+        raise MCPInputError(
+            code="invalid_genome_build",
+            message="genome_build and deprecated genome_version must match when both are supplied.",
+            suggestions=["Use only genome_build in new MCP calls."],
+        )
+    if deprecated is not None:
+        warnings.append(
+            MCPWarning(
+                code="deprecated_genome_version",
+                message="genome_version is deprecated for MCP search; use genome_build.",
+            )
+        )
+    return canonical or deprecated or "hg38", warnings
+
+
+def normalize_variant_id(variant_id: str) -> str:
+    value = variant_id.strip().upper()
+    if not value or not VARIANT_ID_RE.fullmatch(value):
+        raise MCPInputError(
+            code="invalid_variant_id",
+            message="Variant IDs must use AutoPVS1 format such as X-82763936-A-T.",
+            suggestions=[
+                "Use search_variants with a gene symbol if you do not know the AutoPVS1 variant ID."
+            ],
+        )
+    return value
+
+
+def _cnv_correction(value: str) -> str | None:
+    match = COLON_CNV_RE.fullmatch(value.strip())
+    if not match:
+        return None
+    chrom = match.group("chrom").upper()
+    start = match.group("start")
+    end = match.group("end")
+    cnv_type = match.group("type").upper()
+    if int(start) >= int(end):
+        raise _invalid_cnv_interval_error()
+    return f"{chrom}-{start}-{end}-{cnv_type}"
+
+
+def _invalid_cnv_interval_error() -> MCPInputError:
+    return MCPInputError(
+        code="invalid_cnv_id",
+        message="CNV start must be less than end.",
+        suggestions=[CNV_FORMAT_SUGGESTION],
+    )
+
+
+def normalize_cnv_id(cnv_id: str) -> str:
+    value = cnv_id.strip().upper()
+    match = CNV_ID_RE.fullmatch(value)
+    if not match:
+        correction = _cnv_correction(cnv_id)
+        suggestions = [f"Use {correction}."] if correction else [CNV_FORMAT_SUGGESTION]
+        raise MCPInputError(
+            code="invalid_cnv_id",
+            message="CNV IDs must use {chrom}-{start}-{end}-{TYPE}, with TYPE DEL or DUP.",
+            suggestions=suggestions,
+        )
+
+    start = int(match.group("start"))
+    end = int(match.group("end"))
+    if start >= end:
+        raise _invalid_cnv_interval_error()
+    return value
+
+
+def normalize_search_query(query: str) -> str:
+    value = query.strip()
+    if not value:
+        raise MCPInputError(
+            code="invalid_search_query",
+            message="Search query must not be empty.",
+            suggestions=[
+                "Search by gene symbol, partial AutoPVS1 variant ID, or upstream-supported query."
+            ],
+        )
+    return value
+
+
+def normalize_limit_cursor(limit: int, cursor: str | None) -> tuple[int, int]:
+    bounded_limit = max(1, min(limit, 50))
+    if cursor is None:
+        return bounded_limit, 0
+    try:
+        offset = int(cursor)
+    except ValueError as exc:
+        raise MCPInputError(
+            code="invalid_search_query",
+            message="Search cursor must be an integer-offset string.",
+            suggestions=[
+                "Use the next_cursor value returned by the previous search_variants call."
+            ],
+        ) from exc
+    if offset < 0:
+        raise MCPInputError(
+            code="invalid_search_query",
+            message="Search cursor must be zero or greater.",
+            suggestions=[
+                "Use the next_cursor value returned by the previous search_variants call."
+            ],
+        )
+    return bounded_limit, offset
