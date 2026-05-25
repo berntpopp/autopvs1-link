@@ -100,13 +100,51 @@ facts. The MCP presenter becomes responsible for agent-facing contract quality:
 - server version echo;
 - warnings and suggestions;
 - citation fields;
-- invalid-link nulling;
 - search pagination;
-- final-strength normalization;
 - compact capabilities payloads.
 
 This keeps core scraper behavior stable while letting MCP outputs evolve toward
 agent-oriented contracts.
+
+### Implementation Layout
+
+Create a focused MCP presenter package rather than growing existing tool modules:
+
+- `autopvs1_link/mcp/envelope.py`: envelope, metadata, warning, citation, and
+  error contract models.
+- `autopvs1_link/mcp/validation.py`: MCP input normalization and validation for
+  variant IDs, CNV IDs, search queries, pagination, and genome-build aliases.
+- `autopvs1_link/mcp/presenters/variant.py`: variant/CNV response shaping.
+- `autopvs1_link/mcp/presenters/search.py`: search pagination and guidance.
+- `autopvs1_link/mcp/presenters/capabilities.py`: compact tool discovery and
+  detailed capabilities resource payloads.
+- `autopvs1_link/mcp/presenters/cache.py`: stable cache-stat resource shaping.
+
+Keep each new Python module below the 600-line repository cap. Split presenter
+modules further if a file approaches 500 lines.
+
+### Parser vs Presenter Boundary
+
+Apply bug fixes at the lowest layer that owns the incorrect fact:
+
+- Parser-level fixes that may improve REST and MCP output:
+  - recognize `VeryStrong` and reduced-weight strength labels when extracting
+    `final_strength`;
+  - infer missing `final_strength` from the terminal decision-tree strength when
+    the parsed HTML contains that terminal node;
+  - collapse HTML layout whitespace in `decision_tree[].code`;
+  - treat ClinVar `/variation/na` sentinel links as absent, so REST no longer
+    returns a false citation URL.
+- MCP presenter-only enrichments:
+  - envelope, metadata, request ID, warnings, citation, and suggestions;
+  - inline `note_text` on MCP flowchart steps;
+  - `external_links` values that may be `null` to preserve a known-but-invalid
+    link label with a warning;
+  - `pli_score_display`;
+  - bounded search pagination and no-result guidance.
+
+The shared REST models should not gain new required fields. Optional parser
+value improvements are acceptable when backed by fixtures.
 
 ## MCP Response Envelope
 
@@ -163,20 +201,52 @@ Error responses use the same envelope:
 `ok`, `data`, `error`, and `meta` are required. `data` is non-null only when
 `ok` is true. `error` is non-null only when `ok` is false.
 
+### Envelope vs Output Schema and Structured Content
+
+The MCP envelope is the structured result. Each MCP tool must replace its
+current inner `output_schema` with an envelope schema:
+
+- `get_variant_pvs1_data`: `MCPEnvelope[VariantMCPData]`
+- `get_cnv_pvs1_data`: `MCPEnvelope[CNVMCPData]`
+- `search_variants`: `MCPEnvelope[SearchMCPData]`
+- `get_server_capabilities`: `MCPEnvelope[CompactCapabilitiesData]`
+- `clear_cache`: `MCPEnvelope[ClearCacheData]`
+
+Under MCP 2025-06-18, the envelope belongs in the tool result's
+`structuredContent` and must conform to the advertised `outputSchema`. For
+backwards compatibility, the result should also expose the same envelope as
+serialized JSON in a text content block when FastMCP does not do that
+automatically.
+
+Implementation detail for FastMCP: tool functions return the envelope `dict`.
+The registered `output_schema` is the envelope schema, not the inner
+AutoPVS1Data/AutoPVS1CNVData/AutoPVS1SearchResults schema. Runtime tests must
+assert that clients receive the envelope fields, not the previous flat payload.
+
+Expected validation and upstream failures are tool execution errors, not JSON-RPC
+protocol errors. The structured envelope should have `ok: false`. If FastMCP
+exposes `isError`, set it to true for these responses; otherwise do not raise
+away the envelope because callers need the structured `error.code`.
+
 ### Error Codes
 
-Use stable machine-readable error codes:
+Use stable machine-readable error codes. Keep existing public MCP error codes
+where they already exist:
 
 - `invalid_genome_build`
 - `invalid_variant_id`
 - `invalid_cnv_id`
 - `invalid_search_query`
 - `not_found`
-- `upstream_error`
+- `upstream_unavailable`
 - `upstream_timeout`
 - `parse_error`
-- `destructive_operation_disabled`
+- `destructive_disabled`
 - `internal_error`
+
+Do not rename existing `upstream_unavailable` or `destructive_disabled` codes in
+this pass. New docs may describe their meaning in clearer prose, but the
+machine-readable `code` values stay stable for clients.
 
 Error messages must not leak raw upstream HTML, MDN URLs, stack traces, or full
 low-level exception strings. Include enough detail for an LLM to decide whether
@@ -189,10 +259,30 @@ to retry, ask the user for corrected input, or report upstream unavailability.
 `genome_build` is the canonical MCP parameter name for all variant, CNV, and
 search tools.
 
-For compatibility, `search_variants` may continue accepting `genome_version` as
-a deprecated alias for one release. If both are supplied and disagree, return
-`invalid_genome_build` with a clear message. Discovery docs and examples must
-show only `genome_build`.
+`search_variants` must use direct arguments with this migration shape:
+
+```python
+async def search_variants(
+    query: str,
+    genome_build: GenomeBuild | None = None,
+    limit: int = 10,
+    cursor: str | None = None,
+    genome_version: GenomeBuild | None = None,
+) -> dict[str, Any]:
+    ...
+```
+
+Rules:
+
+- if neither build field is supplied, use `hg38`;
+- if only `genome_build` is supplied, use it;
+- if only deprecated `genome_version` is supplied, use it and add a warning;
+- if both are supplied with the same value, use it and add a warning;
+- if both are supplied with different values, return `invalid_genome_build`.
+
+Discovery docs and examples must show `genome_build`. The input schema will show
+`genome_version` for one release because it remains a compatibility argument,
+but its description must mark it deprecated.
 
 ### Variant IDs
 
@@ -241,6 +331,7 @@ that show the corrected hyphenated form.
 
 Rules:
 
+- default `genome_build` is `hg38` when neither build parameter is supplied;
 - whitespace-only input returns `invalid_search_query`;
 - gene symbols, partial variant IDs, and upstream-supported query strings remain
   accepted;
@@ -273,12 +364,20 @@ outputs so very small values such as `3.29e-20` remain readable and stable for
 presentation. Document that pLI is expected in the range `0.0` to `1.0`, with
 very small scientific-notation values possible.
 
+Formatting rule for `pli_score_display`:
+
+- `null` when `pli_score` is `null`;
+- `"0"` when `pli_score` is exactly zero;
+- scientific notation with three significant digits when
+  `0 < abs(pli_score) < 1e-3`;
+- otherwise decimal/significant notation with four significant digits.
+
 ### Final Strength
 
 `pvs1_flowchart.final_strength` is the source of truth for the final PVS1
 strength in MCP outputs.
 
-The parser and presenter must recognize all observed AutoPVS1 strength labels:
+The parser and presenter must recognize at least these AutoPVS1 strength labels:
 
 - `VeryStrong`
 - `Strong`
@@ -286,16 +385,28 @@ The parser and presenter must recognize all observed AutoPVS1 strength labels:
 - `Supporting`
 - `Not applicable`
 - `Unmet`
+- `Strong_RWS`
+- `Moderate_RWS`
+- `Supporting_RWS`
+
+These are not asserted as an exhaustive upstream vocabulary. The implementation
+should treat unknown terminal codes as ordinary decision-tree text and should not
+invent a `final_strength` from an unrecognized label.
 
 If the HTML omits or misplaces the final-strength field but the ordered decision
-tree contains a terminal strength, the presenter should populate
-`final_strength` from the last terminal strength node and add a warning:
+tree contains a terminal strength, the parser should populate `final_strength`
+from the last terminal strength node. The MCP presenter should add this warning
+when it detects that inference path:
 
 ```text
 final_strength was inferred from the terminal decision_tree node.
 ```
 
 Callers should not need to inspect `decision_tree[-1].code` to find the verdict.
+
+Add `final_strength_inferred: bool = False` as an optional field on
+`PVS1Flowchart` so the presenter can emit the warning without duplicating parser
+logic. This is an additive REST schema field, not a required field.
 
 ### Decision Tree and Notes
 
@@ -305,7 +416,7 @@ Decision tree steps must be normalized for LLM use:
 - remove HTML layout artifacts;
 - preserve original ordering;
 - extract `note_id` when a step references a note marker such as `#1`;
-- include resolved `note_text` inline when available;
+- include resolved `note_text` inline in MCP output when available;
 - keep `notes` as a compact map for backwards explainability.
 
 Example step:
@@ -322,7 +433,8 @@ Example step:
 ### External Links
 
 MCP `external_links` should allow `null` values so invalid upstream sentinel links
-can be preserved without becoming false citations.
+can be reported without becoming false citations. REST parser output may omit the
+invalid link to preserve the existing `dict[str, str]` model shape.
 
 Rules:
 
@@ -388,6 +500,12 @@ stable stat-key semantics:
 All configured keys should appear in the resource even when counters are zero.
 This makes the resource monotonic in shape across reads.
 
+Replace or remove the stale `CacheStatistics` model in
+`autopvs1_link/mcp/contracts.py`. Its current flat fields do not match the
+resource shape returned by `cache_manager.get_statistics()`. The MCP contract
+should model a resource payload keyed by method name, where each value is a
+cache-stat block.
+
 Each block should include:
 
 - `hits`;
@@ -418,8 +536,8 @@ MCP responses should include:
 - `meta.recommended_citation`.
 
 If the MCP runtime cannot expose an incoming request ID for stdio calls, the
-server should generate a lightweight per-tool-call ID. HTTP transport should
-reuse `X-Request-ID` where FastAPI/ASGI context makes it available.
+server should generate a UUIDv4 string per tool call. HTTP transport should
+reuse `X-Request-ID` as-is where FastAPI/ASGI context makes it available.
 
 Warnings are for structured, non-fatal facts an LLM should consider, such as:
 
@@ -437,6 +555,8 @@ Keep the current good behavior:
   `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`;
 - destructive annotation remains;
 - disabled response clearly says how to enable.
+- disabled calls return the standard envelope with `ok: false`,
+  `error.code: "destructive_disabled"`, and `retryable: false`.
 
 Improve the input shape:
 
@@ -453,7 +573,15 @@ Update:
 - `docs/mcp-tool-catalog.md`;
 - `docs/api.md` MCP section;
 - README MCP examples if present;
-- generated tool catalog if the repository expects it.
+- generated tool catalog output.
+
+`docs/mcp-tool-catalog.md` is generated by
+`scripts/generate_mcp_tool_catalog.py`. After MCP schema changes, regenerate it
+with:
+
+```bash
+uv run python scripts/generate_mcp_tool_catalog.py
+```
 
 Documentation must include:
 
@@ -470,7 +598,14 @@ Documentation must include:
 
 Required focused coverage:
 
+- commit real upstream HTML fixtures
+  `tests/fixtures/variant_hg19_BRCA1_17-41276045-ACT-A.html` and
+  `tests/fixtures/cnv_hg19_MYO15A_17-15000000-20000000-DEL.html` containing terminal
+  `<code>VeryStrong</code>` nodes; include capture URL/build/date in adjacent
+  test comments or fixture metadata notes;
 - parser test for `VeryStrong` final-strength extraction;
+- parser test that inferred terminal strengths set
+  `final_strength_inferred: true`;
 - parser/presenter test for cleaned decision-tree whitespace and inline notes;
 - presenter test for ClinVar `/variation/na` nulling;
 - MCP runtime test for invalid variant ID returning `invalid_variant_id`;
@@ -480,16 +615,21 @@ Required focused coverage:
 - MCP runtime test for no-result HGVS-like search including warnings and
   suggestions;
 - MCP schema test that `search_variants` advertises `genome_build`, `limit`,
-  and `cursor`;
-- compatibility test that deprecated `genome_version` still works for one
-  release or is rejected with a clear migration message if compatibility is not
-  feasible in FastMCP direct-argument schemas;
+  `cursor`, and deprecated `genome_version`;
+- compatibility test that deprecated `genome_version` works for one release and
+  emits a warning in `meta.warnings`;
+- compatibility test that conflicting `genome_build` and `genome_version`
+  returns `invalid_genome_build`;
 - cache-stat resource test that all configured stat keys remain present across
   reads, including zero-count keys;
 - cache-stat counter test for hit/miss/error semantics;
 - capabilities test proving tool and resource payloads are not byte-for-byte
   duplicates;
-- clear-cache test for `{}` input and disabled clean error.
+- clear-cache test for `{}` input and disabled clean error code
+  `destructive_disabled`;
+- generated catalog test or documentation check showing
+  `uv run python scripts/generate_mcp_tool_catalog.py` has been run after schema
+  changes.
 
 Add a small transcript-inspired MCP evaluation fixture or checklist covering:
 
@@ -515,12 +655,18 @@ Tool names remain stable:
 - `get_server_capabilities`
 - `clear_cache`
 
-The MCP response shape intentionally changes to an envelope to support
-structured errors and metadata. REST response schemas should remain unchanged
-unless a parser bugfix naturally improves parsed values.
+The MCP response shape intentionally changes to an envelope carried as MCP
+structured content to support structured errors and metadata. REST response
+schemas should remain unchanged unless a parser bugfix naturally improves parsed
+values.
 
-`search_variants.genome_version` is a deprecated MCP alias for one release if
-FastMCP can expose it cleanly. New docs and examples use `genome_build`.
+`search_variants.genome_version` is a deprecated MCP alias for one release.
+Implement it as a second optional direct argument beside canonical
+`genome_build`, with validation rules defined in the Genome Build Naming
+section. New docs and examples use `genome_build`.
+
+Existing machine-readable MCP error codes `upstream_unavailable` and
+`destructive_disabled` remain stable. New error codes are additive.
 
 ## Risks
 
@@ -550,7 +696,9 @@ FastMCP can expose it cleanly. New docs and examples use `genome_build`.
 - Search trims input and rejects whitespace-only queries.
 - Empty search results include useful warnings or suggestions when the query
   appears malformed or unsupported.
-- Cache-stat keys are stable across consecutive reads.
+- All five configured method keys appear in the cache statistics resource even
+  when their counters are zero; the key set does not change between reads in a
+  single process lifetime.
 - `search_variants` uses canonical `genome_build` in documentation and MCP
   schema, with alias handling documented.
 - `external_links.ClinVar` never points to `/variation/na` in MCP output.
