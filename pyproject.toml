@@ -97,8 +97,6 @@ line-ending = "lf"
 # FastAPI dependency injection uses Depends() in argument defaults by design.
 # B904: legacy raise-from chains in route exception handlers, refactored later.
 "autopvs1_link/api/routes/*" = ["B008", "B904"]
-# Pre-Phase-3 code; targeted refactors land with Phase 3 dep bumps.
-"autopvs1_link/api/autopvs1_client.py" = ["SIM105"]
 "autopvs1_link/middleware/logging_middleware.py" = ["RUF013"]
 "autopvs1_link/services/autopvs1_service.py" = ["RUF013"]
 
@@ -144,7 +142,6 @@ ignore_missing_imports = true
 # (MCP subpackage / unified_server split) replace each module.
 [[tool.mypy.overrides]]
 module = [
-    "autopvs1_link.api.autopvs1_client",
     "autopvs1_link.api.client_manager",
     "autopvs1_link.api.routes.cnv",
     "autopvs1_link.api.routes.gene",

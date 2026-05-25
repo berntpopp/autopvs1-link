@@ -20,6 +20,13 @@ from autopvs1_link.models.autopvs1_models import (
 logger = structlog.get_logger()
 
 
+def _href(tag: Tag | None) -> str | None:
+    if tag is None:
+        return None
+    value = tag.get("href")
+    return value if isinstance(value, str) else None
+
+
 def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
     """Parse variant information from the HTML."""
     info_col = soup.select_one(".container .row .col-lg-6")
@@ -39,18 +46,17 @@ def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
         variant_type = "Unknown"
         variant_name = variant_id
 
-    gene_p = info_col.find("p", string=re.compile(r"Gene:"))
-    if not gene_p:
-        for p in info_col.find_all("p"):
-            if p.get_text().strip().startswith("Gene:"):
-                gene_p = p
-                break
+    gene_p = None
+    for p in info_col.find_all("p"):
+        if p.get_text().strip().startswith("Gene:"):
+            gene_p = p
+            break
 
     if isinstance(gene_p, Tag):
         gene_i = gene_p.find("i")
-        gene_symbol = gene_i.text.strip() if gene_i else ""
+        gene_symbol = gene_i.text.strip() if isinstance(gene_i, Tag) else ""
         gene_link = gene_p.find("a")
-        gene_url = gene_link.get("href") if gene_link else None
+        gene_url = _href(gene_link if isinstance(gene_link, Tag) else None)
     else:
         gene_symbol = ""
         gene_url = None
@@ -67,14 +73,14 @@ def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
     haploinsuff_p = find_field_paragraph(info_col, "Haploinsufficiency:")
     if haploinsuff_p:
         haploinsuff_link = haploinsuff_p.find("a")
-        if haploinsuff_link:
+        if isinstance(haploinsuff_link, Tag):
             haploinsufficiency = haploinsuff_link.text.strip()
-            haploinsuff_url = haploinsuff_link.get("href")
+            haploinsuff_url = _href(haploinsuff_link)
 
-    external_links = {}
+    external_links: dict[str, str] = {}
     for link in info_col.find_all("a", class_="btn"):
         link_text = link.text.strip()
-        link_url = link.get("href")
+        link_url = _href(link if isinstance(link, Tag) else None)
         if link_text and link_url:
             external_links[link_text] = link_url
 
@@ -97,7 +103,7 @@ def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
 def parse_pvs1_flowchart(soup: BeautifulSoup) -> PVS1Flowchart:
     """Parse PVS1 flowchart information."""
     flowchart_columns = soup.select(".container .row .col-lg-6")
-    flowchart_col = None
+    flowchart_col: Tag | None = None
 
     for col in flowchart_columns:
         if col.select("ul.tree"):
@@ -132,9 +138,9 @@ def parse_pvs1_flowchart(soup: BeautifulSoup) -> PVS1Flowchart:
         deepest_li = flowchart_col.select("ul.tree li ul li ul li ul li")
         if deepest_li:
             for li in deepest_li:
-                code = li.find("code")
-                if code:
-                    text = code.text.strip()
+                nested_code = li.find("code")
+                if isinstance(nested_code, Tag):
+                    text = nested_code.text.strip()
                     if text in valid_strengths:
                         final_strength = text
                         logger.debug(
@@ -182,17 +188,18 @@ def parse_disease_mechanisms(soup: BeautifulSoup) -> list[DiseaseMechanism]:
         if len(cols) >= 6:
             gene_cell = cols[0]
             gene_link = gene_cell.find("a")
-            gene_symbol = (
-                gene_link.find("i").text
-                if gene_link and gene_link.find("i")
-                else gene_cell.text.strip()
-            )
-            gene_url = gene_link.get("href") if gene_link else None
+            gene_i = gene_link.find("i") if isinstance(gene_link, Tag) else None
+            gene_symbol = gene_i.text if isinstance(gene_i, Tag) else gene_cell.text.strip()
+            gene_url = _href(gene_link if isinstance(gene_link, Tag) else None)
 
             disease_cell = cols[1]
             disease_link = disease_cell.find("a")
-            disease = disease_link.text.strip() if disease_link else disease_cell.text.strip()
-            disease_url = disease_link.get("href") if disease_link else None
+            disease = (
+                disease_link.text.strip()
+                if isinstance(disease_link, Tag)
+                else disease_cell.text.strip()
+            )
+            disease_url = _href(disease_link if isinstance(disease_link, Tag) else None)
 
             disease_mechanisms.append(
                 DiseaseMechanism(
@@ -251,7 +258,7 @@ def parse_search_results(soup: BeautifulSoup, genome_version: str) -> list[Searc
                     gene=gene_symbol,
                     variant_type=variant_type,
                     genome_build=genome_version,
-                    url=variant_link.get("href", ""),
+                    url=_href(variant_link if isinstance(variant_link, Tag) else None) or "",
                 )
             )
         except (AttributeError, IndexError) as e:
@@ -275,11 +282,16 @@ def parse_cnv_info(soup: BeautifulSoup, cnv_id: str) -> CNVInfo:
     cnv_name = parts[1] if len(parts) > 1 else cnv_id
 
     gene_symbol = ""
-    gene_p = info_col.find("p", string=re.compile(r"Gene:"))
+    gene_p = None
+    for p in info_col.find_all("p"):
+        if p.get_text().strip().startswith("Gene:"):
+            gene_p = p
+            break
     if isinstance(gene_p, Tag):
         gene_link = gene_p.find("a")
-        if gene_link and gene_link.find("i"):
-            gene_symbol = gene_link.find("i").text
+        gene_i = gene_link.find("i") if isinstance(gene_link, Tag) else None
+        if isinstance(gene_i, Tag):
+            gene_symbol = gene_i.text
 
     return CNVInfo(
         cnv_id=cnv_name,
@@ -298,9 +310,9 @@ def extract_field_value(container: Tag, field_name: str) -> str | None:
             if ":" in full_text:
                 return full_text.split(":", 1)[1].strip()
 
-    field_p = container.find("p", string=re.compile(re.escape(field_name)))
+    field_p = find_field_paragraph(container, field_name)
     if field_p:
-        field_text = field_p.text
+        field_text = field_p.get_text()
         if ":" in field_text:
             return field_text.split(":", 1)[1].strip()
     return None
@@ -313,5 +325,4 @@ def find_field_paragraph(container: Tag, field_name: str) -> Tag | None:
         if b_tag and field_name in b_tag.text:
             return p
 
-    field_p = container.find("p", string=re.compile(re.escape(field_name)))
-    return field_p if isinstance(field_p, Tag) else None
+    return None

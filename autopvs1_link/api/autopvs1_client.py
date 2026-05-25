@@ -237,7 +237,11 @@ class AutoPVS1Client:
     def _parse_variant_pvs1_sections(
         self, soup: BeautifulSoup
     ) -> tuple[PVS1Flowchart, list[DiseaseMechanism]]:
-        incompatible_text = soup.find("p", string=re.compile(r"incompatible with.*PVS1"))
+        incompatible_pattern = re.compile(r"incompatible with.*PVS1")
+        incompatible_text = next(
+            (p for p in soup.find_all("p") if incompatible_pattern.search(p.get_text())),
+            None,
+        )
         if incompatible_text:
             return (
                 PVS1Flowchart(
