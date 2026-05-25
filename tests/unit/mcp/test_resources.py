@@ -11,3 +11,4 @@ async def test_build_mcp_server_registers_cache_resource() -> None:
     resources = await mcp.list_resources()
     resource_uris = {str(r.uri) for r in resources}
     assert any("autopvs1-link://cache/statistics" in u for u in resource_uris)
+    assert any("autopvs1-link://capabilities" in u for u in resource_uris)

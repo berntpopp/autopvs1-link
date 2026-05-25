@@ -23,7 +23,7 @@ async def test_get_variant_pvs1_data_tool_runtime(mocker) -> None:
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "get_variant_pvs1_data",
-        {"payload": {"genome_build": "hg38", "variant_id": "X-1-A-T"}},
+        {"genome_build": "hg38", "variant_id": "X-1-A-T"},
     )
     fake.assert_awaited_once_with("hg38", "X-1-A-T")
     assert result is not None
@@ -37,7 +37,7 @@ async def test_get_cnv_pvs1_data_tool_runtime(mocker) -> None:
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "get_cnv_pvs1_data",
-        {"payload": {"genome_build": "hg19", "cnv_id": "1-1-2-DEL"}},
+        {"genome_build": "hg19", "cnv_id": "1-1-2-DEL"},
     )
     fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
     assert result is not None
@@ -51,9 +51,16 @@ async def test_search_variants_tool_runtime(mocker) -> None:
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "search_variants",
-        {"payload": {"query": "MYH9", "genome_version": "hg38"}},
+        {"query": "MYH9", "genome_version": "hg38"},
     )
     fake.assert_awaited_once_with("MYH9", "hg38")
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_get_server_capabilities_tool_runtime() -> None:
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("get_server_capabilities", {})
     assert result is not None
 
 

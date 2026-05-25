@@ -11,6 +11,7 @@ from autopvs1_link.mcp.metadata import (
     SERVER_DESCRIPTION,
     SERVER_NAME,
     SERVER_VERSION,
+    register_metadata,
 )
 
 
@@ -30,6 +31,7 @@ def build_mcp_server() -> FastMCP:
         variant_tool,
     )
 
+    register_metadata(mcp)
     variant_tool.register(mcp)
     cnv_tool.register(mcp)
     search_tool.register(mcp)

@@ -21,7 +21,11 @@ def create_app() -> FastAPI:
     """Construct the FastAPI app, including the MCP Streamable-HTTP mount."""
     # Build the MCP server first so its lifespan can be chained.
     mcp = build_mcp_server()
-    mcp_app = mcp.http_app(path="/")
+    mcp_app = mcp.http_app(
+        path="/",
+        json_response=True,
+        stateless_http=True,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
