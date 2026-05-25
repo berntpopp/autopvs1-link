@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI
 
 from autopvs1_link.api.client_manager import shutdown_clients
-from autopvs1_link.api.routes import cnv, gene, variant
+from autopvs1_link.api.routes import cache, cnv, gene, variant
 from autopvs1_link.config import settings
 from autopvs1_link.mcp.facade import build_mcp_server
 from autopvs1_link.middleware.logging_middleware import RequestLoggingMiddleware
@@ -48,26 +47,11 @@ def create_app() -> FastAPI:
     app.include_router(variant.router)
     app.include_router(cnv.router)
     app.include_router(gene.router)
+    app.include_router(cache.router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
-
-    @app.get("/api/cache/stats")
-    async def cache_stats() -> dict[str, Any]:
-        from autopvs1_link.services.service_manager import get_service_manager
-
-        manager = await get_service_manager()
-        stats: dict[str, Any] = await manager.get_cache_statistics()
-        return stats
-
-    @app.post("/api/cache/clear")
-    async def cache_clear() -> dict[str, Any]:
-        from autopvs1_link.services.service_manager import get_service_manager
-
-        manager = await get_service_manager()
-        result: dict[str, Any] = await manager.clear_all_caches()
-        return result
 
     app.mount("/mcp", mcp_app)
     return app
