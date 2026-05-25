@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from autopvs1_link.mcp.envelope import error_envelope
+
 
 class MCPToolError(Exception):
     """Raised by MCP tools to surface a structured error to the client."""
@@ -36,4 +38,27 @@ class DestructiveOperationDisabledError(MCPToolError):
             "AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true to enable.",
             code="destructive_disabled",
             details={"op": op_name},
+        )
+
+
+class MCPInputError(MCPToolError):
+    """Validation error that should be returned as a structured MCP envelope."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        suggestions: list[str] | None = None,
+    ) -> None:
+        super().__init__(message, code=code, details={"suggestions": suggestions or []})
+        self.suggestions = suggestions or []
+        self.retryable = False
+
+    def to_envelope(self) -> dict[str, Any]:
+        return error_envelope(
+            code=self.code,
+            message=str(self),
+            retryable=self.retryable,
+            suggestions=self.suggestions,
         )
