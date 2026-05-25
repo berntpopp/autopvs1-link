@@ -137,6 +137,35 @@ def _infer_terminal_strength(flowchart_codes: list[Tag]) -> str:
     return ""
 
 
+def _is_invalid_clinvar_sentinel(label: str, url: str) -> bool:
+    """Return true for AutoPVS1 ClinVar sentinel URLs that are not citations."""
+    return label == "ClinVar" and url.rstrip("/").endswith("/variation/na")
+
+
+def _extract_note_id(code: Tag) -> str | None:
+    """Extract the first red note marker from a decision-tree code element."""
+    for note_tag in code.find_all("b", style=re.compile(r"color:#CD5C5C")):
+        note_text = _collapse_html_text(note_tag)
+        if re.fullmatch(r"#\d+", note_text):
+            return note_text
+    return None
+
+
+def _flowchart_step_from_code(code: Tag) -> FlowchartStep | None:
+    """Build a clean decision-tree step from one upstream code element."""
+    code_copy = BeautifulSoup(str(code), "lxml").find("code")
+    if not isinstance(code_copy, Tag):
+        return None
+    note_id = _extract_note_id(code_copy)
+    for note_tag in code_copy.find_all("b", style=re.compile(r"color:#CD5C5C")):
+        if re.fullmatch(r"#\d+", _collapse_html_text(note_tag)):
+            note_tag.decompose()
+    code_text = _collapse_html_text(code_copy)
+    if not code_text:
+        return None
+    return FlowchartStep(code=code_text, note_id=note_id)
+
+
 def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
     """Parse variant information from the HTML."""
     info_col = soup.select_one(".container .row .col-lg-6")
@@ -188,11 +217,16 @@ def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
             haploinsuff_url = _href(haploinsuff_link)
 
     external_links: dict[str, str] = {}
+    invalid_external_links: dict[str, str] = {}
     for link in info_col.find_all("a", class_="btn"):
         link_text = link.text.strip()
         link_url = _href(link if isinstance(link, Tag) else None)
-        if link_text and link_url:
-            external_links[link_text] = link_url
+        if not link_text or not link_url:
+            continue
+        if _is_invalid_clinvar_sentinel(link_text, link_url):
+            invalid_external_links[link_text] = link_url
+            continue
+        external_links[link_text] = link_url
 
     return VariantInfo(
         variant_id=variant_name.strip(),
@@ -207,6 +241,7 @@ def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
         exon=extract_field_value(info_col, "Exon:"),
         intron=extract_field_value(info_col, "Intron:"),
         external_links=external_links,
+        invalid_external_links=invalid_external_links,
     )
 
 
@@ -244,14 +279,16 @@ def parse_pvs1_flowchart(soup: BeautifulSoup) -> PVS1Flowchart:
 
     decision_tree = []
     for code in flowchart_codes:
-        code_text = code.text.strip()
-        if code_text:
-            decision_tree.append(FlowchartStep(code=code_text))
+        step = _flowchart_step_from_code(code)
+        if step is not None:
+            decision_tree.append(step)
 
     notes = {}
     note_elements = flowchart_col.find_all("b", style=re.compile(r"color:#CD5C5C"))
     for note_elem in note_elements:
-        note_id = note_elem.text.strip()
+        note_id = _collapse_html_text(note_elem)
+        if not re.fullmatch(r"#\d+", note_id):
+            continue
         next_elem = note_elem.find_next_sibling()
         if next_elem and hasattr(next_elem, "text"):
             notes[note_id] = next_elem.text.strip()

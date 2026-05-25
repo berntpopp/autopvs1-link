@@ -53,16 +53,27 @@ class TestVariantInfoParsing:
         assert variant_info.intron == "-/0"
 
     def test_parse_variant_info_external_links(self, client, variant_soup):
-        """Test parsing external links."""
+        """Test parsing external links without serializing invalid ClinVar sentinels."""
         variant_info = client._parse_variant_info(variant_soup, "X-83508928-A-T")
 
         assert "OMIM" in variant_info.external_links
-        assert "ClinVar" in variant_info.external_links
+        assert "ClinVar" not in variant_info.external_links
         assert "gnomAD" in variant_info.external_links
+        assert variant_info.invalid_external_links == {
+            "ClinVar": "https://www.ncbi.nlm.nih.gov/clinvar/variation/na"
+        }
+        assert "invalid_external_links" not in variant_info.model_dump(mode="json")
         assert (
             variant_info.external_links["gnomAD"]
             == "https://gnomad.broadinstitute.org/variant/X-83508928-A-T"
         )
+
+    def test_variant_info_invalid_external_links_absent_from_public_schema(self):
+        """Internal invalid-link metadata should not appear in public schemas."""
+        schema = AutoPVS1Data.model_json_schema()
+        variant_info_properties = schema["$defs"]["VariantInfo"]["properties"]
+
+        assert "invalid_external_links" not in variant_info_properties
 
     def test_parse_variant_info_gene_url(self, client, variant_soup):
         """Test parsing gene URL."""
@@ -110,6 +121,96 @@ class TestPVS1FlowchartParsing:
 
         # Should have notes marked with #1, #2, etc.
         assert len(flowchart.notes) > 0
+
+    def test_parse_pvs1_flowchart_cleans_steps_and_extracts_note_ids(self, client, variant_soup):
+        """Decision-tree codes should be compact, ordered, and carry note IDs separately."""
+        flowchart = client._parse_pvs1_flowchart(variant_soup)
+
+        role_step = next(
+            step for step in flowchart.decision_tree if step.code.startswith("Role of region")
+        )
+        lof_step = next(
+            step for step in flowchart.decision_tree if step.code.startswith("LoF variants")
+        )
+
+        assert role_step.code == "Role of region in protein function is unknown"
+        assert role_step.note_id == "#1"
+        assert lof_step.code == (
+            "LoF variants in this exon are not frequent in the general population "
+            "and exon is present in biologically-relevant transcripts"
+        )
+        assert lof_step.note_id == "#2"
+        assert "<br>" not in role_step.code
+        assert "\n" not in lof_step.code
+        assert "#1" not in role_step.code
+        assert "#2" not in lof_step.code
+
+    def test_parse_pvs1_flowchart_preserves_non_note_red_text(self, client):
+        """Red bold decision text should be preserved unless it is a note marker."""
+        soup = BeautifulSoup(
+            """
+            <div class="container">
+                <div class="row">
+                    <div class="col-lg-6">
+                        <figcaption>Preliminary Decision Path: NF_SYN</figcaption>
+                        <ul class="tree">
+                            <li>
+                                <code>
+                                    Decision keeps
+                                    <b style="color:#CD5C5C">important warning</b>
+                                    text
+                                </code>
+                            </li>
+                            <li><code>Strong</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            """,
+            "lxml",
+        )
+
+        flowchart = client._parse_pvs1_flowchart(soup)
+
+        step = flowchart.decision_tree[0]
+        assert step.code == "Decision keeps important warning text"
+        assert step.note_id is None
+        assert flowchart.final_strength == "Strong"
+
+    def test_parse_pvs1_flowchart_extracts_later_note_after_red_text(self, client):
+        """Later note markers should be extracted without treating red text as a note."""
+        soup = BeautifulSoup(
+            """
+            <div class="container">
+                <div class="row">
+                    <div class="col-lg-6">
+                        <figcaption>Preliminary Decision Path: NF_SYN</figcaption>
+                        <ul class="tree">
+                            <li>
+                                <code>
+                                    Decision keeps
+                                    <b style="color:#CD5C5C">important warning</b>
+                                    <span>context</span>
+                                    before note
+                                    <b style="color:#CD5C5C">#7</b>
+                                </code>
+                            </li>
+                            <li><code>Strong</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            """,
+            "lxml",
+        )
+
+        flowchart = client._parse_pvs1_flowchart(soup)
+
+        step = flowchart.decision_tree[0]
+        assert "important warning" in step.code
+        assert "#7" not in step.code
+        assert step.note_id == "#7"
+        assert "important warning" not in flowchart.notes
 
 
 class TestDiseaseMechanismParsing:

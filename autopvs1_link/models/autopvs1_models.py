@@ -1,6 +1,7 @@
 """Pydantic data models for AutoPVS1 Link."""
 
 from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 
 
 class VariantInfo(BaseModel):
@@ -18,6 +19,9 @@ class VariantInfo(BaseModel):
     exon: str | None = None
     intron: str | None = None
     external_links: dict[str, str] = Field(default_factory=dict)
+    invalid_external_links: SkipJsonSchema[dict[str, str]] = Field(
+        default_factory=dict, exclude=True
+    )
 
 
 class FlowchartStep(BaseModel):
