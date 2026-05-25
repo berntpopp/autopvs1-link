@@ -1,6 +1,6 @@
 """Tests for HGVS redirect and enhanced search functionality."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -131,10 +131,10 @@ class TestRedirectDetection:
     async def test_search_with_redirect_detection_hgvs(self):
         """Test enhanced search with HGVS notation that redirects."""
         # Mock response that simulates a redirect
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.text = self._get_f11_variant_html()
         mock_response.url = "https://autopvs1.bgi.com/variant/hg19/4-187208978-G-A"
-        mock_response.history = [AsyncMock()]  # Simulate redirect history
+        mock_response.history = [MagicMock()]  # Simulate redirect history
 
         client = AutoPVS1Client()
 
@@ -171,7 +171,7 @@ class TestRedirectDetection:
     async def test_search_with_redirect_detection_gene_symbol(self):
         """Test enhanced search with gene symbol that returns search results."""
         # Mock response for normal search results (no redirect)
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.text = self._get_brca1_search_results_html()
         mock_response.url = "https://autopvs1.bgi.com/search?q=BRCA1&genome_version=hg19"
         mock_response.history = []  # No redirect history
@@ -204,10 +204,10 @@ class TestRedirectDetection:
     async def test_resolve_hgvs_notation_success(self):
         """Test direct HGVS resolution to variant data."""
         # Mock response that simulates a redirect
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.text = self._get_f11_variant_html()
         mock_response.url = "https://autopvs1.bgi.com/variant/hg19/4-187208978-G-A"
-        mock_response.history = [AsyncMock()]
+        mock_response.history = [MagicMock()]
 
         client = AutoPVS1Client()
 
@@ -231,7 +231,7 @@ class TestRedirectDetection:
     async def test_resolve_hgvs_notation_failure(self):
         """Test HGVS resolution failure when no redirect occurs."""
         # Mock response for search results (no redirect)
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.text = self._get_brca1_search_results_html()
         mock_response.url = "https://autopvs1.bgi.com/search?q=invalid&genome_version=hg19"
         mock_response.history = []
