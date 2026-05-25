@@ -88,6 +88,29 @@ Useful focused commands:
 - Pre-commit ruff `rev` may drift from `uv.lock` ruff version. Accept the
   drift; CI uses `uv` and is authoritative.
 
+## File Size Discipline
+
+Hard cap: **600 lines per Python module** in `autopvs1_link/`, `server.py`,
+and `mcp_server.py`. Enforced by `make lint-loc` (wired into `ci-local` and
+pre-commit). Tests are exempt.
+
+Why: large modules concentrate complexity, slow mypy and import cost, and
+degrade LLM-assisted refactors because a single edit risks unrelated breakage.
+When a file approaches 500 lines, plan its split.
+
+How:
+
+- New files MUST stay under 600 lines.
+- Existing oversized files are grandfathered in `.loc-allowlist` with their
+  current line count as the ceiling. They may shrink but not grow. Removing an
+  entry after a successful split is the goal.
+- Prefer cohesive splits: one module per responsibility, not random
+  partitioning to slip under the cap.
+- Keep the public facade stable across splits so call sites do not churn.
+- If you must add to an allowlisted file as part of an unrelated fix, raise the
+  ceiling explicitly in `.loc-allowlist` in the same commit and link the
+  decomposition plan in the message.
+
 ## Testing Notes
 
 - `make test` is the fast default.
