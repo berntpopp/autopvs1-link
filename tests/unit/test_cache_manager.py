@@ -2,6 +2,8 @@
 
 import time
 
+import pytest
+
 from autopvs1_link.utils.cache_manager import AdvancedCacheManager, CacheStatistics
 
 
@@ -49,3 +51,21 @@ def test_manager_clear_statistics_method() -> None:
 def test_statistics_with_recent_events() -> None:
     s = CacheStatistics(hits=1, misses=0, last_hit=time.time())
     assert s.last_hit is not None
+
+
+@pytest.mark.asyncio
+async def test_cache_error_increments_errors_without_miss() -> None:
+    manager = AdvancedCacheManager()
+
+    @manager.enhanced_cache(key_func=lambda value: f"flaky:{value}")
+    async def flaky(value: str) -> str:
+        raise RuntimeError(f"boom {value}")
+
+    with pytest.raises(RuntimeError, match="boom x"):
+        await flaky("x")
+
+    stats = manager.get_statistics("flaky")["flaky"]
+    assert stats["errors"] == 1
+    assert stats["misses"] == 0
+    assert stats["hits"] == 0
+    assert stats["total_requests"] == 0
