@@ -1,7 +1,7 @@
 """Tests for real website parsing with improved extraction logic."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from bs4 import BeautifulSoup
@@ -25,7 +25,7 @@ class TestRealWebsiteParsing:
         html_content = load_fixture("variant_2_48033984_G_GGATT_hg19.html")
 
         # Mock the HTTP response
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.text = html_content
 
         client = AutoPVS1Client()
@@ -115,7 +115,7 @@ class TestRealWebsiteParsing:
         html_content = load_fixture("variant_X_82763936_A_T_hg19.html")
 
         # Mock the HTTP response
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.text = html_content
 
         client = AutoPVS1Client()

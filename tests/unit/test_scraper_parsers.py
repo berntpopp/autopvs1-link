@@ -1,7 +1,7 @@
 """Unit tests for the AutoPVS1 scraper parsing logic."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from bs4 import BeautifulSoup
@@ -148,9 +148,8 @@ class TestClientIntegration:
     async def test_get_variant_data_integration(self, mock_get, client, variant_html):
         """Test full variant data retrieval."""
         # Mock HTTP response
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.text = variant_html
-        mock_response.raise_for_status = AsyncMock()
         mock_get.return_value = mock_response
 
         result = await client.get_variant_data("hg38", "X-83508928-A-T")

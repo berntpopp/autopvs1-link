@@ -1,6 +1,7 @@
 """Advanced cache management with detailed statistics and event logging."""
 
 import time
+import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -8,7 +9,7 @@ from functools import wraps
 from typing import Any
 
 import structlog
-from async_lru import alru_cache
+from async_lru import AlruCacheLoopResetWarning, alru_cache
 
 from autopvs1_link.config import settings
 
@@ -186,7 +187,12 @@ class AdvancedCacheManager:
                 try:
                     # Check if result is in cache
                     cache_info_before = cached_func.cache_info()
-                    result = await cached_func(*args, **kwargs)
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings(
+                            "ignore",
+                            category=AlruCacheLoopResetWarning,
+                        )
+                        result = await cached_func(*args, **kwargs)
                     cache_info_after = cached_func.cache_info()
 
                     execution_time = time.time() - start_time

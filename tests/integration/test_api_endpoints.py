@@ -1,7 +1,7 @@
 """Tests for FastAPI endpoints."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -15,6 +15,33 @@ from autopvs1_link.models.autopvs1_models import (
     VariantInfo,
 )
 from autopvs1_link.server_manager import app
+from autopvs1_link.services.autopvs1_service import AutoPVS1Service
+
+
+def clear_service_caches() -> None:
+    """Reset shared service caches so pytest event loops do not leak across tests."""
+    AutoPVS1Service.get_variant_data.cache_clear()
+    AutoPVS1Service.search_variants.cache_clear()
+    AutoPVS1Service.search_with_redirect_detection.cache_clear()
+    AutoPVS1Service.resolve_hgvs_notation.cache_clear()
+    AutoPVS1Service.get_cnv_data.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+async def reset_managed_services():
+    """Keep managed clients, services, and caches isolated between async tests."""
+    from autopvs1_link.api.client_manager import shutdown_clients
+    from autopvs1_link.services.service_manager import shutdown_services
+
+    clear_service_caches()
+    await shutdown_services()
+    await shutdown_clients()
+
+    yield
+
+    clear_service_caches()
+    await shutdown_services()
+    await shutdown_clients()
 
 
 def load_fixture(name: str) -> str:
@@ -119,11 +146,11 @@ class TestVariantEndpoints:
     async def test_get_variant_not_found(self, mock_get_variant, async_client):
         """Test variant not found error."""
         # Create a mock response for 404
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.status_code = 404
 
         mock_get_variant.side_effect = httpx.HTTPStatusError(
-            message="Not Found", request=AsyncMock(), response=mock_response
+            message="Not Found", request=httpx.Request("GET", "http://test"), response=mock_response
         )
 
         response = await async_client.get("http://test/variant/hg38/nonexistent-variant")
