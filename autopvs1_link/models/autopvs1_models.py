@@ -33,6 +33,7 @@ class PVS1Flowchart(BaseModel):
 
     preliminary_decision_path: str
     final_strength: str
+    final_strength_inferred: bool = False
     decision_tree: list[FlowchartStep] = Field(default_factory=list)
     notes: dict[str, str] = Field(default_factory=dict)
 

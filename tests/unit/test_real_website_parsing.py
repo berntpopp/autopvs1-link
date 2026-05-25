@@ -176,6 +176,46 @@ class TestRealWebsiteParsing:
         assert mechanism.adjusted_strength == "Strong"
 
     @pytest.mark.asyncio
+    async def test_parse_brca1_variant_with_verystrong_strength(self):
+        """Parse BRCA1 upstream fixture with a terminal VeryStrong PVS1 node."""
+        html_content = load_fixture("variant_hg19_BRCA1_17-41276045-ACT-A.html")
+        mock_response = MagicMock()
+        mock_response.text = html_content
+        client = AutoPVS1Client()
+
+        try:
+            with patch("httpx.AsyncClient.get", return_value=mock_response):
+                result = await client.get_variant_data("hg19", "17-41276045-ACT-A")
+        finally:
+            await client.close()
+
+        assert result.genome_build == "hg19"
+        assert result.variant_info.variant_id == "17-41276045-ACT-A"
+        assert result.pvs1_flowchart.final_strength == "VeryStrong"
+        assert result.pvs1_flowchart.final_strength_inferred is True
+        assert "VeryStrong" in [step.code for step in result.pvs1_flowchart.decision_tree]
+
+    @pytest.mark.asyncio
+    async def test_parse_myo15a_cnv_with_verystrong_strength(self):
+        """Parse MYO15A upstream CNV fixture with a terminal VeryStrong PVS1 node."""
+        html_content = load_fixture("cnv_hg19_MYO15A_17-15000000-20000000-DEL.html")
+        mock_response = MagicMock()
+        mock_response.text = html_content
+        client = AutoPVS1Client()
+
+        try:
+            with patch("httpx.AsyncClient.get", return_value=mock_response):
+                result = await client.get_cnv_data("hg19", "17-15000000-20000000-DEL")
+        finally:
+            await client.close()
+
+        assert result.genome_build == "hg19"
+        assert result.cnv_info.cnv_id == "17-15000000-20000000-DEL"
+        assert result.pvs1_flowchart.final_strength == "VeryStrong"
+        assert result.pvs1_flowchart.final_strength_inferred is True
+        assert "VeryStrong" in [step.code for step in result.pvs1_flowchart.decision_tree]
+
+    @pytest.mark.asyncio
     async def test_field_extraction_edge_cases(self):
         """Test edge cases in field extraction."""
         # Test HTML with different field formats
@@ -215,11 +255,15 @@ class TestRealWebsiteParsing:
         """Test comprehensive final strength extraction with different HTML structures."""
         # Test all possible final strengths
         test_cases = [
+            ("VeryStrong", "VeryStrong"),
             ("Strong", "Strong"),
             ("Moderate", "Moderate"),
             ("Supporting", "Supporting"),
             ("Not applicable", "Not applicable"),
             ("Unmet", "Unmet"),
+            ("Strong_RWS", "Strong_RWS"),
+            ("Moderate_RWS", "Moderate_RWS"),
+            ("Supporting_RWS", "Supporting_RWS"),
         ]
 
         for strength, expected in test_cases:
@@ -249,6 +293,145 @@ class TestRealWebsiteParsing:
             try:
                 flowchart = client._parse_pvs1_flowchart(soup)
                 assert flowchart.final_strength == expected, f"Failed to parse strength: {strength}"
+                assert flowchart.final_strength_inferred is True
             finally:
                 # Cleanup without async issues for sync test
                 pass
+
+    def test_split_explicit_final_strength_is_not_marked_inferred(self):
+        """Parse explicit final strength when label and value are split across tags."""
+        html = """
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-6">
+                    <p><b>Final Strength:</b> Moderate</p>
+                    <ul class="tree">
+                        <li><code>Some decision</code>
+                            <ul>
+                                <li><code>Strong</code></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        """
+
+        soup = BeautifulSoup(html, "lxml")
+        client = AutoPVS1Client()
+
+        flowchart = client._parse_pvs1_flowchart(soup)
+
+        assert flowchart.final_strength == "Moderate"
+        assert flowchart.final_strength_inferred is False
+
+    def test_sibling_explicit_final_strength_is_not_marked_inferred(self):
+        """Parse explicit final strength from a sibling after the label."""
+        html = """
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-6">
+                    <b>Final Strength:</b>
+                    <span>Moderate</span>
+                    <ul class="tree">
+                        <li><code>Some decision</code>
+                            <ul>
+                                <li><code>Strong</code></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        """
+
+        soup = BeautifulSoup(html, "lxml")
+        client = AutoPVS1Client()
+
+        flowchart = client._parse_pvs1_flowchart(soup)
+
+        assert flowchart.final_strength == "Moderate"
+        assert flowchart.final_strength_inferred is False
+
+    def test_parent_sibling_explicit_final_strength_is_not_marked_inferred(self):
+        """Parse explicit final strength from a sibling field after the label field."""
+        html = """
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-6">
+                    <p><b>Final Strength:</b></p>
+                    <p>Moderate</p>
+                    <ul class="tree">
+                        <li><code>Some decision</code>
+                            <ul>
+                                <li><code>Strong</code></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        """
+
+        soup = BeautifulSoup(html, "lxml")
+        client = AutoPVS1Client()
+
+        flowchart = client._parse_pvs1_flowchart(soup)
+
+        assert flowchart.final_strength == "Moderate"
+        assert flowchart.final_strength_inferred is False
+
+    def test_bare_explicit_label_does_not_consume_tree_strength(self):
+        """Do not treat decision-tree text as an explicit final-strength value."""
+        html = """
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-6">
+                    <b>Final Strength:</b>
+                    <ul class="tree">
+                        <li><code>Strong</code>
+                            <ul>
+                                <li><code>ExperimentalStrength</code></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        """
+
+        soup = BeautifulSoup(html, "lxml")
+        client = AutoPVS1Client()
+
+        flowchart = client._parse_pvs1_flowchart(soup)
+
+        assert flowchart.final_strength == ""
+        assert flowchart.final_strength_inferred is False
+        assert "ExperimentalStrength" in [step.code for step in flowchart.decision_tree]
+
+    def test_unrecognized_terminal_code_does_not_infer_earlier_strength(self):
+        """Do not infer final strength when the terminal code is not recognized."""
+        html = """
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-6">
+                    <ul class="tree">
+                        <li><code>Strong</code>
+                            <ul>
+                                <li><code>ExperimentalStrength</code></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        """
+
+        soup = BeautifulSoup(html, "lxml")
+        client = AutoPVS1Client()
+
+        flowchart = client._parse_pvs1_flowchart(soup)
+
+        assert flowchart.final_strength == ""
+        assert flowchart.final_strength_inferred is False
+        assert "ExperimentalStrength" in [step.code for step in flowchart.decision_tree]

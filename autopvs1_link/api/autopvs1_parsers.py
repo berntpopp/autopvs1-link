@@ -19,12 +19,122 @@ from autopvs1_link.models.autopvs1_models import (
 
 logger = structlog.get_logger()
 
+PVS1_STRENGTH_LABELS = {
+    "VeryStrong",
+    "Strong",
+    "Moderate",
+    "Supporting",
+    "Not applicable",
+    "Unmet",
+    "Strong_RWS",
+    "Moderate_RWS",
+    "Supporting_RWS",
+}
+
 
 def _href(tag: Tag | None) -> str | None:
     if tag is None:
         return None
     value = tag.get("href")
     return value if isinstance(value, str) else None
+
+
+def _collapse_html_text(tag: Tag) -> str:
+    """Return visible text with HTML layout whitespace collapsed."""
+    return re.sub(r"\s+", " ", tag.get_text(" ", strip=True)).strip()
+
+
+def _match_strength_candidate(candidate: str) -> str:
+    """Match a strength label at the start of candidate text."""
+    candidate = re.sub(r"\s+", " ", candidate).strip()
+    for strength in sorted(PVS1_STRENGTH_LABELS, key=len, reverse=True):
+        if candidate == strength or candidate.startswith(f"{strength} "):
+            return strength
+    return ""
+
+
+def _extract_strength_after_label(text: str, pattern: re.Pattern[str]) -> str:
+    """Extract the first recognized strength immediately after a final-strength label."""
+    match = pattern.search(text)
+    if not match:
+        return ""
+    return _match_strength_candidate(match.group(1))
+
+
+def _contains_flowchart_tree(tag: Tag) -> bool:
+    """Return whether tag is or contains the decision-tree markup."""
+    is_tree = tag.name == "ul" and "tree" in tag.get_attribute_list("class")
+    return is_tree or tag.select_one("ul.tree") is not None
+
+
+def _extract_strength_from_next_sibling(tag: Tag) -> str:
+    """Extract a strength from the first non-tree sibling after tag."""
+    for sibling in tag.next_siblings:
+        if isinstance(sibling, Tag):
+            if _contains_flowchart_tree(sibling):
+                return ""
+            candidate = _collapse_html_text(sibling)
+        else:
+            candidate = re.sub(r"\s+", " ", str(sibling)).strip()
+        if candidate:
+            return _match_strength_candidate(candidate)
+    return ""
+
+
+def _extract_strength_from_label_sibling(text_node: object) -> str:
+    """Extract a strength from a sibling after the label or its field container."""
+    parent = getattr(text_node, "parent", None)
+    if not isinstance(parent, Tag):
+        return ""
+
+    strength = _extract_strength_from_next_sibling(parent)
+    if strength:
+        return strength
+
+    container = parent.parent
+    if isinstance(container, Tag) and not _contains_flowchart_tree(container):
+        return _extract_strength_from_next_sibling(container)
+    return ""
+
+
+def _extract_explicit_final_strength(flowchart_col: Tag) -> str:
+    """Extract an explicit final-strength label if the HTML exposes one."""
+    final_strength_pattern = re.compile(r"Final\s+Strength\s*:\s*(.+)", re.IGNORECASE)
+    for text_node in flowchart_col.find_all(string=final_strength_pattern):
+        strength = _extract_strength_after_label(str(text_node), final_strength_pattern)
+        if strength:
+            return strength
+
+    final_strength_label_pattern = re.compile(r"Final\s+Strength\s*:", re.IGNORECASE)
+    for text_node in flowchart_col.find_all(string=final_strength_label_pattern):
+        parent = text_node.parent
+        candidate_tags = [parent]
+        if isinstance(parent, Tag):
+            candidate_tags.append(parent.parent)
+        for tag in candidate_tags:
+            if not isinstance(tag, Tag) or _contains_flowchart_tree(tag):
+                continue
+            strength = _extract_strength_after_label(
+                _collapse_html_text(tag), final_strength_pattern
+            )
+            if strength:
+                return strength
+        strength = _extract_strength_from_label_sibling(text_node)
+        if strength:
+            return strength
+    return ""
+
+
+def _infer_terminal_strength(flowchart_codes: list[Tag]) -> str:
+    """Infer final strength only when the terminal decision-tree code is recognized."""
+    if not flowchart_codes:
+        return ""
+
+    text = _collapse_html_text(flowchart_codes[-1])
+    if text in PVS1_STRENGTH_LABELS:
+        logger.debug("Found final strength", strength=text, method="terminal_code")
+        return text
+    return ""
 
 
 def parse_variant_info(soup: BeautifulSoup, variant_id: str) -> VariantInfo:
@@ -121,34 +231,16 @@ def parse_pvs1_flowchart(soup: BeautifulSoup) -> PVS1Flowchart:
     if figcaption:
         preliminary_path = figcaption.text.replace("Preliminary Decision Path: ", "").strip()
 
-    final_strength = ""
     flowchart_codes = flowchart_col.select("ul.tree code")
-    valid_strengths = ["Strong", "Moderate", "Supporting", "Not applicable", "Unmet"]
-    if flowchart_codes:
-        for code in reversed(flowchart_codes):
-            text = code.text.strip()
-            if text in valid_strengths:
-                final_strength = text
-                logger.debug(
-                    "Found final strength", strength=final_strength, method="reverse_search"
-                )
-                break
+    final_strength = ""
+    final_strength_inferred = False
 
-    if not final_strength:
-        deepest_li = flowchart_col.select("ul.tree li ul li ul li ul li")
-        if deepest_li:
-            for li in deepest_li:
-                nested_code = li.find("code")
-                if isinstance(nested_code, Tag):
-                    text = nested_code.text.strip()
-                    if text in valid_strengths:
-                        final_strength = text
-                        logger.debug(
-                            "Found final strength",
-                            strength=final_strength,
-                            method="deepest_nesting",
-                        )
-                        break
+    explicit_strength = _extract_explicit_final_strength(flowchart_col)
+    if explicit_strength:
+        final_strength = explicit_strength
+    else:
+        final_strength = _infer_terminal_strength(flowchart_codes)
+        final_strength_inferred = bool(final_strength)
 
     decision_tree = []
     for code in flowchart_codes:
@@ -167,6 +259,7 @@ def parse_pvs1_flowchart(soup: BeautifulSoup) -> PVS1Flowchart:
     return PVS1Flowchart(
         preliminary_decision_path=preliminary_path,
         final_strength=final_strength,
+        final_strength_inferred=final_strength_inferred,
         decision_tree=decision_tree,
         notes=notes,
     )
