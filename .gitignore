@@ -186,3 +186,6 @@ cython_debug/
 CLAUDE.local.md
 PLAN.md
 TODO.md
+
+# Local git worktrees
+.worktrees/
