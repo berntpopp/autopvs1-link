@@ -93,16 +93,27 @@ See [`docs/api.md`](docs/api.md) for the full reference.
 
 ### MCP tools and resources
 
-Tools (4):
+Tools (5):
 
 - `get_variant_pvs1_data(genome_build, variant_id)`
 - `get_cnv_pvs1_data(genome_build, cnv_id)`
-- `search_variants(query, genome_version)`
+- `search_variants(query, genome_build, limit=10, cursor=None)`
+- `get_server_capabilities()`
 - `clear_cache()` - **gated** behind `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`
 
-Resources (1):
+Resources (2):
 
 - `autopvs1-link://cache/statistics` - read-only cache stats snapshot
+- `autopvs1-link://capabilities` - detailed MCP usage guidance
+
+Cache statistics expose stable method-keyed counters and cache-key-shape
+metadata for the configured service methods.
+
+MCP tool responses use the standard `ok`, `data`, `error`, `meta` envelope.
+Validation and upstream failures return stable `error.code` values. Search
+pagination uses `limit` plus returned `data.next_cursor`. Outputs are
+research-use AutoPVS1 data, not clinical decision support; cite AutoPVS1
+(`10.1002/humu.24051`) where appropriate.
 
 The auto-generated tool catalog with full schemas lives in
 [`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md).
@@ -161,6 +172,7 @@ make docker-logs     # Follow logs
 - [`docs/configuration.md`](docs/configuration.md) - env-var reference
 - [`docs/api.md`](docs/api.md) - REST + MCP surface
 - [`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md) - generated tool schemas
+- [`docs/mcp-evaluation-checklist.md`](docs/mcp-evaluation-checklist.md) - MCP contract checks
 - [`AGENTS.md`](AGENTS.md) - shared instructions for agentic coding tools
 - [`CHANGELOG.md`](CHANGELOG.md) - release notes
 

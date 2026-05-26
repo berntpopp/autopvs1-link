@@ -20,7 +20,7 @@ async def render() -> str:
     lines.append("")
     lines.append("## Tools")
     lines.append("")
-    for tool in await mcp.list_tools():
+    for tool in sorted(await mcp.list_tools(), key=lambda tool: tool.name):
         lines.append(f"### `{tool.name}`")
         lines.append("")
         if tool.description:
@@ -28,15 +28,28 @@ async def render() -> str:
             lines.append("")
         schema = tool.parameters
         if schema:
+            lines.append("#### Input Schema")
+            lines.append("")
             lines.append("```json")
-            lines.append(json.dumps(schema, indent=2))
+            lines.append(json.dumps(schema, indent=2, sort_keys=True))
+            lines.append("```")
+            lines.append("")
+        output_schema = tool.output_schema
+        if output_schema:
+            lines.append("#### Output Schema")
+            lines.append("")
+            lines.append("```json")
+            lines.append(json.dumps(output_schema, indent=2, sort_keys=True))
             lines.append("```")
             lines.append("")
     lines.append("## Resources")
     lines.append("")
-    for resource in await mcp.list_resources():
+    for resource in sorted(await mcp.list_resources(), key=lambda resource: str(resource.uri)):
         desc = (resource.description or "").strip()
-        lines.append(f"- `{resource.uri}` - {desc}")
+        if desc:
+            lines.append(f"- `{resource.uri}` - {desc}")
+        else:
+            lines.append(f"- `{resource.uri}`")
     lines.append("")
     return "\n".join(lines)
 

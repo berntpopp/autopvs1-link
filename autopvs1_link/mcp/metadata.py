@@ -48,4 +48,5 @@ def register_metadata(mcp: FastMCP) -> None:
 
     @mcp.resource("autopvs1-link://capabilities")
     def capabilities() -> dict[str, Any]:
+        """Detailed MCP usage guidance, examples, limitations, and citation."""
         return detailed_capabilities_resource()
