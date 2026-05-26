@@ -7,6 +7,7 @@ from typing import Any, cast
 from fastmcp import FastMCP
 
 from autopvs1_link.mcp import service_adapters
+from autopvs1_link.mcp.presenters.cache import present_cache_statistics
 
 
 def register(mcp: FastMCP) -> None:
@@ -16,6 +17,9 @@ def register(mcp: FastMCP) -> None:
     async def cache_statistics() -> dict[str, Any]:
         """Read-only snapshot of in-memory cache statistics."""
         stats = await service_adapters.cache_statistics()
-        if hasattr(stats, "model_dump"):
-            return cast(dict[str, Any], stats.model_dump(mode="json"))
-        return dict(stats)
+        raw = (
+            cast(dict[str, Any], stats.model_dump(mode="json"))
+            if hasattr(stats, "model_dump")
+            else dict(stats)
+        )
+        return present_cache_statistics(raw).model_dump(mode="json")

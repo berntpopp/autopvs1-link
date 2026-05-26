@@ -1,5 +1,6 @@
 """Exercise MCP tool wrappers through FastMCP's call_tool runtime."""
 
+import json
 from unittest.mock import AsyncMock
 
 import httpx
@@ -520,3 +521,67 @@ async def test_cache_resource_runtime(mocker) -> None:
     mcp = build_mcp_server()
     result = await mcp.read_resource("autopvs1-link://cache/statistics")
     assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_clear_cache_disabled_returns_standard_envelope(monkeypatch, mocker) -> None:
+    monkeypatch.delenv("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", raising=False)
+    fake = AsyncMock()
+    fake.clear_cache = AsyncMock()
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters._service",
+        new=AsyncMock(return_value=fake),
+    )
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("clear_cache", {})
+
+    fake.clear_cache.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "destructive_disabled"
+    assert result.structured_content["error"]["retryable"] is False
+
+
+@pytest.mark.asyncio
+async def test_clear_cache_enabled_accepts_empty_input(monkeypatch, mocker) -> None:
+    monkeypatch.setenv("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", "true")
+    fake = AsyncMock()
+    fake.clear_cache = AsyncMock()
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters._service",
+        new=AsyncMock(return_value=fake),
+    )
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("clear_cache", {})
+
+    fake.clear_cache.assert_awaited_once()
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["data"] == {
+        "cleared": True,
+        "message": "All service caches and cache statistics cleared.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_cache_resource_returns_stable_method_keys(mocker) -> None:
+    fake = AsyncMock()
+    fake.get_cache_statistics = AsyncMock(return_value={})
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters._service",
+        new=AsyncMock(return_value=fake),
+    )
+
+    mcp = build_mcp_server()
+    result = await mcp.read_resource("autopvs1-link://cache/statistics")
+
+    assert result is not None
+    assert result.contents
+    payload = json.loads(result.contents[0].content)
+    assert set(payload["statistics"]) == {
+        "get_variant_data",
+        "get_cnv_data",
+        "search_variants",
+        "search_with_redirect_detection",
+        "resolve_hgvs_notation",
+    }

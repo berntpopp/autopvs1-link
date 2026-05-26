@@ -8,7 +8,9 @@ from fastmcp import FastMCP
 
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import DESTRUCTIVE_CLOSED_WORLD
-from autopvs1_link.mcp.contracts import ClearCacheInput
+from autopvs1_link.mcp.contracts import ClearCacheData, ClearCacheMCPEnvelope
+from autopvs1_link.mcp.envelope import error_envelope, ok_envelope
+from autopvs1_link.mcp.errors import DestructiveOperationDisabledError
 
 
 def register(mcp: FastMCP) -> None:
@@ -17,12 +19,30 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="clear_cache",
         title="Clear AutoPVS1-Link Cache",
+        output_schema=ClearCacheMCPEnvelope.model_json_schema(),
         annotations=DESTRUCTIVE_CLOSED_WORLD,
     )
-    async def clear_cache(_: ClearCacheInput | None = None) -> dict[str, Any]:
+    async def clear_cache() -> dict[str, Any]:
         """Clear all service caches.
 
         Disabled by default. Enable with
         AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true.
         """
-        return await service_adapters.clear_cache()
+        try:
+            await service_adapters.clear_cache()
+        except DestructiveOperationDisabledError as exc:
+            return error_envelope(
+                code="destructive_disabled",
+                message=str(exc),
+                retryable=False,
+                suggestions=[
+                    "Set AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true only in trusted "
+                    "administrative environments."
+                ],
+            )
+        return ok_envelope(
+            ClearCacheData(
+                cleared=True,
+                message="All service caches and cache statistics cleared.",
+            )
+        )

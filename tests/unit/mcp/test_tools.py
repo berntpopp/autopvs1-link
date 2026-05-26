@@ -82,3 +82,14 @@ async def test_data_tools_have_titles_annotations_and_output_schemas() -> None:
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False
         assert tool.annotations.idempotentHint is True
+
+
+@pytest.mark.asyncio
+async def test_clear_cache_schema_accepts_empty_object_without_dummy_field() -> None:
+    mcp: FastMCP = build_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    schema = tools["clear_cache"].parameters
+    assert schema.get("properties", {}) == {}
+    assert "_" not in schema.get("properties", {})
+    assert set(tools["clear_cache"].output_schema["properties"]) == {"ok", "data", "error", "meta"}
