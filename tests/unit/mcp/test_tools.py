@@ -43,6 +43,7 @@ async def test_data_tools_have_titles_annotations_and_output_schemas() -> None:
         tool = tools[name]
         assert tool.title
         assert tool.output_schema is not None
+        assert set(tool.output_schema["properties"]) == {"ok", "data", "error", "meta"}
         assert tool.annotations is not None
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False

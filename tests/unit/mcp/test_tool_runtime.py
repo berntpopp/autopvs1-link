@@ -2,10 +2,18 @@
 
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 from pydantic import BaseModel
 
 from autopvs1_link.mcp.facade import build_mcp_server
+from autopvs1_link.models.autopvs1_models import (
+    AutoPVS1CNVData,
+    AutoPVS1Data,
+    CNVInfo,
+    PVS1Flowchart,
+    VariantInfo,
+)
 
 
 class _FakeResult(BaseModel):
@@ -15,9 +23,65 @@ class _FakeResult(BaseModel):
     method: str = ""
 
 
+def _assert_no_raw_error_leak(text: str) -> None:
+    lowered = text.lower()
+    assert "mdn" not in text
+    assert "errors.pydantic.dev" not in lowered
+    assert "string should have at least" not in lowered
+    assert "<html" not in lowered
+    assert "traceback" not in lowered
+
+
+def _http_status_error(status_code: int, url: str) -> httpx.HTTPStatusError:
+    request = httpx.Request("GET", url)
+    response = httpx.Response(status_code, request=request)
+    return httpx.HTTPStatusError(
+        f"AutoPVS1 returned HTTP {status_code}",
+        request=request,
+        response=response,
+    )
+
+
+def _variant_result() -> AutoPVS1Data:
+    return AutoPVS1Data(
+        genome_build="hg38",
+        variant_info=VariantInfo(
+            variant_id="X-1-A-T",
+            variant_type="Nonsense",
+            gene_symbol="GENE",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF",
+            final_strength="Strong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+
+
+def _cnv_result() -> AutoPVS1CNVData:
+    return AutoPVS1CNVData(
+        genome_build="hg19",
+        cnv_info=CNVInfo(
+            cnv_id="1-1-2-DEL",
+            cnv_type="Deletion",
+            gene_symbol="GENE",
+            coordinates="1-1-2-DEL",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="DEL",
+            final_strength="Strong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+
+
 @pytest.mark.asyncio
 async def test_get_variant_pvs1_data_tool_runtime(mocker) -> None:
-    fake = AsyncMock(return_value=_FakeResult(method="variant"))
+    fake = AsyncMock(return_value=_variant_result())
     mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
 
     mcp = build_mcp_server()
@@ -26,12 +90,13 @@ async def test_get_variant_pvs1_data_tool_runtime(mocker) -> None:
         {"genome_build": "hg38", "variant_id": "X-1-A-T"},
     )
     fake.assert_awaited_once_with("hg38", "X-1-A-T")
-    assert result is not None
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["data"]["upstream_service"] == "AutoPVS1"
 
 
 @pytest.mark.asyncio
 async def test_get_cnv_pvs1_data_tool_runtime(mocker) -> None:
-    fake = AsyncMock(return_value=_FakeResult(method="cnv"))
+    fake = AsyncMock(return_value=_cnv_result())
     mocker.patch("autopvs1_link.mcp.service_adapters.get_cnv", new=fake)
 
     mcp = build_mcp_server()
@@ -40,7 +105,168 @@ async def test_get_cnv_pvs1_data_tool_runtime(mocker) -> None:
         {"genome_build": "hg19", "cnv_id": "1-1-2-DEL"},
     )
     fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
-    assert result is not None
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["data"]["upstream_service"] == "AutoPVS1"
+
+
+@pytest.mark.asyncio
+async def test_get_variant_invalid_id_returns_envelope_without_calling_upstream(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "NOT-A-VARIANT"},
+    )
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_variant_id"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_get_variant_empty_id_returns_envelope_without_calling_upstream(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": ""},
+    )
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_variant_id"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_get_cnv_colon_format_returns_guidance_without_calling_upstream(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_cnv", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_cnv_pvs1_data",
+        {"genome_build": "hg19", "cnv_id": "chr17:15000000-20000000:DEL"},
+    )
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_cnv_id"
+    assert result.structured_content["error"]["suggestions"] == ["Use 17-15000000-20000000-DEL."]
+
+
+@pytest.mark.asyncio
+async def test_get_cnv_empty_id_returns_envelope_without_calling_upstream(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_cnv", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_cnv_pvs1_data",
+        {"genome_build": "hg19", "cnv_id": ""},
+    )
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_cnv_id"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_get_cnv_hyphenated_format_forwards_upstream(mocker) -> None:
+    parsed = AutoPVS1CNVData(
+        genome_build="hg19",
+        cnv_info=CNVInfo(
+            cnv_id="17-15000000-20000000-DEL",
+            cnv_type="Deletion",
+            gene_symbol="MYO15A",
+            coordinates="17-15000000-20000000-DEL",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="DEL",
+            final_strength="VeryStrong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_cnv", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_cnv_pvs1_data",
+        {"genome_build": "hg19", "cnv_id": "17-15000000-20000000-DEL"},
+    )
+
+    fake.assert_awaited_once_with("hg19", "17-15000000-20000000-DEL")
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["data"]["cnv_info"]["gene_symbol"] == "MYO15A"
+
+
+@pytest.mark.asyncio
+async def test_get_variant_connect_error_returns_upstream_unavailable_envelope(mocker) -> None:
+    request = httpx.Request("GET", "https://autopvs1.bgi.com/variant/hg38/X-1-A-T")
+    fake = AsyncMock(side_effect=httpx.ConnectError("connect failed", request=request))
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "X-1-A-T"},
+    )
+
+    fake.assert_awaited_once_with("hg38", "X-1-A-T")
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "upstream_unavailable"
+    assert result.structured_content["error"]["retryable"] is True
+    assert "connect failed" not in result.content[0].text
+
+
+@pytest.mark.asyncio
+async def test_get_cnv_connect_error_returns_upstream_unavailable_envelope(mocker) -> None:
+    request = httpx.Request("GET", "https://autopvs1.bgi.com/cnv/hg19/1-1-2-DEL")
+    fake = AsyncMock(side_effect=httpx.ConnectError("connect failed", request=request))
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_cnv", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_cnv_pvs1_data",
+        {"genome_build": "hg19", "cnv_id": "1-1-2-DEL"},
+    )
+
+    fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "upstream_unavailable"
+    assert result.structured_content["error"]["retryable"] is True
+    assert "connect failed" not in result.content[0].text
+
+
+@pytest.mark.asyncio
+async def test_get_variant_429_status_is_retryable_upstream_unavailable(mocker) -> None:
+    fake = AsyncMock(
+        side_effect=_http_status_error(
+            429,
+            "https://autopvs1.bgi.com/variant/hg38/X-1-A-T",
+        )
+    )
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "X-1-A-T"},
+    )
+
+    fake.assert_awaited_once_with("hg38", "X-1-A-T")
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "upstream_unavailable"
+    assert result.structured_content["error"]["retryable"] is True
 
 
 @pytest.mark.asyncio
