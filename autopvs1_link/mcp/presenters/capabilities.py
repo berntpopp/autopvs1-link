@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from autopvs1_link.mcp.contracts import CompactCapabilitiesData
+from autopvs1_link.mcp.contracts import CompactCapabilitiesData, ToolSummaryMCP, WorkflowStepMCP
 from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 
 
@@ -17,12 +17,36 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
         endpoint="/mcp/",
         research_use_only=True,
         tool_summaries={
-            "get_variant_pvs1_data": ("research-use PVS1 analysis for one AutoPVS1 SNV/indel ID."),
-            "get_cnv_pvs1_data": "research-use PVS1 analysis for one AutoPVS1 CNV ID.",
-            "search_variants": (
-                "Search AutoPVS1 by gene symbol, partial variant ID, or upstream-supported query."
+            "get_variant_pvs1_data": ToolSummaryMCP(
+                purpose="research-use PVS1 analysis for one AutoPVS1 SNV/indel ID.",
+                example={
+                    "genome_build": "hg19",
+                    "variant_id": "X-82763936-A-T",
+                },
             ),
-            "clear_cache": ("Opt-in destructive cache clear; disabled unless explicitly enabled."),
+            "get_cnv_pvs1_data": ToolSummaryMCP(
+                purpose="research-use PVS1 analysis for one AutoPVS1 CNV ID.",
+                example={
+                    "genome_build": "hg19",
+                    "cnv_id": "17-15000000-20000000-DEL",
+                },
+            ),
+            "search_variants": ToolSummaryMCP(
+                purpose=(
+                    "Search AutoPVS1 by gene symbol, partial variant ID, or "
+                    "upstream-supported query."
+                ),
+                example={
+                    "query": "BRCA1",
+                    "genome_build": "hg38",
+                    "limit": 10,
+                    "cursor": None,
+                },
+            ),
+            "clear_cache": ToolSummaryMCP(
+                purpose="Opt-in destructive cache clear; disabled unless explicitly enabled.",
+                example={},
+            ),
         },
         canonical_parameters={
             "get_variant_pvs1_data": ["genome_build", "variant_id"],
@@ -31,10 +55,24 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
             "clear_cache": [],
         },
         compact_workflow=[
-            "Ask for hg19 or hg38 if the source coordinate build is unknown.",
-            "Use search_variants only when the AutoPVS1 variant or CNV ID is unknown.",
-            "Use get_variant_pvs1_data or get_cnv_pvs1_data for scoring.",
-            "Report outputs as research-use AutoPVS1 data, not clinical decision support.",
+            WorkflowStepMCP(
+                step="Confirm genome build",
+                when="The source coordinate build is unknown or absent.",
+            ),
+            WorkflowStepMCP(
+                step="Search for an AutoPVS1 ID",
+                when=(
+                    "The caller has a gene symbol, partial variant ID, or upstream-supported query."
+                ),
+            ),
+            WorkflowStepMCP(
+                step="Score one variant or CNV",
+                when="The caller has a normalized AutoPVS1 variant_id or cnv_id.",
+            ),
+            WorkflowStepMCP(
+                step="Report research-use output",
+                when="Summarizing any AutoPVS1 result for a user.",
+            ),
         ],
         details_resource="autopvs1-link://capabilities",
     )

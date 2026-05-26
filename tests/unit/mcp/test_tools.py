@@ -1,9 +1,54 @@
 """Smoke tests for MCP tool registration."""
 
+from typing import Any
+
 import pytest
 from fastmcp import FastMCP
 
 from autopvs1_link.mcp.facade import build_mcp_server
+
+JsonSchema = dict[str, Any]
+
+
+def _non_null_schema(schema: JsonSchema) -> JsonSchema:
+    for branch in schema.get("anyOf", []):
+        if branch.get("type") != "null":
+            return branch
+    return schema
+
+
+def _resolve_ref(root: JsonSchema, schema: JsonSchema) -> JsonSchema:
+    ref = schema.get("$ref")
+    if ref is None:
+        return schema
+
+    assert isinstance(ref, str)
+    assert ref.startswith("#/")
+    resolved: Any = root
+    for part in ref.removeprefix("#/").split("/"):
+        resolved = resolved[part]
+    assert isinstance(resolved, dict)
+    return resolved
+
+
+def _data_schema(output_schema: JsonSchema) -> JsonSchema:
+    return _non_null_schema(output_schema["properties"]["data"])
+
+
+def _property_schema(root: JsonSchema, schema: JsonSchema, property_name: str) -> JsonSchema:
+    return _resolve_ref(root, schema["properties"][property_name])
+
+
+def _assert_typed_object_schema(
+    root: JsonSchema,
+    schema: JsonSchema,
+    expected_properties: set[str],
+) -> JsonSchema:
+    resolved = _resolve_ref(root, schema)
+    assert "properties" in resolved
+    assert expected_properties <= set(resolved["properties"])
+    assert resolved.get("additionalProperties") is not True
+    return resolved
 
 
 def _schema_allows_null(schema: dict) -> bool:
@@ -82,6 +127,74 @@ async def test_data_tools_have_titles_annotations_and_output_schemas() -> None:
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False
         assert tool.annotations.idempotentHint is True
+
+
+@pytest.mark.asyncio
+async def test_data_tool_output_schemas_expose_typed_nested_payloads() -> None:
+    mcp: FastMCP = build_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    variant_schema = tools["get_variant_pvs1_data"].output_schema
+    variant_data = _data_schema(variant_schema)
+    variant_info = _property_schema(variant_schema, variant_data, "variant_info")
+    _assert_typed_object_schema(
+        variant_schema,
+        variant_info,
+        {"variant_id", "variant_type", "gene_symbol", "pli_score_display", "external_links"},
+    )
+    pvs1_flowchart = _property_schema(variant_schema, variant_data, "pvs1_flowchart")
+    resolved_flowchart = _assert_typed_object_schema(
+        variant_schema,
+        pvs1_flowchart,
+        {
+            "preliminary_decision_path",
+            "final_strength",
+            "final_strength_inferred",
+            "decision_tree",
+            "notes",
+        },
+    )
+    flowchart_step = _resolve_ref(
+        variant_schema,
+        resolved_flowchart["properties"]["decision_tree"]["items"],
+    )
+    _assert_typed_object_schema(
+        variant_schema,
+        flowchart_step,
+        {"code", "description", "note_id", "note_text"},
+    )
+    disease_mechanism = _resolve_ref(
+        variant_schema,
+        variant_data["properties"]["disease_mechanisms"]["items"],
+    )
+    _assert_typed_object_schema(
+        variant_schema,
+        disease_mechanism,
+        {"gene", "disease", "inheritance", "clinical_validity", "adjusted_strength"},
+    )
+
+    cnv_schema = tools["get_cnv_pvs1_data"].output_schema
+    cnv_data = _data_schema(cnv_schema)
+    cnv_info = _property_schema(cnv_schema, cnv_data, "cnv_info")
+    _assert_typed_object_schema(
+        cnv_schema,
+        cnv_info,
+        {"cnv_id", "cnv_type", "gene_symbol", "coordinates", "size"},
+    )
+    _assert_typed_object_schema(
+        cnv_schema,
+        _property_schema(cnv_schema, cnv_data, "pvs1_flowchart"),
+        {"preliminary_decision_path", "final_strength", "decision_tree"},
+    )
+
+    search_schema = tools["search_variants"].output_schema
+    search_data = _data_schema(search_schema)
+    search_result = _resolve_ref(search_schema, search_data["properties"]["results"]["items"])
+    _assert_typed_object_schema(
+        search_schema,
+        search_result,
+        {"variant_id", "gene", "variant_type", "genome_build", "url"},
+    )
 
 
 @pytest.mark.asyncio
