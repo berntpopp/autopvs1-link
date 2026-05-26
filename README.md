@@ -93,27 +93,43 @@ See [`docs/api.md`](docs/api.md) for the full reference.
 
 ### MCP tools and resources
 
-Tools (5):
+Default tools (5):
 
 - `get_variant_pvs1_data(genome_build, variant_id)`
 - `get_cnv_pvs1_data(genome_build, cnv_id)`
-- `search_variants(query, genome_build, limit=10, cursor=None)`
+- `search_variants(query, genome_build=None, limit=10, cursor=None)`
+- `get_server_health()`
 - `get_server_capabilities()`
-- `clear_cache()` - **gated** behind `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`
+
+Opt-in destructive tool:
+
+- `clear_cache()` - registered only when
+  `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`
 
 Resources (2):
 
 - `autopvs1-link://cache/statistics` - read-only cache stats snapshot
 - `autopvs1-link://capabilities` - detailed MCP usage guidance
 
+Prompts (2):
+
+- `classify_variant` - canonical variant classification workflow guidance
+- `classify_cnv` - canonical CNV classification workflow guidance
+
 Cache statistics expose stable method-keyed counters and cache-key-shape
 metadata for the configured service methods.
 
 MCP tool responses use the standard `ok`, `data`, `error`, `meta` envelope.
-Validation and upstream failures return stable `error.code` values. Search
-pagination uses `limit` plus returned `data.next_cursor`. Outputs are
-research-use AutoPVS1 data, not clinical decision support; cite AutoPVS1
-(`10.1002/humu.24051`) where appropriate.
+Read tools accept `response_mode` (`summary`, `standard`, `full`) and
+`meta_mode` (`full`, `compact`, `minimal`) so agents can control token cost
+while preserving research-use framing. Variant and CNV tools also accept
+`include_unmet` to filter disease-mechanism rows. Validation and upstream
+failures return stable `error.code` values; CNV colon-form validation errors
+include structured `error.details.corrected_id` when a corrected AutoPVS1 ID
+can be derived. Search pagination uses `limit` plus returned
+`data.next_cursor`; omitting `genome_build` defaults to `hg38` with a warning.
+Outputs are research-use AutoPVS1 data, not clinical decision support; cite
+AutoPVS1 (`10.1002/humu.24051`) where appropriate.
 
 The auto-generated tool catalog with full schemas lives in
 [`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md).
