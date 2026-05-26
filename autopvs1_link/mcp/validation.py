@@ -21,7 +21,13 @@ COLON_CNV_RE = re.compile(
 CNV_FORMAT_SUGGESTION = "Use AutoPVS1 CNV format such as 17-15000000-20000000-DEL."
 
 
-def normalize_genome_build(value: str) -> str:
+def normalize_genome_build(value: object) -> str:
+    if not isinstance(value, str):
+        raise MCPInputError(
+            code="invalid_genome_build",
+            message="Genome build must be hg19 or hg38.",
+            suggestions=["Use genome_build='hg38' unless the source variant coordinates are hg19."],
+        )
     normalized = value.strip()
     if normalized not in VALID_GENOME_BUILDS:
         raise MCPInputError(
@@ -33,8 +39,8 @@ def normalize_genome_build(value: str) -> str:
 
 
 def normalize_genome_builds(
-    genome_build: str | None,
-    genome_version: str | None,
+    genome_build: object | None,
+    genome_version: object | None,
 ) -> tuple[str, list[MCPWarning]]:
     warnings: list[MCPWarning] = []
     canonical = normalize_genome_build(genome_build) if genome_build is not None else None
@@ -109,7 +115,15 @@ def normalize_cnv_id(cnv_id: str) -> str:
     return value
 
 
-def normalize_search_query(query: str) -> str:
+def normalize_search_query(query: object) -> str:
+    if not isinstance(query, str):
+        raise MCPInputError(
+            code="invalid_search_query",
+            message="Search query must be text.",
+            suggestions=[
+                "Search by gene symbol, partial AutoPVS1 variant ID, or upstream-supported query."
+            ],
+        )
     value = query.strip()
     if not value:
         raise MCPInputError(
@@ -122,10 +136,41 @@ def normalize_search_query(query: str) -> str:
     return value
 
 
-def normalize_limit_cursor(limit: int, cursor: str | None) -> tuple[int, int]:
-    bounded_limit = max(1, min(limit, 50))
+def _invalid_search_pagination(message: str) -> MCPInputError:
+    return MCPInputError(
+        code="invalid_search_query",
+        message=message,
+        suggestions=[
+            "Use limit as an integer from 1 to 50 and cursor as the returned next_cursor."
+        ],
+    )
+
+
+def _normalize_limit(limit: object) -> int:
+    if isinstance(limit, int) and not isinstance(limit, bool):
+        return limit
+    if isinstance(limit, str):
+        value = limit.strip()
+        if value:
+            try:
+                return int(value)
+            except ValueError as exc:
+                raise _invalid_search_pagination("Search limit must be an integer.") from exc
+    raise _invalid_search_pagination("Search limit must be an integer.")
+
+
+def normalize_limit_cursor(limit: object, cursor: object | None) -> tuple[int, int]:
+    bounded_limit = max(1, min(_normalize_limit(limit), 50))
     if cursor is None:
         return bounded_limit, 0
+    if not isinstance(cursor, str):
+        raise MCPInputError(
+            code="invalid_search_query",
+            message="Search cursor must be an integer-offset string.",
+            suggestions=[
+                "Use the next_cursor value returned by the previous search_variants call."
+            ],
+        )
     try:
         offset = int(cursor)
     except ValueError as exc:

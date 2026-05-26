@@ -6,6 +6,30 @@ from fastmcp import FastMCP
 from autopvs1_link.mcp.facade import build_mcp_server
 
 
+def _schema_allows_null(schema: dict) -> bool:
+    return schema.get("type") == "null" or any(
+        branch.get("type") == "null" for branch in schema.get("anyOf", [])
+    )
+
+
+def _assert_optional_enum_is_coherent(schema: dict) -> None:
+    assert _schema_allows_null(schema)
+    if "enum" in schema:
+        assert None in schema["enum"]
+
+
+def _enum_values(schema: dict) -> set[str]:
+    values = {value for value in schema.get("enum", []) if isinstance(value, str)}
+    for branch in schema.get("anyOf", []):
+        values.update(value for value in branch.get("enum", []) if isinstance(value, str))
+    return values
+
+
+def _assert_optional_genome_build_schema(schema: dict) -> None:
+    _assert_optional_enum_is_coherent(schema)
+    assert {"hg19", "hg38"} <= _enum_values(schema)
+
+
 @pytest.mark.asyncio
 async def test_build_mcp_server_registers_expected_tools() -> None:
     mcp: FastMCP = build_mcp_server()
@@ -30,8 +54,18 @@ async def test_data_tools_use_direct_arguments_for_llm_discovery() -> None:
     assert variant_schema["required"] == ["genome_build", "variant_id"]
 
     search_schema = tools["search_variants"].parameters
-    assert set(search_schema["properties"]) == {"query", "genome_version"}
+    assert set(search_schema["properties"]) == {
+        "query",
+        "genome_build",
+        "limit",
+        "cursor",
+        "genome_version",
+    }
     assert search_schema["required"] == ["query"]
+    assert "deprecated" in search_schema["properties"]["genome_version"]["description"].lower()
+    _assert_optional_genome_build_schema(search_schema["properties"]["genome_build"])
+    _assert_optional_genome_build_schema(search_schema["properties"]["genome_version"])
+    assert _schema_allows_null(search_schema["properties"]["cursor"])
 
 
 @pytest.mark.asyncio

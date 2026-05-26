@@ -10,6 +10,7 @@ from autopvs1_link.mcp.facade import build_mcp_server
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
     AutoPVS1Data,
+    AutoPVS1SearchResults,
     CNVInfo,
     PVS1Flowchart,
     VariantInfo,
@@ -281,6 +282,208 @@ async def test_search_variants_tool_runtime(mocker) -> None:
     )
     fake.assert_awaited_once_with("MYH9", "hg38")
     assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_search_whitespace_returns_invalid_search_query(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "   "})
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_search_query"
+
+
+@pytest.mark.asyncio
+async def test_search_empty_query_returns_invalid_search_query_without_raw_validation(
+    mocker,
+) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": ""})
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_search_query"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_search_no_result_hgvs_like_query_returns_guidance(mocker) -> None:
+    parsed = AutoPVS1SearchResults(query="BRCA1 c.5266dupC", genome_version="hg38", results=[])
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "search_variants",
+        {"query": " BRCA1 c.5266dupC ", "genome_build": "hg38"},
+    )
+
+    fake.assert_awaited_once_with("BRCA1 c.5266dupC", "hg38")
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["data"]["total_count"] == 0
+    assert result.structured_content["data"]["suggestions"] == [
+        "Search for BRCA1 only.",
+        "Use a resolved AutoPVS1 variant ID when known.",
+        "Confirm genome build before scoring.",
+    ]
+    assert result.structured_content["meta"]["warnings"][0]["code"] == (
+        "unsupported_hgvs_like_search"
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_deprecated_genome_version_alias_still_works(mocker) -> None:
+    parsed = AutoPVS1SearchResults(query="MYH9", genome_version="hg19", results=[])
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "search_variants",
+        {"query": "MYH9", "genome_version": "hg19"},
+    )
+
+    fake.assert_awaited_once_with("MYH9", "hg19")
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["meta"]["warnings"][0]["code"] == "deprecated_genome_version"
+
+
+@pytest.mark.asyncio
+async def test_search_conflicting_genome_build_alias_returns_error(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "search_variants",
+        {"query": "MYH9", "genome_build": "hg19", "genome_version": "hg38"},
+    )
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+
+
+@pytest.mark.asyncio
+async def test_search_numeric_genome_build_returns_invalid_genome_build_envelope(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": 5})
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_search_numeric_genome_version_returns_invalid_genome_build_envelope(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_version": 5})
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_search_non_integer_limit_returns_invalid_search_query_envelope(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": "abc"})
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_search_query"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_search_numeric_cursor_returns_invalid_search_query_envelope(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "cursor": 5})
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_search_query"
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_search_timeout_returns_upstream_timeout_envelope(mocker) -> None:
+    request = httpx.Request("GET", "https://autopvs1.bgi.com/search")
+    fake = AsyncMock(side_effect=httpx.TimeoutException("timed out", request=request))
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
+
+    fake.assert_awaited_once_with("MYH9", "hg38")
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "upstream_timeout"
+    assert result.structured_content["error"]["retryable"] is True
+
+
+@pytest.mark.asyncio
+async def test_search_status_error_returns_upstream_unavailable_envelope(mocker) -> None:
+    fake = AsyncMock(side_effect=_http_status_error(503, "https://autopvs1.bgi.com/search"))
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
+
+    fake.assert_awaited_once_with("MYH9", "hg38")
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "upstream_unavailable"
+    assert result.structured_content["error"]["retryable"] is True
+
+
+@pytest.mark.asyncio
+async def test_search_429_status_is_retryable_upstream_unavailable(mocker) -> None:
+    fake = AsyncMock(side_effect=_http_status_error(429, "https://autopvs1.bgi.com/search"))
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
+
+    fake.assert_awaited_once_with("MYH9", "hg38")
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "upstream_unavailable"
+    assert result.structured_content["error"]["retryable"] is True
+
+
+@pytest.mark.asyncio
+async def test_search_request_error_returns_upstream_unavailable_envelope(mocker) -> None:
+    request = httpx.Request("GET", "https://autopvs1.bgi.com/search")
+    fake = AsyncMock(side_effect=httpx.ConnectError("connect failed", request=request))
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
+
+    fake.assert_awaited_once_with("MYH9", "hg38")
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "upstream_unavailable"
+    assert result.structured_content["error"]["retryable"] is True
+    assert "connect failed" not in result.content[0].text
 
 
 @pytest.mark.asyncio
