@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from autopvs1_link.mcp.contracts import SearchMCPData
 from autopvs1_link.mcp.envelope import MCPWarning
+from autopvs1_link.mcp.mode_validation import ResponseMode, normalize_response_mode
 
 HGVS_LIKE_RE = re.compile(
     r"((?:^|\s)[A-Z][A-Z0-9-]*(?:\s+|\s*:\s*)c\.)"
@@ -27,6 +28,10 @@ GENE_HGVS_RE = re.compile(
 
 def _dump_result(value: BaseModel | dict[str, Any]) -> dict[str, Any]:
     return value.model_dump(mode="json") if isinstance(value, BaseModel) else dict(value)
+
+
+def _normalize_response_mode(response_mode: Any) -> ResponseMode:
+    return normalize_response_mode(response_mode)
 
 
 def _empty_search_suggestions(query: str) -> list[str]:
@@ -53,8 +58,10 @@ def present_search(
     limit: int,
     offset: int,
     inherited_warnings: list[MCPWarning],
+    response_mode: Any = "standard",
 ) -> tuple[SearchMCPData, list[MCPWarning]]:
     """Shape search results into a bounded MCP page."""
+    mode = _normalize_response_mode(response_mode)
     raw = parsed.model_dump(mode="json") if isinstance(parsed, BaseModel) else dict(parsed)
     all_results = [_dump_result(result) for result in raw.get("results", [])]
     total_count = len(all_results)
@@ -88,7 +95,7 @@ def present_search(
             total_count=total_count,
             returned_count=len(page),
             next_cursor=next_cursor,
-            results=page,
+            results=[] if mode == "summary" else page,
             suggestions=suggestions,
         ),
         warnings,

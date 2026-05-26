@@ -196,3 +196,52 @@ def test_present_search_uses_generic_guidance_for_transcript_only_hgvs_like_quer
         "Confirm genome build before scoring.",
     ]
     assert warnings[0].code == "unsupported_hgvs_like_search"
+
+
+def test_present_search_summary_keeps_counts_and_omits_result_rows() -> None:
+    parsed = AutoPVS1SearchResults(
+        query="BRCA1",
+        genome_version="hg38",
+        results=[_result(index) for index in range(3)],
+    )
+
+    data, warnings = present_search(
+        parsed,
+        query="BRCA1",
+        genome_build="hg38",
+        limit=2,
+        offset=0,
+        inherited_warnings=[],
+        response_mode="summary",
+    )
+
+    payload = data.model_dump(mode="json")
+    assert payload["query"] == "BRCA1"
+    assert payload["genome_build"] == "hg38"
+    assert payload["total_count"] == 3
+    assert payload["returned_count"] == 2
+    assert payload["next_cursor"] == "2"
+    assert payload["ordering"] == "upstream"
+    assert payload["results"] == []
+    assert warnings[0].code == "search_results_truncated"
+
+
+def test_present_search_full_preserves_result_rows() -> None:
+    parsed = AutoPVS1SearchResults(
+        query="BRCA1",
+        genome_version="hg38",
+        results=[_result(index) for index in range(3)],
+    )
+
+    data, warnings = present_search(
+        parsed,
+        query="BRCA1",
+        genome_build="hg38",
+        limit=2,
+        offset=0,
+        inherited_warnings=[],
+        response_mode="full",
+    )
+
+    assert [row["variant_id"] for row in data.results] == ["17-0-A-T", "17-1-A-T"]
+    assert warnings[0].code == "search_results_truncated"

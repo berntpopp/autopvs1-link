@@ -86,7 +86,7 @@ class PVS1FlowchartMCP(MCPContractModel):
 
     preliminary_decision_path: str
     final_strength: str
-    final_strength_inferred: bool = False
+    final_strength_source: Literal["asserted", "inferred"] = "asserted"
     decision_tree: list[FlowchartStepMCP] = Field(default_factory=list)
     notes: dict[str, str] = Field(default_factory=dict)
 

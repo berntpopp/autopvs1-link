@@ -13,7 +13,10 @@ from autopvs1_link.models.autopvs1_models import (
     AutoPVS1Data,
     AutoPVS1SearchResults,
     CNVInfo,
+    DiseaseMechanism,
+    FlowchartStep,
     PVS1Flowchart,
+    SearchResult,
     VariantInfo,
 )
 
@@ -42,6 +45,22 @@ def _http_status_error(status_code: int, url: str) -> httpx.HTTPStatusError:
         request=request,
         response=response,
     )
+
+
+def _assert_input_mode_error(
+    payload: dict,
+    *,
+    code: str,
+    parameter: str,
+    supported_values: str,
+) -> None:
+    assert payload["ok"] is False
+    assert payload["data"] is None
+    assert payload["error"]["code"] == code
+    assert payload["error"]["retryable"] is False
+    assert parameter in payload["error"]["message"]
+    assert supported_values in payload["error"]["message"]
+    assert payload["error"]["suggestions"]
 
 
 def _variant_result() -> AutoPVS1Data:
@@ -97,6 +116,60 @@ async def test_get_variant_pvs1_data_tool_runtime(mocker) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_variant_invalid_response_mode_returns_envelope_without_calling_upstream(
+    mocker,
+) -> None:
+    fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {
+            "genome_build": "hg38",
+            "variant_id": "X-1-A-T",
+            "response_mode": "verbose",
+        },
+    )
+
+    fake.assert_not_awaited()
+    _assert_input_mode_error(
+        result.structured_content,
+        code="invalid_response_mode",
+        parameter="response_mode",
+        supported_values="summary, standard, or full",
+    )
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_get_variant_invalid_meta_mode_returns_envelope_without_calling_upstream(
+    mocker,
+) -> None:
+    fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {
+            "genome_build": "hg38",
+            "variant_id": "X-1-A-T",
+            "meta_mode": "tiny",
+        },
+    )
+
+    fake.assert_not_awaited()
+    _assert_input_mode_error(
+        result.structured_content,
+        code="invalid_meta_mode",
+        parameter="meta_mode",
+        supported_values="full, compact, or minimal",
+    )
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
 async def test_get_cnv_pvs1_data_tool_runtime(mocker) -> None:
     fake = AsyncMock(return_value=_cnv_result())
     mocker.patch("autopvs1_link.mcp.service_adapters.get_cnv", new=fake)
@@ -109,6 +182,64 @@ async def test_get_cnv_pvs1_data_tool_runtime(mocker) -> None:
     fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
     assert result.structured_content["ok"] is True
     assert result.structured_content["data"]["upstream_service"] == "AutoPVS1"
+
+
+@pytest.mark.asyncio
+async def test_search_invalid_response_mode_returns_envelope_without_calling_upstream(
+    mocker,
+) -> None:
+    fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(query="BRCA1", genome_version="hg38", results=[])
+    )
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "search_variants",
+        {
+            "query": "BRCA1",
+            "genome_build": "hg38",
+            "response_mode": "verbose",
+        },
+    )
+
+    fake.assert_not_awaited()
+    _assert_input_mode_error(
+        result.structured_content,
+        code="invalid_response_mode",
+        parameter="response_mode",
+        supported_values="summary, standard, or full",
+    )
+    _assert_no_raw_error_leak(result.content[0].text)
+
+
+@pytest.mark.asyncio
+async def test_search_invalid_meta_mode_returns_envelope_without_calling_upstream(
+    mocker,
+) -> None:
+    fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(query="BRCA1", genome_version="hg38", results=[])
+    )
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "search_variants",
+        {
+            "query": "BRCA1",
+            "genome_build": "hg38",
+            "meta_mode": "tiny",
+        },
+    )
+
+    fake.assert_not_awaited()
+    _assert_input_mode_error(
+        result.structured_content,
+        code="invalid_meta_mode",
+        parameter="meta_mode",
+        supported_values="full, compact, or minimal",
+    )
+    _assert_no_raw_error_leak(result.content[0].text)
 
 
 @pytest.mark.asyncio
@@ -469,6 +600,154 @@ async def test_search_429_status_is_retryable_upstream_unavailable(mocker) -> No
     assert result.structured_content["ok"] is False
     assert result.structured_content["error"]["code"] == "upstream_unavailable"
     assert result.structured_content["error"]["retryable"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_variant_summary_response_and_compact_meta_mode(mocker) -> None:
+    parsed = AutoPVS1Data(
+        genome_build="hg38",
+        variant_info=VariantInfo(
+            variant_id="X-1-A-T",
+            variant_type="Nonsense",
+            gene_symbol="GENE",
+            chgvs="c.1A>T",
+            external_links={"gnomAD": "https://example.test/variant"},
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF",
+            final_strength="Strong",
+            final_strength_inferred=True,
+            decision_tree=[FlowchartStep(code="NF1", note_id="#1")],
+            notes={"#1": "Resolved note text."},
+        ),
+        disease_mechanisms=[
+            DiseaseMechanism(
+                gene="GENE",
+                disease="Disease",
+                inheritance="AD",
+                clinical_validity="Definitive",
+                consideration="No Decrease",
+                adjusted_strength="Strong",
+            )
+        ],
+    )
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {
+            "genome_build": "hg38",
+            "variant_id": "X-1-A-T",
+            "response_mode": "summary",
+            "meta_mode": "compact",
+        },
+    )
+
+    fake.assert_awaited_once_with("hg38", "X-1-A-T")
+    data = result.structured_content["data"]
+    meta = result.structured_content["meta"]
+    assert data["variant_info"]["variant_id"] == "X-1-A-T"
+    assert data["pvs1_flowchart"]["final_strength_source"] == "inferred"
+    assert data["disease_mechanisms"] == []
+    assert {warning["code"] for warning in meta["warnings"]} == set()
+    assert meta["research_use_only"] is True
+    assert meta["recommended_citation"] == {
+        "doi": "10.1002/humu.24051",
+        "pmid": "32442321",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_cnv_summary_response_and_minimal_meta_mode(mocker) -> None:
+    parsed = AutoPVS1CNVData(
+        genome_build="hg19",
+        cnv_info=CNVInfo(
+            cnv_id="1-1-2-DEL",
+            cnv_type="Deletion",
+            gene_symbol="GENE",
+            coordinates="1-1-2-DEL",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="DEL",
+            final_strength="Strong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[
+            DiseaseMechanism(
+                gene="GENE",
+                disease="Disease",
+                inheritance="AD",
+                clinical_validity="Definitive",
+                consideration="No Decrease",
+                adjusted_strength="Strong",
+            )
+        ],
+    )
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_cnv", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_cnv_pvs1_data",
+        {
+            "genome_build": "hg19",
+            "cnv_id": "1-1-2-DEL",
+            "response_mode": "summary",
+            "meta_mode": "minimal",
+        },
+    )
+
+    fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
+    data = result.structured_content["data"]
+    meta = result.structured_content["meta"]
+    assert data["cnv_info"]["cnv_id"] == "1-1-2-DEL"
+    assert data["pvs1_flowchart"]["final_strength_source"] == "asserted"
+    assert data["disease_mechanisms"] == []
+    assert meta["research_use_only"] is True
+    assert meta["warnings"] == []
+    assert "request_id" in meta
+    assert "server_version" in meta
+    assert "recommended_citation" not in meta
+
+
+@pytest.mark.asyncio
+async def test_search_variants_summary_response_mode(mocker) -> None:
+    parsed = AutoPVS1SearchResults(
+        query="BRCA1",
+        genome_version="hg38",
+        results=[
+            SearchResult(
+                variant_id="17-1-A-T",
+                gene="BRCA1",
+                variant_type="Nonsense",
+                genome_build="hg38",
+                url="https://autopvs1.bgi.com/variant/hg38/17-1-A-T",
+            )
+        ],
+    )
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "search_variants",
+        {
+            "query": "BRCA1",
+            "genome_build": "hg38",
+            "response_mode": "summary",
+            "meta_mode": "minimal",
+        },
+    )
+
+    fake.assert_awaited_once_with("BRCA1", "hg38")
+    assert result.structured_content["data"]["total_count"] == 1
+    assert result.structured_content["data"]["returned_count"] == 1
+    assert result.structured_content["data"]["results"] == []
+    assert result.structured_content["meta"]["research_use_only"] is True
+    assert "recommended_citation" not in result.structured_content["meta"]
 
 
 @pytest.mark.asyncio

@@ -8,11 +8,28 @@ from pydantic import BaseModel
 
 from autopvs1_link.mcp.contracts import CNVMCPData, VariantMCPData
 from autopvs1_link.mcp.envelope import MCPWarning
+from autopvs1_link.mcp.mode_validation import ResponseMode, normalize_response_mode
 from autopvs1_link.models.autopvs1_models import AutoPVS1CNVData, AutoPVS1Data
 
 
 def _dump(value: BaseModel | dict[str, Any]) -> dict[str, Any]:
     return value.model_dump(mode="json") if isinstance(value, BaseModel) else dict(value)
+
+
+def _normalize_response_mode(response_mode: Any) -> ResponseMode:
+    return normalize_response_mode(response_mode)
+
+
+def _normalize_include_unmet(include_unmet: Any) -> bool:
+    if isinstance(include_unmet, bool):
+        return include_unmet
+    if isinstance(include_unmet, str):
+        normalized = include_unmet.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    return True
 
 
 def format_pli_score(value: float | None) -> str | None:
@@ -28,11 +45,15 @@ def format_pli_score(value: float | None) -> str | None:
 
 def _present_flowchart(
     flowchart: BaseModel | dict[str, Any],
+    *,
+    response_mode: ResponseMode,
 ) -> tuple[dict[str, Any], list[MCPWarning]]:
     raw = _dump(flowchart)
     warnings: list[MCPWarning] = []
     notes = raw.get("notes") or {}
     presented_steps: list[dict[str, Any]] = []
+    final_strength_inferred = bool(raw.pop("final_strength_inferred", False))
+    raw["final_strength_source"] = "inferred" if final_strength_inferred else "asserted"
 
     for step in raw.get("decision_tree", []):
         step_data = _dump(step) if isinstance(step, BaseModel) else dict(step)
@@ -42,13 +63,19 @@ def _present_flowchart(
         presented_steps.append(step_data)
 
     raw["decision_tree"] = presented_steps
-    if raw.get("final_strength_inferred"):
+    if final_strength_inferred and response_mode != "summary":
         warnings.append(
             MCPWarning(
                 code="final_strength_inferred",
                 message="final_strength was inferred from the terminal decision_tree node.",
             )
         )
+    if response_mode == "summary":
+        raw = {
+            "preliminary_decision_path": raw["preliminary_decision_path"],
+            "final_strength": raw["final_strength"],
+            "final_strength_source": raw["final_strength_source"],
+        }
     return raw, warnings
 
 
@@ -88,9 +115,12 @@ def present_variant(
     parsed: AutoPVS1Data | dict[str, Any],
     *,
     source_url: str | None,
+    response_mode: Any = "standard",
+    include_unmet: Any = True,
 ) -> tuple[VariantMCPData, list[MCPWarning]]:
     """Shape parsed variant data for MCP callers."""
     raw = _dump(parsed)
+    mode = _normalize_response_mode(response_mode)
     warnings: list[MCPWarning] = []
 
     variant_info = dict(raw["variant_info"])
@@ -103,15 +133,30 @@ def present_variant(
     variant_info.pop("invalid_external_links", None)
     variant_info.pop("_invalid_external_link_urls", None)
     warnings.extend(link_warnings)
+    if mode == "summary":
+        variant_info = {
+            key: variant_info[key]
+            for key in ("variant_id", "variant_type", "gene_symbol")
+            if key in variant_info
+        }
 
-    flowchart, flowchart_warnings = _present_flowchart(raw["pvs1_flowchart"])
+    flowchart, flowchart_warnings = _present_flowchart(raw["pvs1_flowchart"], response_mode=mode)
     warnings.extend(flowchart_warnings)
+    disease_mechanisms = list(raw.get("disease_mechanisms") or [])
+    if mode == "summary":
+        disease_mechanisms = []
+    elif not _normalize_include_unmet(include_unmet):
+        disease_mechanisms = [
+            row
+            for row in disease_mechanisms
+            if str(row.get("adjusted_strength", "")).strip().lower() != "unmet"
+        ]
 
     data = VariantMCPData(
         genome_build=raw["genome_build"],
         variant_info=variant_info,
         pvs1_flowchart=flowchart,
-        disease_mechanisms=list(raw.get("disease_mechanisms") or []),
+        disease_mechanisms=disease_mechanisms,
         source_url=source_url,
     )
     return data, warnings
@@ -121,15 +166,34 @@ def present_cnv(
     parsed: AutoPVS1CNVData | dict[str, Any],
     *,
     source_url: str | None,
+    response_mode: Any = "standard",
+    include_unmet: Any = True,
 ) -> tuple[CNVMCPData, list[MCPWarning]]:
     """Shape parsed CNV data for MCP callers."""
     raw = _dump(parsed)
-    flowchart, warnings = _present_flowchart(raw["pvs1_flowchart"])
+    mode = _normalize_response_mode(response_mode)
+    flowchart, warnings = _present_flowchart(raw["pvs1_flowchart"], response_mode=mode)
+    disease_mechanisms = list(raw.get("disease_mechanisms") or [])
+    if mode == "summary":
+        disease_mechanisms = []
+    elif not _normalize_include_unmet(include_unmet):
+        disease_mechanisms = [
+            row
+            for row in disease_mechanisms
+            if str(row.get("adjusted_strength", "")).strip().lower() != "unmet"
+        ]
+    cnv_info = dict(raw["cnv_info"])
+    if mode == "summary":
+        cnv_info = {
+            key: cnv_info[key]
+            for key in ("cnv_id", "cnv_type", "gene_symbol", "coordinates")
+            if key in cnv_info
+        }
     data = CNVMCPData(
         genome_build=raw["genome_build"],
-        cnv_info=dict(raw["cnv_info"]),
+        cnv_info=cnv_info,
         pvs1_flowchart=flowchart,
-        disease_mechanisms=list(raw.get("disease_mechanisms") or []),
+        disease_mechanisms=disease_mechanisms,
         source_url=source_url,
     )
     return data, warnings

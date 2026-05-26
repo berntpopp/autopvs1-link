@@ -13,7 +13,14 @@ from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from autopvs1_link.mcp.contracts import SearchMCPEnvelope
 from autopvs1_link.mcp.envelope import error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import MCPInputError
+from autopvs1_link.mcp.mode_validation import (
+    InvalidMCPModeError,
+    MetaMode,
+    normalize_meta_mode,
+    normalize_response_mode,
+)
 from autopvs1_link.mcp.presenters.search import present_search
+from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
 from autopvs1_link.mcp.validation import (
     normalize_genome_builds,
     normalize_limit_cursor,
@@ -27,6 +34,8 @@ GENOME_BUILD_SCHEMA = {
     ]
 }
 NULLABLE_STRING_SCHEMA = {"anyOf": [{"type": "string"}, {"type": "null"}]}
+RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["summary", "standard", "full"]}
+META_MODE_SCHEMA = {"type": "string", "enum": ["full", "compact", "minimal"]}
 
 
 def register(mcp: FastMCP) -> None:
@@ -77,9 +86,26 @@ def register(mcp: FastMCP) -> None:
                 json_schema_extra=GENOME_BUILD_SCHEMA,
             ),
         ] = None,
+        response_mode: Annotated[
+            Any,
+            Field(
+                description="Response detail level: summary, standard, or full.",
+                json_schema_extra=RESPONSE_MODE_SCHEMA,
+            ),
+        ] = "standard",
+        meta_mode: Annotated[
+            Any,
+            Field(
+                description="Metadata detail level: full, compact, or minimal.",
+                json_schema_extra=META_MODE_SCHEMA,
+            ),
+        ] = "full",
     ) -> dict[str, Any]:
         """Use this to search AutoPVS1 by gene symbol or variant text."""
+        normalized_meta_mode: MetaMode = "full"
         try:
+            normalized_meta_mode = normalize_meta_mode(meta_mode)
+            normalized_response_mode = normalize_response_mode(response_mode)
             normalized_query = normalize_search_query(query)
             normalized_build, build_warnings = normalize_genome_builds(genome_build, genome_version)
             normalized_limit, offset = normalize_limit_cursor(limit, cursor)
@@ -91,16 +117,26 @@ def register(mcp: FastMCP) -> None:
                 limit=normalized_limit,
                 offset=offset,
                 inherited_warnings=build_warnings,
+                response_mode=normalized_response_mode,
             )
-            return ok_envelope(data, warnings=warnings)
+            return ok_envelope(data, warnings=warnings, meta_mode=normalized_meta_mode)
+        except InvalidMCPModeError as exc:
+            return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)
         except MCPInputError as exc:
-            return exc.to_envelope()
+            return error_envelope(
+                code=exc.code,
+                message=str(exc),
+                retryable=exc.retryable,
+                suggestions=exc.suggestions,
+                meta_mode=normalized_meta_mode,
+            )
         except httpx.TimeoutException:
             return error_envelope(
                 code="upstream_timeout",
                 message="AutoPVS1 upstream timed out while searching variants.",
                 retryable=True,
                 suggestions=["Retry later or search by gene symbol only."],
+                meta_mode=normalized_meta_mode,
             )
         except httpx.HTTPStatusError as exc:
             return error_envelope(
@@ -108,6 +144,7 @@ def register(mcp: FastMCP) -> None:
                 message="AutoPVS1 upstream could not complete the search request.",
                 retryable=exc.response.status_code in {408, 429} or exc.response.status_code >= 500,
                 suggestions=["Retry later or simplify the search query."],
+                meta_mode=normalized_meta_mode,
             )
         except httpx.RequestError:
             return error_envelope(
@@ -115,4 +152,5 @@ def register(mcp: FastMCP) -> None:
                 message="AutoPVS1 upstream was unreachable while searching variants.",
                 retryable=True,
                 suggestions=["Retry later or search by gene symbol only."],
+                meta_mode=normalized_meta_mode,
             )

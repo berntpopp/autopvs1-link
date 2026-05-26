@@ -95,8 +95,24 @@ async def test_data_tools_use_direct_arguments_for_llm_discovery() -> None:
     tools = {tool.name: tool for tool in await mcp.list_tools()}
 
     variant_schema = tools["get_variant_pvs1_data"].parameters
-    assert set(variant_schema["properties"]) == {"genome_build", "variant_id"}
+    assert set(variant_schema["properties"]) == {
+        "genome_build",
+        "variant_id",
+        "response_mode",
+        "meta_mode",
+        "include_unmet",
+    }
     assert variant_schema["required"] == ["genome_build", "variant_id"]
+    assert _enum_values(variant_schema["properties"]["response_mode"]) == {
+        "summary",
+        "standard",
+        "full",
+    }
+    assert _enum_values(variant_schema["properties"]["meta_mode"]) == {
+        "full",
+        "compact",
+        "minimal",
+    }
 
     search_schema = tools["search_variants"].parameters
     assert set(search_schema["properties"]) == {
@@ -105,12 +121,24 @@ async def test_data_tools_use_direct_arguments_for_llm_discovery() -> None:
         "limit",
         "cursor",
         "genome_version",
+        "response_mode",
+        "meta_mode",
     }
     assert search_schema["required"] == ["query"]
     assert "deprecated" in search_schema["properties"]["genome_version"]["description"].lower()
     _assert_optional_genome_build_schema(search_schema["properties"]["genome_build"])
     _assert_optional_genome_build_schema(search_schema["properties"]["genome_version"])
     assert _schema_allows_null(search_schema["properties"]["cursor"])
+    assert _enum_values(search_schema["properties"]["response_mode"]) == {
+        "summary",
+        "standard",
+        "full",
+    }
+    assert _enum_values(search_schema["properties"]["meta_mode"]) == {
+        "full",
+        "compact",
+        "minimal",
+    }
 
 
 @pytest.mark.asyncio
@@ -149,7 +177,7 @@ async def test_data_tool_output_schemas_expose_typed_nested_payloads() -> None:
         {
             "preliminary_decision_path",
             "final_strength",
-            "final_strength_inferred",
+            "final_strength_source",
             "decision_tree",
             "notes",
         },

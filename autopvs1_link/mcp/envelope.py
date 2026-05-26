@@ -9,6 +9,7 @@ from asgi_correlation_id.context import correlation_id
 from pydantic import BaseModel, Field
 
 from autopvs1_link import __version__
+from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
 
 DataT = TypeVar("DataT")
 
@@ -65,9 +66,29 @@ def _dump_warning(warning: MCPWarning) -> dict[str, Any]:
     return warning.model_dump(mode="json")
 
 
+def _normalize_meta_mode(meta_mode: Any) -> MetaMode:
+    return normalize_meta_mode(meta_mode)
+
+
+def _apply_meta_mode(payload: dict[str, Any], meta_mode: Any) -> dict[str, Any]:
+    mode = _normalize_meta_mode(meta_mode)
+    meta = payload["meta"]
+    if mode == "compact":
+        citation = RecommendedCitation()
+        meta["recommended_citation"] = {
+            "doi": citation.doi,
+            "pmid": citation.pmid,
+        }
+    elif mode == "minimal":
+        meta.pop("recommended_citation", None)
+    return payload
+
+
 def ok_envelope(
     data: BaseModel | dict[str, Any],
     warnings: list[MCPWarning] | None = None,
+    *,
+    meta_mode: Any = "full",
 ) -> dict[str, Any]:
     """Return a successful MCP envelope as a JSON-ready dict."""
     payload = data.model_dump(mode="json") if isinstance(data, BaseModel) else data
@@ -77,7 +98,7 @@ def ok_envelope(
         error=None,
         meta=MCPMeta(warnings=warnings or []),
     )
-    return envelope.model_dump(mode="json")
+    return _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
 
 
 def error_envelope(
@@ -87,6 +108,7 @@ def error_envelope(
     retryable: bool,
     suggestions: list[str] | None = None,
     warnings: list[MCPWarning] | None = None,
+    meta_mode: Any = "full",
 ) -> dict[str, Any]:
     """Return a failed MCP envelope as a JSON-ready dict."""
     envelope: MCPEnvelope[Any] = MCPEnvelope(
@@ -100,4 +122,4 @@ def error_envelope(
         ),
         meta=MCPMeta(warnings=warnings or []),
     )
-    return envelope.model_dump(mode="json")
+    return _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
