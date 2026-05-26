@@ -90,6 +90,8 @@ def test_present_cnv_shapes_cnv_payload() -> None:
 
     assert data.genome_build == "hg19"
     assert data.cnv_info["gene_symbol"] == "MYO15A"
+    assert data.cnv_info["cnv_type"] == "DEL"
+    assert data.cnv_info["size"] == "5000000"
     assert data.pvs1_flowchart["final_strength"] == "VeryStrong"
     assert data.upstream_service == "AutoPVS1"
     assert warnings == []
@@ -337,7 +339,8 @@ def test_present_cnv_full_preserves_rich_fields_and_unmet_by_default() -> None:
     )
 
     payload = data.model_dump(mode="json")
-    assert payload["cnv_info"]["size"] == "5Mb"
+    assert payload["cnv_info"]["cnv_type"] == "DEL"
+    assert payload["cnv_info"]["size"] == "5000000"
     assert payload["pvs1_flowchart"]["notes"] == {"#1": "Resolved CNV note text."}
     assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"] == "Resolved CNV note text."
     assert [row["adjusted_strength"] for row in payload["disease_mechanisms"]] == [

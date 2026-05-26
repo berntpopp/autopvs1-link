@@ -108,6 +108,7 @@ def register(mcp: FastMCP) -> None:
                 message=str(exc),
                 retryable=exc.retryable,
                 suggestions=exc.suggestions,
+                details=exc.details or None,
                 meta_mode=normalized_meta_mode,
             )
         except httpx.TimeoutException:

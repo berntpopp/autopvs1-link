@@ -38,6 +38,7 @@ def test_normalize_cnv_id_rejects_colon_format_with_correction() -> None:
 
     assert exc_info.value.code == "invalid_cnv_id"
     assert exc_info.value.suggestions == ["Use 17-15000000-20000000-DEL."]
+    assert exc_info.value.details == {"corrected_id": "17-15000000-20000000-DEL"}
 
 
 def test_normalize_cnv_id_rejects_colon_format_invalid_interval_without_correction() -> None:
@@ -60,7 +61,8 @@ def test_normalize_cnv_id_rejects_invalid_interval() -> None:
 def test_normalize_genome_builds_defaults_to_hg38() -> None:
     build, warnings = normalize_genome_builds(None, None)
     assert build == "hg38"
-    assert warnings == []
+    assert warnings[0].code == "default_genome_build"
+    assert "hg38" in warnings[0].message
 
 
 def test_normalize_genome_builds_accepts_deprecated_alias_with_warning() -> None:

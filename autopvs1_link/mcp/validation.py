@@ -59,6 +59,13 @@ def normalize_genome_builds(
                 message="genome_version is deprecated for MCP search; use genome_build.",
             )
         )
+    if canonical is None and deprecated is None:
+        warnings.append(
+            MCPWarning(
+                code="default_genome_build",
+                message="Search defaulted to genome_build='hg38'; confirm coordinates use hg38.",
+            )
+        )
     return canonical or deprecated or "hg38", warnings
 
 
@@ -106,6 +113,7 @@ def normalize_cnv_id(cnv_id: str) -> str:
             code="invalid_cnv_id",
             message="CNV IDs must use {chrom}-{start}-{end}-{TYPE}, with TYPE DEL or DUP.",
             suggestions=suggestions,
+            details={"corrected_id": correction} if correction else None,
         )
 
     start = int(match.group("start"))

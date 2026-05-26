@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from pydantic import BaseModel
@@ -10,6 +11,11 @@ from autopvs1_link.mcp.contracts import CNVMCPData, VariantMCPData
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.mode_validation import ResponseMode, normalize_response_mode
 from autopvs1_link.models.autopvs1_models import AutoPVS1CNVData, AutoPVS1Data
+
+CNV_ID_RE = re.compile(
+    r"^(?P<chrom>[1-9]|1[0-9]|2[0-2]|X|Y|MT)-(?P<start>[1-9][0-9]*)-"
+    r"(?P<end>[1-9][0-9]*)-(?P<type>DEL|DUP)$"
+)
 
 
 def _dump(value: BaseModel | dict[str, Any]) -> dict[str, Any]:
@@ -111,6 +117,19 @@ def _invalid_links_from_variant(parsed: AutoPVS1Data | dict[str, Any]) -> dict[s
     return dict(variant_info.get("invalid_external_links") or {})
 
 
+def _enrich_cnv_info(cnv_info: dict[str, Any]) -> dict[str, Any]:
+    cnv_id = str(cnv_info.get("cnv_id") or cnv_info.get("coordinates") or "").strip().upper()
+    match = CNV_ID_RE.fullmatch(cnv_id)
+    if not match:
+        return cnv_info
+
+    start = int(match.group("start"))
+    end = int(match.group("end"))
+    cnv_info["cnv_type"] = match.group("type")
+    cnv_info["size"] = str(end - start)
+    return cnv_info
+
+
 def present_variant(
     parsed: AutoPVS1Data | dict[str, Any],
     *,
@@ -182,7 +201,7 @@ def present_cnv(
             for row in disease_mechanisms
             if str(row.get("adjusted_strength", "")).strip().lower() != "unmet"
         ]
-    cnv_info = dict(raw["cnv_info"])
+    cnv_info = _enrich_cnv_info(dict(raw["cnv_info"]))
     if mode == "summary":
         cnv_info = {
             key: cnv_info[key]

@@ -1,6 +1,7 @@
 """Smoke tests for MCP tool registration."""
 
-from typing import Any
+import inspect
+from typing import Any, get_args, get_type_hints
 
 import pytest
 from fastmcp import FastMCP
@@ -8,6 +9,12 @@ from fastmcp import FastMCP
 from autopvs1_link.mcp.facade import build_mcp_server
 
 JsonSchema = dict[str, Any]
+
+
+def _annotation_uses_any(annotation: Any) -> bool:
+    if annotation is Any:
+        return True
+    return any(_annotation_uses_any(arg) for arg in get_args(annotation))
 
 
 def _non_null_schema(schema: JsonSchema) -> JsonSchema:
@@ -139,6 +146,27 @@ async def test_data_tools_use_direct_arguments_for_llm_discovery() -> None:
         "compact",
         "minimal",
     }
+
+
+@pytest.mark.asyncio
+async def test_search_variants_parameters_use_clean_runtime_annotations() -> None:
+    mcp: FastMCP = build_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    signature = inspect.signature(tools["search_variants"].fn)
+    type_hints = get_type_hints(tools["search_variants"].fn, include_extras=True)
+
+    for name in (
+        "query",
+        "genome_build",
+        "limit",
+        "cursor",
+        "genome_version",
+        "response_mode",
+        "meta_mode",
+    ):
+        assert name in signature.parameters
+        assert not _annotation_uses_any(type_hints[name])
 
 
 @pytest.mark.asyncio

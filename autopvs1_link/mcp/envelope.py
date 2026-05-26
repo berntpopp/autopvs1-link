@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from asgi_correlation_id.context import correlation_id
 from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from autopvs1_link import __version__
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
@@ -41,6 +42,7 @@ class MCPError(BaseModel):
     message: str
     retryable: bool
     suggestions: list[str] = Field(default_factory=list)
+    details: SkipJsonSchema[dict[str, Any] | None] = None
 
 
 class MCPMeta(BaseModel):
@@ -107,6 +109,7 @@ def error_envelope(
     message: str,
     retryable: bool,
     suggestions: list[str] | None = None,
+    details: dict[str, Any] | None = None,
     warnings: list[MCPWarning] | None = None,
     meta_mode: Any = "full",
 ) -> dict[str, Any]:
@@ -119,7 +122,11 @@ def error_envelope(
             message=message,
             retryable=retryable,
             suggestions=suggestions or [],
+            details=details,
         ),
         meta=MCPMeta(warnings=warnings or []),
     )
-    return _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
+    payload = envelope.model_dump(mode="json")
+    if payload["error"]["details"] is None:
+        payload["error"].pop("details")
+    return _apply_meta_mode(payload, meta_mode)

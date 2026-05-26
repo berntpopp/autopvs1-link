@@ -291,6 +291,9 @@ async def test_get_cnv_colon_format_returns_guidance_without_calling_upstream(mo
     assert result.structured_content["ok"] is False
     assert result.structured_content["error"]["code"] == "invalid_cnv_id"
     assert result.structured_content["error"]["suggestions"] == ["Use 17-15000000-20000000-DEL."]
+    assert result.structured_content["error"]["details"] == {
+        "corrected_id": "17-15000000-20000000-DEL"
+    }
 
 
 @pytest.mark.asyncio
@@ -427,6 +430,20 @@ async def test_search_whitespace_returns_invalid_search_query(mocker) -> None:
     fake.assert_not_awaited()
     assert result.structured_content["ok"] is False
     assert result.structured_content["error"]["code"] == "invalid_search_query"
+
+
+@pytest.mark.asyncio
+async def test_search_default_build_warns_that_hg38_was_assumed(mocker) -> None:
+    parsed = AutoPVS1SearchResults(query="MYH9", genome_version="hg38", results=[])
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9"})
+
+    fake.assert_awaited_once_with("MYH9", "hg38")
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["meta"]["warnings"][0]["code"] == "default_genome_build"
 
 
 @pytest.mark.asyncio

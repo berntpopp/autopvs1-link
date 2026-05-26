@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import httpx
 from fastmcp import FastMCP
-from pydantic import Field
+from pydantic import Field, SkipValidation
 
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
@@ -27,15 +27,12 @@ from autopvs1_link.mcp.validation import (
     normalize_search_query,
 )
 
-GENOME_BUILD_SCHEMA = {
-    "anyOf": [
-        {"type": "string", "enum": ["hg19", "hg38"]},
-        {"type": "null"},
-    ]
-}
-NULLABLE_STRING_SCHEMA = {"anyOf": [{"type": "string"}, {"type": "null"}]}
-RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["summary", "standard", "full"]}
-META_MODE_SCHEMA = {"type": "string", "enum": ["full", "compact", "minimal"]}
+GenomeBuildParam = SkipValidation[Literal["hg19", "hg38"] | None]
+IntParam = SkipValidation[int]
+SearchTextParam = SkipValidation[str]
+NullableStringParam = SkipValidation[str | None]
+ResponseModeParam = SkipValidation[Literal["summary", "standard", "full"]]
+MetaModeParam = SkipValidation[Literal["full", "compact", "minimal"]]
 
 
 def register(mcp: FastMCP) -> None:
@@ -49,55 +46,48 @@ def register(mcp: FastMCP) -> None:
     )
     async def search_variants(
         query: Annotated[
-            Any,
+            SearchTextParam,
             Field(
                 description="Gene symbol, HGVS text, or partial variant string.",
-                json_schema_extra={"type": "string"},
             ),
         ],
         genome_build: Annotated[
-            Any,
+            GenomeBuildParam,
             Field(
                 description="Canonical genome build for MCP search: hg19 or hg38.",
-                json_schema_extra=GENOME_BUILD_SCHEMA,
             ),
         ] = None,
         limit: Annotated[
-            Any,
+            IntParam,
             Field(
                 description=(
                     "Maximum results to return; default 10. Values below 1 are treated "
                     "as 1 and values above 50 are treated as 50."
                 ),
-                json_schema_extra={"type": "integer"},
             ),
         ] = 10,
         cursor: Annotated[
-            Any,
+            NullableStringParam,
             Field(
                 description="Opaque integer-offset cursor returned as next_cursor.",
-                json_schema_extra=NULLABLE_STRING_SCHEMA,
             ),
         ] = None,
         genome_version: Annotated[
-            Any,
+            GenomeBuildParam,
             Field(
                 description="Deprecated alias for genome_build; accepted for one release.",
-                json_schema_extra=GENOME_BUILD_SCHEMA,
             ),
         ] = None,
         response_mode: Annotated[
-            Any,
+            ResponseModeParam,
             Field(
                 description="Response detail level: summary, standard, or full.",
-                json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
         ] = "standard",
         meta_mode: Annotated[
-            Any,
+            MetaModeParam,
             Field(
                 description="Metadata detail level: full, compact, or minimal.",
-                json_schema_extra=META_MODE_SCHEMA,
             ),
         ] = "full",
     ) -> dict[str, Any]:
@@ -128,6 +118,7 @@ def register(mcp: FastMCP) -> None:
                 message=str(exc),
                 retryable=exc.retryable,
                 suggestions=exc.suggestions,
+                details=exc.details or None,
                 meta_mode=normalized_meta_mode,
             )
         except httpx.TimeoutException:

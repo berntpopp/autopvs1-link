@@ -50,8 +50,9 @@ class MCPInputError(MCPToolError):
         code: str,
         message: str,
         suggestions: list[str] | None = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
-        super().__init__(message, code=code, details={"suggestions": suggestions or []})
+        super().__init__(message, code=code, details=details)
         self.suggestions = suggestions or []
         self.retryable = False
 
@@ -61,4 +62,5 @@ class MCPInputError(MCPToolError):
             message=str(self),
             retryable=self.retryable,
             suggestions=self.suggestions,
+            details=self.details or None,
         )
