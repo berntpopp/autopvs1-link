@@ -23,18 +23,21 @@ def build_mcp_server() -> FastMCP:
         instructions=SERVER_DESCRIPTION,
     )
 
-    from autopvs1_link.mcp import resources
+    from autopvs1_link.mcp import prompts, resources
     from autopvs1_link.mcp.tools import (
         cache_tools,
         cnv_tool,
+        health_tool,
         search_tool,
         variant_tool,
     )
 
     register_metadata(mcp)
+    health_tool.register(mcp)
     variant_tool.register(mcp)
     cnv_tool.register(mcp)
     search_tool.register(mcp)
     cache_tools.register(mcp)
+    prompts.register(mcp)
     resources.register(mcp)
     return mcp

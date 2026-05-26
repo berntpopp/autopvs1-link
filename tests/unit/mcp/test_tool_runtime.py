@@ -791,6 +791,31 @@ async def test_get_server_capabilities_tool_runtime() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_server_health_is_local_read_only_and_does_not_call_upstream(mocker) -> None:
+    fake = AsyncMock()
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters._service",
+        new=fake,
+    )
+
+    mcp = build_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+    health_tool = tools["get_server_health"]
+
+    assert health_tool.annotations is not None
+    assert health_tool.annotations.readOnlyHint is True
+    assert health_tool.annotations.destructiveHint is False
+
+    result = await mcp.call_tool("get_server_health", {})
+
+    fake.assert_not_awaited()
+    assert result.structured_content["ok"] is True
+    assert result.structured_content["data"]["status"] == "ok"
+    assert result.structured_content["data"]["upstream_checked"] is False
+    assert result.structured_content["meta"]["research_use_only"] is True
+
+
+@pytest.mark.asyncio
 async def test_clear_cache_tool_runtime_when_enabled(monkeypatch, mocker) -> None:
     monkeypatch.setenv("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", "true")
     fake = AsyncMock()
@@ -820,7 +845,7 @@ async def test_cache_resource_runtime(mocker) -> None:
 
 
 @pytest.mark.asyncio
-async def test_clear_cache_disabled_returns_standard_envelope(monkeypatch, mocker) -> None:
+async def test_clear_cache_is_not_registered_by_default(monkeypatch, mocker) -> None:
     monkeypatch.delenv("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", raising=False)
     fake = AsyncMock()
     fake.clear_cache = AsyncMock()
@@ -830,12 +855,10 @@ async def test_clear_cache_disabled_returns_standard_envelope(monkeypatch, mocke
     )
 
     mcp = build_mcp_server()
-    result = await mcp.call_tool("clear_cache", {})
+    tools = {tool.name for tool in await mcp.list_tools()}
 
+    assert "clear_cache" not in tools
     fake.clear_cache.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "destructive_disabled"
-    assert result.structured_content["error"]["retryable"] is False
 
 
 @pytest.mark.asyncio

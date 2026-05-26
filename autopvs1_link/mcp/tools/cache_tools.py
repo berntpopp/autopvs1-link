@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastmcp import FastMCP
@@ -13,8 +14,15 @@ from autopvs1_link.mcp.envelope import error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import DestructiveOperationDisabledError
 
 
+def destructive_tools_enabled() -> bool:
+    """Return whether destructive MCP tools should be registered."""
+    return os.environ.get("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", "false").lower() == "true"
+
+
 def register(mcp: FastMCP) -> None:
     """Register the gated clear_cache tool."""
+    if not destructive_tools_enabled():
+        return
 
     @mcp.tool(
         name="clear_cache",

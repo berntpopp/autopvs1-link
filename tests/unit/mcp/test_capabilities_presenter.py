@@ -19,6 +19,10 @@ def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
         "cursor",
     ]
     assert "genome_version" not in compact.canonical_parameters["search_variants"]
+    assert "get_server_health" in compact.tool_summaries
+    assert "get_server_health" in compact.canonical_parameters
+    assert "clear_cache" not in compact.tool_summaries
+    assert "clear_cache" not in compact.canonical_parameters
     assert payload["tool_summaries"]["get_variant_pvs1_data"] == {
         "purpose": "research-use PVS1 analysis for one AutoPVS1 SNV/indel ID.",
         "example": {

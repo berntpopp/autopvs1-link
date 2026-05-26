@@ -83,17 +83,33 @@ def _assert_optional_genome_build_schema(schema: dict) -> None:
 
 
 @pytest.mark.asyncio
-async def test_build_mcp_server_registers_expected_tools() -> None:
+async def test_build_mcp_server_registers_expected_tools(monkeypatch) -> None:
+    monkeypatch.delenv("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", raising=False)
     mcp: FastMCP = build_mcp_server()
     tools = await mcp.list_tools()
     tool_names = {t.name for t in tools}
     assert {
         "get_server_capabilities",
+        "get_server_health",
         "get_variant_pvs1_data",
         "get_cnv_pvs1_data",
         "search_variants",
-        "clear_cache",
     } <= tool_names
+    assert "clear_cache" not in tool_names
+
+
+@pytest.mark.asyncio
+async def test_clear_cache_is_registered_only_when_destructive_tools_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", "true")
+
+    mcp: FastMCP = build_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    assert "clear_cache" in tools
+    schema = tools["clear_cache"].parameters
+    assert schema.get("properties", {}) == {}
+    assert "_" not in schema.get("properties", {})
+    assert set(tools["clear_cache"].output_schema["properties"]) == {"ok", "data", "error", "meta"}
 
 
 @pytest.mark.asyncio
@@ -174,7 +190,12 @@ async def test_data_tools_have_titles_annotations_and_output_schemas() -> None:
     mcp: FastMCP = build_mcp_server()
     tools = {tool.name: tool for tool in await mcp.list_tools()}
 
-    for name in ("get_server_capabilities", "get_variant_pvs1_data", "get_cnv_pvs1_data"):
+    for name in (
+        "get_server_capabilities",
+        "get_server_health",
+        "get_variant_pvs1_data",
+        "get_cnv_pvs1_data",
+    ):
         tool = tools[name]
         assert tool.title
         assert tool.output_schema is not None
@@ -254,11 +275,46 @@ async def test_data_tool_output_schemas_expose_typed_nested_payloads() -> None:
 
 
 @pytest.mark.asyncio
-async def test_clear_cache_schema_accepts_empty_object_without_dummy_field() -> None:
+async def test_workflow_prompts_are_registered_for_variant_and_cnv_classification() -> None:
     mcp: FastMCP = build_mcp_server()
-    tools = {tool.name: tool for tool in await mcp.list_tools()}
+    prompts = {prompt.name: prompt for prompt in await mcp.list_prompts()}
 
-    schema = tools["clear_cache"].parameters
-    assert schema.get("properties", {}) == {}
-    assert "_" not in schema.get("properties", {})
-    assert set(tools["clear_cache"].output_schema["properties"]) == {"ok", "data", "error", "meta"}
+    assert {"classify_variant", "classify_cnv"} <= set(prompts)
+    assert prompts["classify_variant"].title == "Classify SNV/Indel with AutoPVS1"
+    assert prompts["classify_cnv"].title == "Classify CNV with AutoPVS1"
+
+
+@pytest.mark.asyncio
+async def test_classify_variant_prompt_renders_canonical_tool_guidance() -> None:
+    mcp: FastMCP = build_mcp_server()
+
+    rendered = await mcp.render_prompt(
+        "classify_variant",
+        {
+            "genome_build": "hg19",
+            "variant_id": "X-82763936-A-T",
+        },
+    )
+
+    message = rendered.messages[0].content.text
+    assert "get_variant_pvs1_data" in message
+    assert "search_variants" in message
+    assert "clear_cache" not in message
+
+
+@pytest.mark.asyncio
+async def test_classify_cnv_prompt_renders_canonical_tool_guidance() -> None:
+    mcp: FastMCP = build_mcp_server()
+
+    rendered = await mcp.render_prompt(
+        "classify_cnv",
+        {
+            "genome_build": "hg19",
+            "cnv_id": "17-15000000-20000000-DEL",
+        },
+    )
+
+    message = rendered.messages[0].content.text
+    assert "get_cnv_pvs1_data" in message
+    assert "search_variants" in message
+    assert "clear_cache" not in message

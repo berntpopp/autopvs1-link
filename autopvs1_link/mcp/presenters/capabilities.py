@@ -43,8 +43,8 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
                     "cursor": None,
                 },
             ),
-            "clear_cache": ToolSummaryMCP(
-                purpose="Opt-in destructive cache clear; disabled unless explicitly enabled.",
+            "get_server_health": ToolSummaryMCP(
+                purpose="Read local server health and enabled feature flags without upstream calls.",
                 example={},
             ),
         },
@@ -52,7 +52,7 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
             "get_variant_pvs1_data": ["genome_build", "variant_id"],
             "get_cnv_pvs1_data": ["genome_build", "cnv_id"],
             "search_variants": ["query", "genome_build", "limit", "cursor"],
-            "clear_cache": [],
+            "get_server_health": [],
         },
         compact_workflow=[
             WorkflowStepMCP(

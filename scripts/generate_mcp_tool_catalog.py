@@ -4,14 +4,28 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
+from contextlib import contextmanager
 import json
+import os
 from pathlib import Path
 
 from autopvs1_link.mcp.facade import build_mcp_server
 
 
+@contextmanager
+def _default_public_tool_surface() -> Iterator[None]:
+    original = os.environ.pop("AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS", None)
+    try:
+        yield
+    finally:
+        if original is not None:
+            os.environ["AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS"] = original
+
+
 async def render() -> str:
-    mcp = build_mcp_server()
+    with _default_public_tool_surface():
+        mcp = build_mcp_server()
     lines: list[str] = ["# MCP Tool Catalog", ""]
     lines.append(
         "Auto-generated from `autopvs1_link.mcp.facade.build_mcp_server`. "
@@ -41,6 +55,25 @@ async def render() -> str:
             lines.append("```json")
             lines.append(json.dumps(output_schema, indent=2, sort_keys=True))
             lines.append("```")
+            lines.append("")
+    lines.append("## Prompts")
+    lines.append("")
+    for prompt in sorted(await mcp.list_prompts(), key=lambda prompt: prompt.name):
+        lines.append(f"### `{prompt.name}`")
+        lines.append("")
+        if prompt.title:
+            lines.append(f"Title: {prompt.title}")
+            lines.append("")
+        if prompt.description:
+            lines.append(prompt.description.strip())
+            lines.append("")
+        if prompt.arguments:
+            lines.append("#### Arguments")
+            lines.append("")
+            for argument in prompt.arguments:
+                requirement = "required" if argument.required else "optional"
+                description = f": {argument.description}" if argument.description else ""
+                lines.append(f"- `{argument.name}` ({requirement}){description}")
             lines.append("")
     lines.append("## Resources")
     lines.append("")
