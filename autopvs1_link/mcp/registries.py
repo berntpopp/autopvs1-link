@@ -9,9 +9,12 @@ not declared here.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 from typing import TypedDict
+
+from autopvs1_link.mcp.server_info import SERVER_VERSION
 
 
 class PayloadModeSpec(TypedDict):
@@ -73,16 +76,27 @@ PAYLOAD_MODES: dict[str, PayloadModeSpec] = {
 }
 
 
+@functools.cache
 def capabilities_version() -> str:
-    """Return a stable 16-char sha256 prefix over the registries.
+    """Return a stable 16-char sha256 prefix over server version + registries.
 
-    Task 3 wires this into ``CompactCapabilitiesData.capabilities_version``
-    so clients can cache discovery output and invalidate when codes or
-    modes change. The hash is deterministic across processes because the
-    JSON serialization uses ``sort_keys=True``.
+    Wired into ``CompactCapabilitiesData.capabilities_version`` and the
+    detailed capabilities resource so clients can cache discovery output
+    and invalidate when codes, modes, or the server build change. The hash
+    is deterministic across processes because the JSON serialization uses
+    ``sort_keys=True``.
+
+    Memoized with ``functools.cache``: the inputs are module-level
+    immutables in production, so re-computing on every discovery request
+    is pure overhead. Tests that need to observe a SERVER_VERSION change
+    must call ``capabilities_version.cache_clear()`` to drop the cached
+    value. Blending SERVER_VERSION into the hash means two deployments
+    with identical registries but different builds publish distinct
+    capabilities_version values — operationally important for cache-aware
+    clients.
     """
     blob = json.dumps(
-        [KNOWN_ERROR_CODES, KNOWN_WARNING_CODES, PAYLOAD_MODES],
+        [SERVER_VERSION, KNOWN_ERROR_CODES, KNOWN_WARNING_CODES, PAYLOAD_MODES],
         sort_keys=True,
     ).encode()
     return hashlib.sha256(blob).hexdigest()[:16]

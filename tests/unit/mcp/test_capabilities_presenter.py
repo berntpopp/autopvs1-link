@@ -154,6 +154,41 @@ def test_capabilities_version_is_stable_across_calls() -> None:
     assert a == b
 
 
+def test_capabilities_version_is_memoized_after_first_call() -> None:
+    """Item 3: SERVER_VERSION + registries are module-level immutables so the
+    hash computation must collapse to a single sha256 pass. functools.cache
+    is the canonical memoization here; verify ``cache_info().hits`` grows
+    on the second call.
+    """
+    capabilities_version.cache_clear()
+    capabilities_version()
+    capabilities_version()
+    info = capabilities_version.cache_info()
+    assert info.hits >= 1
+    assert info.misses == 1
+
+
+def test_capabilities_version_blends_server_version_into_hash(monkeypatch) -> None:
+    """Item 3 provenance: bumping SERVER_VERSION must yield a different
+    capabilities_version so deployments are correlatable. Without the blend,
+    two builds with identical registries but different SERVER_VERSION would
+    advertise the same hash and clients couldn't invalidate caches keyed on
+    the deployment.
+    """
+    from autopvs1_link.mcp import registries as registries_module
+
+    capabilities_version.cache_clear()
+    before = capabilities_version()
+    monkeypatch.setattr(registries_module, "SERVER_VERSION", "999.99.99")
+    capabilities_version.cache_clear()
+    after = capabilities_version()
+    assert before != after
+    # And the stable shape (16 hex chars) is preserved.
+    assert re.fullmatch(r"[0-9a-f]{16}", after), after
+    # Restore caching invariants for downstream tests.
+    capabilities_version.cache_clear()
+
+
 def test_detailed_capabilities_mirrors_capabilities_version() -> None:
     detailed = detailed_capabilities_resource()
     compact = present_compact_capabilities().model_dump(mode="json")
