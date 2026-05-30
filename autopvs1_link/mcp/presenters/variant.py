@@ -77,6 +77,14 @@ def _present_flowchart(
         _dump(step) if isinstance(step, BaseModel) else dict(step)
         for step in raw.get("decision_tree", [])
     ]
+    # The list is typed ``list[dict[str, Any]]`` on the contract so the
+    # outer Pydantic exclude_none does not recurse into it. Strip null
+    # fields here so the audit-mode wire payload matches the same
+    # null-free contract the rest of the data layer follows.
+    raw_decision_tree = [
+        {key: value for key, value in step.items() if value is not None}
+        for step in raw_decision_tree
+    ]
     presented_steps: list[dict[str, Any]] = []
     for step in raw_decision_tree:
         step_data = dict(step)

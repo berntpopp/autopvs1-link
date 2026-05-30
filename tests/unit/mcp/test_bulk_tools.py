@@ -86,7 +86,8 @@ async def test_bulk_variants_happy_path(mocker) -> None:
     assert all(item["ok"] for item in items)
     assert [item["input"]["variant_id"] for item in items] == ["X-1-A-T", "X-2-G-A"]
     assert items[0]["data"]["pvs1_flowchart"]["final_strength"] == "Strong"
-    assert all(item["error"] is None for item in items)
+    # Null-stripping drops ``error`` from successful per-item envelopes.
+    assert all("error" not in item for item in items)
 
 
 @pytest.mark.asyncio
@@ -111,8 +112,10 @@ async def test_bulk_variants_mixed_per_item_errors(mocker) -> None:
     assert payload["data"]["succeeded"] == 1
     assert payload["data"]["failed"] == 1
     first, second = payload["data"]["items"]
-    assert first["ok"] is True and first["error"] is None
+    assert first["ok"] is True and "error" not in first
     assert second["ok"] is False
+    # Null-stripping drops ``data`` from failed per-item envelopes too.
+    assert "data" not in second
     assert second["error"]["code"] == "upstream_timeout"
     assert second["error"]["retryable"] is True
 

@@ -178,17 +178,17 @@ def ok_envelope(
     warnings: list[MCPWarning] | None = None,
     *,
     meta_mode: Any = "full",
-    compact_data: bool = False,
 ) -> dict[str, Any]:
     """Return a successful MCP envelope as a JSON-ready dict.
 
-    Pass ``compact_data=True`` (typically when ``response_mode='summary'``)
-    to drop fields whose value is ``None``. This trims null-defaults that
-    Pydantic would otherwise emit, materially reducing payload size for
-    LLM consumers without changing the declared output schema.
+    Null leaves are always stripped from the inner data dump so the wire
+    payload reflects the response_mode-shaped contract rather than the
+    Pydantic schema's optional-with-default-None scaffolding. The outer
+    envelope ``ok``/``data``/``error``/``meta`` shape is preserved so the
+    documented ``required_fields`` contract still holds.
     """
     if isinstance(data, BaseModel):
-        payload = data.model_dump(mode="json", exclude_none=compact_data)
+        payload = data.model_dump(mode="json", exclude_none=True)
     else:
         payload = data
     envelope: MCPEnvelope[Any] = MCPEnvelope(

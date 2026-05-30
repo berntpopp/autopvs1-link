@@ -727,7 +727,14 @@ async def test_search_ids_only_wire_payload_strips_descriptive_fields(mocker) ->
 
 
 @pytest.mark.asyncio
-async def test_variant_standard_mode_preserves_null_default_fields(mocker) -> None:
+async def test_variant_standard_mode_drops_null_default_fields_from_wire(mocker) -> None:
+    """Standard-mode wire payload must drop null-default fields for tokens.
+
+    Regression for an LLM-consumer report that ``standard`` mode shipped
+    ``chgvs: null``, ``phgvs: null``, ``decision_tree_raw: null``, etc.
+    The contract still declares the optional fields; the wire just omits
+    null leaves so first-turn LLM calls do not waste budget.
+    """
     mocker.patch(
         "autopvs1_link.mcp.service_adapters.get_variant",
         new=AsyncMock(return_value=_variant_result()),
@@ -737,9 +744,14 @@ async def test_variant_standard_mode_preserves_null_default_fields(mocker) -> No
         "get_variant_pvs1_data",
         {"genome_build": "hg38", "variant_id": "X-1-A-T"},
     )
-    variant_info = result.structured_content["data"]["variant_info"]
-    # In standard mode, the typed schema's null defaults stay visible.
-    assert "chgvs" in variant_info and variant_info["chgvs"] is None
+    data = result.structured_content["data"]
+    variant_info = data["variant_info"]
+    # Fixture variant has no chgvs/phgvs/exon/intron → must NOT be on the wire.
+    assert "chgvs" not in variant_info
+    assert "phgvs" not in variant_info
+    # The audit-trail raw fields are absent in standard mode too.
+    assert "external_links_raw" not in variant_info
+    assert "decision_tree_raw" not in data["pvs1_flowchart"]
 
 
 @pytest.mark.asyncio
@@ -1154,9 +1166,11 @@ async def test_search_variants_wire_returns_pagination_block_with_five_fields(mo
     )
     data_one = page_one.structured_content["data"]
     pagination_one = data_one["pagination"]
-    # Pagination block carries all five fields with the right types.
+    # Pagination block carries the four populated fields with the right
+    # types. ``previous_cursor`` is null on the first page; the wire drops
+    # null fields so its presence on page 2 is the round-trip signal.
     assert isinstance(pagination_one["next_cursor"], str)
-    assert pagination_one["previous_cursor"] is None
+    assert "previous_cursor" not in pagination_one
     assert pagination_one["has_more"] is True
     assert pagination_one["offset"] == 0
     assert pagination_one["total_count_kind"] == "upstream_page"

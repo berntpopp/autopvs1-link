@@ -125,7 +125,6 @@ def register(mcp: FastMCP) -> None:
                 data,
                 warnings=warnings,
                 meta_mode=normalized_meta_mode,
-                compact_data=normalized_response_mode in ("summary", "ids_only"),
             )
         except InvalidMCPModeError as exc:
             return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)

@@ -2,6 +2,7 @@
 
 import json
 
+from autopvs1_link.mcp.envelope import ok_envelope
 from autopvs1_link.mcp.presenters.variant import format_pli_score, present_cnv, present_variant
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
@@ -12,6 +13,34 @@ from autopvs1_link.models.autopvs1_models import (
     PVS1Flowchart,
     VariantInfo,
 )
+
+
+_EXTERNAL_LINK_DICTS = {"external_links", "external_links_raw"}
+
+
+def _has_null_field(node: object, path: str = "") -> str | None:
+    """Return the dotted path of the first null FIELD inside ``node``.
+
+    Recurses into nested objects but NOT into ``external_links``-style
+    dicts, where null values are semantically meaningful (an upstream link
+    we deliberately nulled because it was invalid; the matching warning
+    carries the same info).
+    """
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if value is None:
+                return f"{path}.{key}" if path else key
+            if key in _EXTERNAL_LINK_DICTS:
+                continue
+            hit = _has_null_field(value, f"{path}.{key}" if path else key)
+            if hit:
+                return hit
+    if isinstance(node, list):
+        for idx, value in enumerate(node):
+            hit = _has_null_field(value, f"{path}[{idx}]")
+            if hit:
+                return hit
+    return None
 
 
 def test_format_pli_score_for_llm_display() -> None:
@@ -515,6 +544,46 @@ def test_present_variant_standard_drops_notes_dict_because_steps_carry_text() ->
     ]
     assert "Note one." in note_texts
     assert "Note two." in note_texts
+
+
+def test_ok_envelope_standard_mode_data_has_no_null_leaves() -> None:
+    """Wire payload in standard mode must contain zero null leaves.
+
+    Regression for an LLM-consumer report flagging ~15-25% wasted tokens on
+    ``decision_tree_raw: null``, ``external_links_raw: null``, per-step
+    ``description: null``/``note_text: null``, etc. Standard mode's wire
+    shape is the dominant cost path for first-turn LLM calls.
+    """
+    parsed = _canonical_parsed()
+    data, warnings = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="standard",
+    )
+    envelope = ok_envelope(data, warnings=warnings)
+    hit = _has_null_field(envelope["data"])
+    assert hit is None, f"standard-mode wire data must drop null fields; first hit: {hit}"
+    # And the specific fields the LLM-consumer flagged are gone:
+    assert "decision_tree_raw" not in envelope["data"]["pvs1_flowchart"]
+    assert "external_links_raw" not in envelope["data"]["variant_info"]
+    # Inner dict nulls inside external_links are semantically intentional and stay.
+    assert envelope["data"]["variant_info"]["external_links"]["ClinVar"] is None
+
+
+def test_ok_envelope_full_mode_data_has_no_null_fields() -> None:
+    """Full mode also drops null fields; raw audit fields stay populated."""
+    parsed = _canonical_parsed()
+    data, warnings = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="full",
+    )
+    envelope = ok_envelope(data, warnings=warnings)
+    hit = _has_null_field(envelope["data"])
+    assert hit is None, f"full-mode wire data must drop null fields; first hit: {hit}"
+    # And the audit fields are still present:
+    assert "decision_tree_raw" in envelope["data"]["pvs1_flowchart"]
+    assert "external_links_raw" in envelope["data"]["variant_info"]
 
 
 def test_present_variant_full_keeps_notes_dict_for_audit() -> None:
