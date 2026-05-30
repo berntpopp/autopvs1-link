@@ -403,11 +403,38 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
         },
         "warnings": {
           "items": {
-            "description": "Structured non-fatal warning for LLM callers.",
+            "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
             "properties": {
+              "affected_indices": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Affected Indices"
+              },
               "code": {
                 "title": "Code",
                 "type": "string"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Count"
               },
               "message": {
                 "title": "Message",
@@ -992,11 +1019,38 @@ the batch unless ``continue_on_error=false``.
         },
         "warnings": {
           "items": {
-            "description": "Structured non-fatal warning for LLM callers.",
+            "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
             "properties": {
+              "affected_indices": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Affected Indices"
+              },
               "code": {
                 "title": "Code",
                 "type": "string"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Count"
               },
               "message": {
                 "title": "Message",
@@ -1247,11 +1301,38 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
         },
         "warnings": {
           "items": {
-            "description": "Structured non-fatal warning for LLM callers.",
+            "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
             "properties": {
+              "affected_indices": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Affected Indices"
+              },
               "code": {
                 "title": "Code",
                 "type": "string"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Count"
               },
               "message": {
                 "title": "Message",
@@ -1438,11 +1519,38 @@ Return local MCP server health without contacting AutoPVS1 upstream.
         },
         "warnings": {
           "items": {
-            "description": "Structured non-fatal warning for LLM callers.",
+            "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
             "properties": {
+              "affected_indices": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Affected Indices"
+              },
               "code": {
                 "title": "Code",
                 "type": "string"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Count"
               },
               "message": {
                 "title": "Message",
@@ -2005,11 +2113,38 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
         },
         "warnings": {
           "items": {
-            "description": "Structured non-fatal warning for LLM callers.",
+            "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
             "properties": {
+              "affected_indices": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Affected Indices"
+              },
               "code": {
                 "title": "Code",
                 "type": "string"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Count"
               },
               "message": {
                 "title": "Message",
@@ -2725,11 +2860,38 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
         },
         "warnings": {
           "items": {
-            "description": "Structured non-fatal warning for LLM callers.",
+            "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
             "properties": {
+              "affected_indices": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Affected Indices"
+              },
               "code": {
                 "title": "Code",
                 "type": "string"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Count"
               },
               "message": {
                 "title": "Message",
@@ -3046,11 +3208,38 @@ Use this to search AutoPVS1 by gene symbol or variant text.
         },
         "warnings": {
           "items": {
-            "description": "Structured non-fatal warning for LLM callers.",
+            "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
             "properties": {
+              "affected_indices": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Affected Indices"
+              },
               "code": {
                 "title": "Code",
                 "type": "string"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Count"
               },
               "message": {
                 "title": "Message",

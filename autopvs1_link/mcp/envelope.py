@@ -2,15 +2,58 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, TypeVar
 from uuid import uuid4
 
 from asgi_correlation_id.context import correlation_id
+from fastmcp.tools.base import ToolResult
+from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
 
 from autopvs1_link import __version__
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
+
+
+class ErrorToolResult(ToolResult):
+    """ToolResult subclass that flips ``CallToolResult.isError=True`` on the wire.
+
+    The structured envelope is unchanged — clients that parse ``ok/data/error``
+    keep working — but MCP-spec-compliant clients can now distinguish failed
+    calls via ``CallToolResult.isError`` without parsing the envelope.
+
+    Dict-like accessors delegate to ``structured_content`` so existing call
+    sites and tests that index the envelope continue to work.
+    """
+
+    def __getitem__(self, key: str) -> Any:
+        if self.structured_content is None:
+            raise KeyError(key)
+        return self.structured_content[key]
+
+    def __contains__(self, key: object) -> bool:
+        return self.structured_content is not None and key in self.structured_content
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if self.structured_content is None:
+            return default
+        return self.structured_content.get(key, default)
+
+    def to_mcp_result(self) -> CallToolResult:
+        return CallToolResult(
+            content=self.content,
+            structuredContent=self.structured_content,
+            isError=True,
+            _meta=self.meta,  # type: ignore[call-arg]
+        )
+
+
+# Tool handlers return either a plain dict envelope (success path) or an
+# ErrorToolResult (error path that flips ``CallToolResult.isError=true`` on the
+# wire). FastMCP handles both forms; expose a single alias so tool signatures
+# stay readable.
+type ToolResponse = dict[str, Any] | ErrorToolResult
 
 DataT = TypeVar("DataT")
 
@@ -29,10 +72,18 @@ class RecommendedCitation(BaseModel):
 
 
 class MCPWarning(BaseModel):
-    """Structured non-fatal warning for LLM callers."""
+    """Structured non-fatal warning for LLM callers.
+
+    ``count`` and ``affected_indices`` are populated only when this warning
+    aggregates per-item occurrences in a bulk call. Single-tool warnings
+    leave them ``None`` and they drop out of the wire payload via
+    ``exclude_none`` on the per-item meta serialization path.
+    """
 
     code: str
     message: str
+    count: int | None = None
+    affected_indices: list[int] | None = None
 
 
 class MCPError(BaseModel):
@@ -86,21 +137,71 @@ def _apply_meta_mode(payload: dict[str, Any], meta_mode: Any) -> dict[str, Any]:
     return payload
 
 
+def _strip_none_error_details(node: Any) -> Any:
+    """Recursively drop ``error.details`` keys whose value is ``None``.
+
+    Single-tool errors pop the key in ``error_envelope``; bulk per-item
+    errors are nested in ``data.items[*].error`` and would otherwise leak
+    ``"details": null``. This walker keeps the contract symmetric.
+    """
+    if isinstance(node, dict):
+        err = node.get("error")
+        if isinstance(err, dict) and err.get("details") is None and "details" in err:
+            err.pop("details", None)
+        for value in node.values():
+            _strip_none_error_details(value)
+    elif isinstance(node, list):
+        for value in node:
+            _strip_none_error_details(value)
+    return node
+
+
+def _strip_none_warning_aggregate_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    """Drop ``count``/``affected_indices`` from any warning where they are None.
+
+    Pydantic emits them as ``null`` by default; we want them absent for
+    single-tool callers and present (non-null) for aggregated bulk warnings.
+    """
+    meta = payload.get("meta")
+    if isinstance(meta, dict):
+        warnings = meta.get("warnings") or []
+        for warning in warnings:
+            if isinstance(warning, dict):
+                for key in ("count", "affected_indices"):
+                    if warning.get(key) is None:
+                        warning.pop(key, None)
+    return payload
+
+
 def ok_envelope(
     data: BaseModel | dict[str, Any],
     warnings: list[MCPWarning] | None = None,
     *,
     meta_mode: Any = "full",
+    compact_data: bool = False,
 ) -> dict[str, Any]:
-    """Return a successful MCP envelope as a JSON-ready dict."""
-    payload = data.model_dump(mode="json") if isinstance(data, BaseModel) else data
+    """Return a successful MCP envelope as a JSON-ready dict.
+
+    Pass ``compact_data=True`` (typically when ``response_mode='summary'``)
+    to drop fields whose value is ``None``. This trims null-defaults that
+    Pydantic would otherwise emit, materially reducing payload size for
+    LLM consumers without changing the declared output schema.
+    """
+    if isinstance(data, BaseModel):
+        payload = data.model_dump(mode="json", exclude_none=compact_data)
+    else:
+        payload = data
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=True,
         data=payload,
         error=None,
         meta=MCPMeta(warnings=warnings or []),
     )
-    return _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
+    out = _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
+    cleaned = _strip_none_error_details(out)
+    assert isinstance(cleaned, dict)
+    cleaned = _strip_none_warning_aggregate_fields(cleaned)
+    return cleaned
 
 
 def error_envelope(
@@ -112,8 +213,14 @@ def error_envelope(
     details: dict[str, Any] | None = None,
     warnings: list[MCPWarning] | None = None,
     meta_mode: Any = "full",
-) -> dict[str, Any]:
-    """Return a failed MCP envelope as a JSON-ready dict."""
+) -> ErrorToolResult:
+    """Return a failed MCP result that flips ``CallToolResult.isError=true``.
+
+    The structured payload retains the canonical ``ok/data/error/meta`` shape,
+    so dict-style callers (and existing tests) keep working. The wire-level
+    ``isError`` flag is set so MCP-spec clients can distinguish failed calls
+    from successful ones without parsing the envelope.
+    """
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=False,
         data=None,
@@ -129,4 +236,9 @@ def error_envelope(
     payload = envelope.model_dump(mode="json")
     if payload["error"]["details"] is None:
         payload["error"].pop("details")
-    return _apply_meta_mode(payload, meta_mode)
+    payload = _apply_meta_mode(payload, meta_mode)
+    payload = _strip_none_warning_aggregate_fields(payload)
+    return ErrorToolResult(
+        content=[TextContent(type="text", text=json.dumps(payload, separators=(",", ":")))],
+        structured_content=payload,
+    )

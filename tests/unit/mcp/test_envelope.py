@@ -69,3 +69,21 @@ def test_concrete_envelope_schema_uses_standard_fields() -> None:
 
     assert set(schema["properties"]) == {"ok", "data", "error", "meta"}
     assert set(schema["required"]) == {"ok", "data", "error", "meta"}
+
+
+def test_mcp_warning_serializes_without_aggregate_fields_when_unset() -> None:
+    warning = MCPWarning(code="invalid_external_link", message="X link nulled.")
+    payload = warning.model_dump(mode="json", exclude_none=True)
+    assert payload == {"code": "invalid_external_link", "message": "X link nulled."}
+
+
+def test_mcp_warning_with_aggregate_fields_serializes_count_and_indices() -> None:
+    warning = MCPWarning(
+        code="invalid_external_link",
+        message="gnomAD link nulled.",
+        count=3,
+        affected_indices=[0, 1, 2],
+    )
+    payload = warning.model_dump(mode="json")
+    assert payload["count"] == 3
+    assert payload["affected_indices"] == [0, 1, 2]
