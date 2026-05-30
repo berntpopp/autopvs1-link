@@ -78,25 +78,48 @@ PAYLOAD_MODES: dict[str, PayloadModeSpec] = {
 
 @functools.cache
 def capabilities_version() -> str:
-    """Return a stable 16-char sha256 prefix over server version + registries.
+    """Return a stable 16-char sha256 prefix over the full published surface.
 
     Wired into ``CompactCapabilitiesData.capabilities_version`` and the
     detailed capabilities resource so clients can cache discovery output
-    and invalidate when codes, modes, or the server build change. The hash
-    is deterministic across processes because the JSON serialization uses
-    ``sort_keys=True``.
+    and invalidate when ANY published capability changes. The hash now
+    blends the registries (error/warning codes, payload modes) AND the
+    tool surface (tool_summaries, canonical_parameters, compact_workflow,
+    performance block) so an LLM-facing edit to a purpose string or an
+    example invocation invalidates downstream caches keyed on the hash.
+
+    Regression: a prior implementation hashed only the registries; tool
+    surface mutations (purpose strings, examples gaining response_mode)
+    slipped past and cache-aware clients never saw the change.
+
+    The capabilities presenters are lazy-imported to break the import
+    cycle (capabilities.py imports this function for its
+    ``capabilities_version`` field; this function in turn reads the
+    surface constants defined alongside the presenters).
 
     Memoized with ``functools.cache``: the inputs are module-level
-    immutables in production, so re-computing on every discovery request
-    is pure overhead. Tests that need to observe a SERVER_VERSION change
-    must call ``capabilities_version.cache_clear()`` to drop the cached
-    value. Blending SERVER_VERSION into the hash means two deployments
-    with identical registries but different builds publish distinct
-    capabilities_version values — operationally important for cache-aware
-    clients.
+    immutables in production. Tests must call
+    ``capabilities_version.cache_clear()`` after monkeypatching any
+    contributing input.
     """
+    from autopvs1_link.mcp.presenters.capabilities import (
+        _CANONICAL_PARAMETERS,
+        _COMPACT_WORKFLOW,
+        _PERFORMANCE_BLOCK,
+        _TOOL_SUMMARIES,
+    )
+
     blob = json.dumps(
-        [SERVER_VERSION, KNOWN_ERROR_CODES, KNOWN_WARNING_CODES, PAYLOAD_MODES],
+        [
+            SERVER_VERSION,
+            KNOWN_ERROR_CODES,
+            KNOWN_WARNING_CODES,
+            PAYLOAD_MODES,
+            _TOOL_SUMMARIES,
+            _CANONICAL_PARAMETERS,
+            _COMPACT_WORKFLOW,
+            _PERFORMANCE_BLOCK,
+        ],
         sort_keys=True,
     ).encode()
     return hashlib.sha256(blob).hexdigest()[:16]

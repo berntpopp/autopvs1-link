@@ -1,4 +1,12 @@
-"""MCP capabilities presenters."""
+"""MCP capabilities presenters.
+
+Tool surface data (``_TOOL_SUMMARIES``, ``_CANONICAL_PARAMETERS``,
+``_COMPACT_WORKFLOW``, ``_PERFORMANCE_BLOCK``) is kept as module-level
+plain-dict constants so :func:`autopvs1_link.mcp.registries.capabilities_version`
+can lazy-import and hash them as part of the published surface. Without
+that, edits to a tool summary purpose string would slip past the
+version hash and cache-aware clients would never see the change.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +22,176 @@ from autopvs1_link.mcp.registries import (
 from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 
 
+_SCRAPE_TIER = "expensive_cold_cheap_warm"
+_CHEAP_TIER = "cheap"
+_DEFAULT_CACHE_TTL_SECONDS = 86_400
+
+
+_TOOL_SUMMARIES: dict[str, dict[str, Any]] = {
+    "get_variant_pvs1_data": {
+        "purpose": (
+            "Research-use PVS1 analysis for one AutoPVS1 SNV/indel ID. "
+            "LLM-first: pass response_mode='summary' for the verdict."
+        ),
+        "example": {
+            "genome_build": "hg19",
+            "variant_id": "X-82763936-A-T",
+            "response_mode": "summary",
+        },
+    },
+    "get_cnv_pvs1_data": {
+        "purpose": (
+            "Research-use PVS1 analysis for one AutoPVS1 CNV ID. "
+            "LLM-first: pass response_mode='summary' for the verdict."
+        ),
+        "example": {
+            "genome_build": "hg19",
+            "cnv_id": "17-15000000-20000000-DEL",
+            "response_mode": "summary",
+        },
+    },
+    "search_variants": {
+        "purpose": (
+            "Search AutoPVS1 by gene symbol, partial variant ID, or "
+            "upstream-supported query. Use response_mode='ids_only' "
+            "to resolve to a variant_id with minimum bytes."
+        ),
+        "example": {
+            "query": "BRCA1",
+            "genome_build": "hg38",
+            "limit": 10,
+            "response_mode": "ids_only",
+        },
+    },
+    "get_server_health": {
+        "purpose": (
+            "Read local server health and enabled feature flags "
+            "without upstream calls (sub-millisecond, no cost)."
+        ),
+        "example": {},
+    },
+    "get_variants_pvs1_data_bulk": {
+        "purpose": (
+            "Bulk PVS1 scoring for 1-10 SNV/indel variants in one "
+            "call. Default response_mode='summary' to keep 10 "
+            "verdicts inside one turn budget."
+        ),
+        "example": {
+            "items": [
+                {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
+            ],
+            "response_mode": "summary",
+        },
+    },
+    "get_cnvs_pvs1_data_bulk": {
+        "purpose": (
+            "Bulk PVS1 scoring for 1-10 CNVs in one call. Default "
+            "response_mode='summary' to keep 10 verdicts inside one "
+            "turn budget."
+        ),
+        "example": {
+            "items": [
+                {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
+            ],
+            "response_mode": "summary",
+        },
+    },
+}
+
+
+_CANONICAL_PARAMETERS: dict[str, list[str]] = {
+    "get_variant_pvs1_data": ["genome_build", "variant_id"],
+    "get_cnv_pvs1_data": ["genome_build", "cnv_id"],
+    "search_variants": ["query", "genome_build", "limit", "cursor"],
+    "get_server_health": [],
+    "get_variants_pvs1_data_bulk": ["items"],
+    "get_cnvs_pvs1_data_bulk": ["items"],
+}
+
+
+_COMPACT_WORKFLOW: list[dict[str, str]] = [
+    {
+        "step": "Confirm genome build",
+        "when": "The source coordinate build is unknown or absent.",
+    },
+    {
+        "step": "Search for an AutoPVS1 ID",
+        "when": (
+            "The caller has a gene symbol, partial variant ID, or "
+            "upstream-supported query."
+        ),
+    },
+    {
+        "step": "Score one variant or CNV",
+        "when": "The caller has a single normalized AutoPVS1 variant_id or cnv_id.",
+    },
+    {
+        "step": "Score multiple variants or CNVs in one call",
+        "when": (
+            "The caller has 2 to 10 IDs of the same kind; use "
+            "get_variants_pvs1_data_bulk or get_cnvs_pvs1_data_bulk."
+        ),
+    },
+    {
+        "step": "Report research-use output",
+        "when": "Summarizing any AutoPVS1 result for a user.",
+    },
+]
+
+
+_PERFORMANCE_BLOCK: dict[str, Any] = {
+    "note": (
+        "cost_tier is a coarse latency hint. AutoPVS1 scrapes upstream HTML "
+        "so the first uncached call costs cold_call_seconds; subsequent calls "
+        "hit the in-process cache and complete in warm_call_seconds. "
+        "Plan accordingly: batch first contact, re-call freely when warm."
+    ),
+    "cost_tiers": [_CHEAP_TIER, "moderate", _SCRAPE_TIER],
+    "get_variant_pvs1_data": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 3.5,
+        "warm_call_seconds": 0.05,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+    },
+    "get_cnv_pvs1_data": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 3.5,
+        "warm_call_seconds": 0.05,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+    },
+    "search_variants": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 3.0,
+        "warm_call_seconds": 0.05,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+    },
+    "get_variants_pvs1_data_bulk": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 10.0,
+        "warm_call_seconds": 0.5,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+        "note": "Wall time scales linearly with cold-uncached items at ~1 req/s.",
+    },
+    "get_cnvs_pvs1_data_bulk": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 10.0,
+        "warm_call_seconds": 0.5,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+        "note": "Wall time scales linearly with cold-uncached items at ~1 req/s.",
+    },
+    "get_server_health": {
+        "cost_tier": _CHEAP_TIER,
+        "warm_call_seconds": 0.001,
+        "note": "No upstream call; reads in-process state.",
+    },
+    "get_server_capabilities": {
+        "cost_tier": _CHEAP_TIER,
+        "warm_call_seconds": 0.001,
+        "note": "No upstream call; hash-memoized capabilities_version.",
+    },
+}
+
+
 def present_compact_capabilities() -> CompactCapabilitiesData:
     """Return compact capabilities optimized for first-turn tool selection."""
     return CompactCapabilitiesData(
@@ -24,110 +202,11 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
         endpoint="/mcp/",
         research_use_only=True,
         tool_summaries={
-            "get_variant_pvs1_data": ToolSummaryMCP(
-                purpose=(
-                    "Research-use PVS1 analysis for one AutoPVS1 SNV/indel ID. "
-                    "LLM-first: pass response_mode='summary' for the verdict."
-                ),
-                example={
-                    "genome_build": "hg19",
-                    "variant_id": "X-82763936-A-T",
-                    "response_mode": "summary",
-                },
-            ),
-            "get_cnv_pvs1_data": ToolSummaryMCP(
-                purpose=(
-                    "Research-use PVS1 analysis for one AutoPVS1 CNV ID. "
-                    "LLM-first: pass response_mode='summary' for the verdict."
-                ),
-                example={
-                    "genome_build": "hg19",
-                    "cnv_id": "17-15000000-20000000-DEL",
-                    "response_mode": "summary",
-                },
-            ),
-            "search_variants": ToolSummaryMCP(
-                purpose=(
-                    "Search AutoPVS1 by gene symbol, partial variant ID, or "
-                    "upstream-supported query. Use response_mode='ids_only' "
-                    "to resolve to a variant_id with minimum bytes."
-                ),
-                example={
-                    "query": "BRCA1",
-                    "genome_build": "hg38",
-                    "limit": 10,
-                    "response_mode": "ids_only",
-                },
-            ),
-            "get_server_health": ToolSummaryMCP(
-                purpose=(
-                    "Read local server health and enabled feature flags "
-                    "without upstream calls (sub-millisecond, no cost)."
-                ),
-                example={},
-            ),
-            "get_variants_pvs1_data_bulk": ToolSummaryMCP(
-                purpose=(
-                    "Bulk PVS1 scoring for 1-10 SNV/indel variants in one "
-                    "call. Default response_mode='summary' to keep 10 "
-                    "verdicts inside one turn budget."
-                ),
-                example={
-                    "items": [
-                        {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
-                    ],
-                    "response_mode": "summary",
-                },
-            ),
-            "get_cnvs_pvs1_data_bulk": ToolSummaryMCP(
-                purpose=(
-                    "Bulk PVS1 scoring for 1-10 CNVs in one call. Default "
-                    "response_mode='summary' to keep 10 verdicts inside one "
-                    "turn budget."
-                ),
-                example={
-                    "items": [
-                        {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
-                    ],
-                    "response_mode": "summary",
-                },
-            ),
+            name: ToolSummaryMCP(purpose=data["purpose"], example=data["example"])
+            for name, data in _TOOL_SUMMARIES.items()
         },
-        canonical_parameters={
-            "get_variant_pvs1_data": ["genome_build", "variant_id"],
-            "get_cnv_pvs1_data": ["genome_build", "cnv_id"],
-            "search_variants": ["query", "genome_build", "limit", "cursor"],
-            "get_server_health": [],
-            "get_variants_pvs1_data_bulk": ["items"],
-            "get_cnvs_pvs1_data_bulk": ["items"],
-        },
-        compact_workflow=[
-            WorkflowStepMCP(
-                step="Confirm genome build",
-                when="The source coordinate build is unknown or absent.",
-            ),
-            WorkflowStepMCP(
-                step="Search for an AutoPVS1 ID",
-                when=(
-                    "The caller has a gene symbol, partial variant ID, or upstream-supported query."
-                ),
-            ),
-            WorkflowStepMCP(
-                step="Score one variant or CNV",
-                when="The caller has a single normalized AutoPVS1 variant_id or cnv_id.",
-            ),
-            WorkflowStepMCP(
-                step="Score multiple variants or CNVs in one call",
-                when=(
-                    "The caller has 2 to 10 IDs of the same kind; use "
-                    "get_variants_pvs1_data_bulk or get_cnvs_pvs1_data_bulk."
-                ),
-            ),
-            WorkflowStepMCP(
-                step="Report research-use output",
-                when="Summarizing any AutoPVS1 result for a user.",
-            ),
-        ],
+        canonical_parameters=_CANONICAL_PARAMETERS,
+        compact_workflow=[WorkflowStepMCP(**step) for step in _COMPACT_WORKFLOW],
         details_resource="autopvs1-link://capabilities",
     )
 
@@ -249,60 +328,3 @@ def detailed_capabilities_resource() -> dict[str, Any]:
         ],
         "performance": _PERFORMANCE_BLOCK,
     }
-
-
-_SCRAPE_TIER = "expensive_cold_cheap_warm"
-_CHEAP_TIER = "cheap"
-_DEFAULT_CACHE_TTL_SECONDS = 86_400
-
-_PERFORMANCE_BLOCK: dict[str, Any] = {
-    "note": (
-        "cost_tier is a coarse latency hint. AutoPVS1 scrapes upstream HTML "
-        "so the first uncached call costs cold_call_seconds; subsequent calls "
-        "hit the in-process cache and complete in warm_call_seconds. "
-        "Plan accordingly: batch first contact, re-call freely when warm."
-    ),
-    "cost_tiers": [_CHEAP_TIER, "moderate", _SCRAPE_TIER],
-    "get_variant_pvs1_data": {
-        "cost_tier": _SCRAPE_TIER,
-        "cold_call_seconds": 3.5,
-        "warm_call_seconds": 0.05,
-        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
-    },
-    "get_cnv_pvs1_data": {
-        "cost_tier": _SCRAPE_TIER,
-        "cold_call_seconds": 3.5,
-        "warm_call_seconds": 0.05,
-        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
-    },
-    "search_variants": {
-        "cost_tier": _SCRAPE_TIER,
-        "cold_call_seconds": 3.0,
-        "warm_call_seconds": 0.05,
-        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
-    },
-    "get_variants_pvs1_data_bulk": {
-        "cost_tier": _SCRAPE_TIER,
-        "cold_call_seconds": 10.0,
-        "warm_call_seconds": 0.5,
-        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
-        "note": "Wall time scales linearly with cold-uncached items at ~1 req/s.",
-    },
-    "get_cnvs_pvs1_data_bulk": {
-        "cost_tier": _SCRAPE_TIER,
-        "cold_call_seconds": 10.0,
-        "warm_call_seconds": 0.5,
-        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
-        "note": "Wall time scales linearly with cold-uncached items at ~1 req/s.",
-    },
-    "get_server_health": {
-        "cost_tier": _CHEAP_TIER,
-        "warm_call_seconds": 0.001,
-        "note": "No upstream call; reads in-process state.",
-    },
-    "get_server_capabilities": {
-        "cost_tier": _CHEAP_TIER,
-        "warm_call_seconds": 0.001,
-        "note": "No upstream call; hash-memoized capabilities_version.",
-    },
-}

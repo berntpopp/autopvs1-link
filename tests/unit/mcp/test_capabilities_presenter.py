@@ -259,6 +259,66 @@ def test_detailed_capabilities_documents_bulk_behavior_contract() -> None:
     assert bulk["accounting_invariant"] == "total == attempted + skipped"
 
 
+def test_capabilities_version_invalidates_on_tool_summary_mutation(monkeypatch) -> None:
+    """Tool surface mutations must change the version hash.
+
+    Regression: between two passes the ``tool_summaries`` purpose strings and
+    examples changed (added ``LLM-first`` framing, ``response_mode`` keys)
+    but ``capabilities_version`` stayed ``7372b825144a8d55``. Cache-aware
+    clients keyed on the hash never saw the change. The hash must cover the
+    full published surface, not just the registries.
+    """
+    from autopvs1_link.mcp.presenters import capabilities as caps_mod
+    from autopvs1_link.mcp.registries import capabilities_version
+
+    capabilities_version.cache_clear()
+    before = capabilities_version()
+
+    # Mutate the published surface in a way a client could observe.
+    mutated_summaries = {
+        name: {**data, "purpose": "Mutated purpose for hash test."}
+        if name == "get_variant_pvs1_data"
+        else data
+        for name, data in caps_mod._TOOL_SUMMARIES.items()
+    }
+    monkeypatch.setattr(caps_mod, "_TOOL_SUMMARIES", mutated_summaries)
+
+    capabilities_version.cache_clear()
+    after = capabilities_version()
+    capabilities_version.cache_clear()
+
+    assert before != after, (
+        "capabilities_version must change when tool_summaries content changes; "
+        "otherwise clients caching on the hash never see surface updates."
+    )
+
+
+def test_capabilities_version_invalidates_on_performance_block_mutation(monkeypatch) -> None:
+    """Performance block mutations must change the version hash too.
+
+    The performance block was added in the same pass that broke search;
+    a future tweak to ``warm_call_seconds`` or ``cost_tier`` must invalidate
+    cached discovery output so LLM clients adjust their latency planning.
+    """
+    from autopvs1_link.mcp.presenters import capabilities as caps_mod
+    from autopvs1_link.mcp.registries import capabilities_version
+
+    capabilities_version.cache_clear()
+    before = capabilities_version()
+    mutated_perf = {
+        **caps_mod._PERFORMANCE_BLOCK,
+        "get_variant_pvs1_data": {
+            **caps_mod._PERFORMANCE_BLOCK["get_variant_pvs1_data"],
+            "warm_call_seconds": 0.123,
+        },
+    }
+    monkeypatch.setattr(caps_mod, "_PERFORMANCE_BLOCK", mutated_perf)
+    capabilities_version.cache_clear()
+    after = capabilities_version()
+    capabilities_version.cache_clear()
+    assert before != after
+
+
 def test_detailed_capabilities_documents_per_tool_performance_block() -> None:
     """Each tool advertises a cost_tier + cold/warm latency hint.
 
