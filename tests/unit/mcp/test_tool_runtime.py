@@ -628,6 +628,35 @@ async def test_variant_summary_mode_drops_null_default_fields(mocker) -> None:
 
 
 @pytest.mark.asyncio
+async def test_variant_ids_only_wire_payload_strips_null_fields(mocker) -> None:
+    """End-to-end check: response_mode='ids_only' must reach the wire as a
+    truly minimal payload — variant_info contains only variant_id, and
+    pvs1_flowchart/external_links/etc. are absent (not null). Without
+    routing ids_only through compact_data on ok_envelope, the widened
+    Optional fields serialize as nulls and blow up the payload size.
+    """
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(return_value=_variant_result()),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {
+            "genome_build": "hg38",
+            "variant_id": "X-1-A-T",
+            "response_mode": "ids_only",
+        },
+    )
+    data = result.structured_content["data"]
+    variant_info = data["variant_info"]
+    # variant_info on the wire is strictly the identifier — null leaks fail.
+    assert set(variant_info) == {"variant_id"}, variant_info
+    # pvs1_flowchart absent on the wire (not present-with-null).
+    assert "pvs1_flowchart" not in data, data
+
+
+@pytest.mark.asyncio
 async def test_variant_standard_mode_preserves_null_default_fields(mocker) -> None:
     mocker.patch(
         "autopvs1_link.mcp.service_adapters.get_variant",

@@ -289,7 +289,7 @@ def register(mcp: FastMCP) -> None:
             payload,
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
-            compact_data=normalized_response_mode == "summary",
+            compact_data=normalized_response_mode in ("summary", "ids_only"),
         )
 
     @mcp.tool(
@@ -417,5 +417,5 @@ def register(mcp: FastMCP) -> None:
             payload,
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
-            compact_data=normalized_response_mode == "summary",
+            compact_data=normalized_response_mode in ("summary", "ids_only"),
         )
