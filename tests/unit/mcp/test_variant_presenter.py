@@ -14,7 +14,6 @@ from autopvs1_link.models.autopvs1_models import (
     VariantInfo,
 )
 
-
 _EXTERNAL_LINK_DICTS = {"external_links", "external_links_raw"}
 
 
@@ -539,9 +538,7 @@ def test_present_variant_standard_drops_notes_dict_because_steps_carry_text() ->
         "standard mode must drop notes dict (steps carry note_text)"
     )
     # The resolved note text still has to ride along on each step.
-    note_texts = [
-        step.get("note_text") for step in payload["pvs1_flowchart"]["decision_tree"]
-    ]
+    note_texts = [step.get("note_text") for step in payload["pvs1_flowchart"]["decision_tree"]]
     assert "Note one." in note_texts
     assert "Note two." in note_texts
 
@@ -584,6 +581,74 @@ def test_ok_envelope_full_mode_data_has_no_null_fields() -> None:
     # And the audit fields are still present:
     assert "decision_tree_raw" in envelope["data"]["pvs1_flowchart"]
     assert "external_links_raw" in envelope["data"]["variant_info"]
+
+
+def test_present_variant_summary_drops_invalid_external_link_warning() -> None:
+    """``invalid_external_link`` references a field that is gone in summary mode.
+
+    Regression: summary mode trims variant_info to {variant_id, variant_type,
+    gene_symbol} — ``external_links`` is dropped. But the warning continued
+    to ride along, telling callers about a field they could not see. The
+    warning is meaningful only when ``external_links`` is on the wire.
+    """
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-82763936-A-T",
+            variant_type="Nonsense",
+            gene_symbol="POU3F4",
+            external_links={"gnomAD": "https://example.test/v"},
+            invalid_external_links={
+                "ClinVar": "https://www.ncbi.nlm.nih.gov/clinvar/variation/na",
+            },
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF5",
+            final_strength="Strong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+    _, warnings = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="summary",
+    )
+    codes = [w.code for w in warnings]
+    assert "invalid_external_link" not in codes, (
+        "summary mode hides external_links from the wire; the warning is dangling"
+    )
+
+
+def test_present_variant_standard_still_emits_invalid_external_link_warning() -> None:
+    """Standard mode keeps ``external_links`` so the warning is still useful."""
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-82763936-A-T",
+            variant_type="Nonsense",
+            gene_symbol="POU3F4",
+            external_links={"gnomAD": "https://example.test/v"},
+            invalid_external_links={
+                "ClinVar": "https://www.ncbi.nlm.nih.gov/clinvar/variation/na",
+            },
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF5",
+            final_strength="Strong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+    _, warnings = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="standard",
+    )
+    codes = [w.code for w in warnings]
+    assert "invalid_external_link" in codes
 
 
 def test_present_variant_full_keeps_notes_dict_for_audit() -> None:

@@ -207,6 +207,11 @@ def present_variant(
             for key in ("variant_id", "variant_type", "gene_symbol")
             if key in variant_info
         }
+        # external_links is gone from the wire in summary mode; the
+        # ``invalid_external_link`` warning would dangle, pointing at a
+        # field the caller cannot see. Drop it so summary callers do not
+        # see warnings about suppressed fields.
+        warnings = [w for w in warnings if w.code != "invalid_external_link"]
 
     flowchart, flowchart_warnings = _present_flowchart(raw["pvs1_flowchart"], response_mode=mode)
     warnings.extend(flowchart_warnings)

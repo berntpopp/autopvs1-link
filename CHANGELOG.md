@@ -8,6 +8,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`search_variants` was completely broken on page 1.** The new
+  `exclude_none=True` wire-compaction pass stripped `pagination.previous_cursor`
+  on the first page, but `SearchPaginationMCP.previous_cursor: str | None` had
+  no default — the published JSON schema marked it required and the MCP client
+  rejected every call with `Output validation error: 'previous_cursor' is a
+  required property`. Adds `= None` defaults to `previous_cursor` and
+  `next_cursor` so the schema marks them non-required (consistent with the
+  wire strip). Adds a meta-test that calls every tool through `mcp.call_tool`
+  and validates the resulting `structured_content` against the tool's own
+  published `output_schema` using `jsonschema` — this seam was missing.
+- **`capabilities_version` was a stale hash.** It covered only the static
+  registries (`KNOWN_ERROR_CODES`, `KNOWN_WARNING_CODES`, `PAYLOAD_MODES`,
+  `SERVER_VERSION`) so edits to `tool_summaries` purpose strings or examples
+  slipped past the hash; cache-aware clients keyed on it never saw the
+  change. Refactors `capabilities.py` to expose the surface as module-level
+  plain-dict constants and extends `capabilities_version()` to lazy-import
+  and blend `_TOOL_SUMMARIES`, `_CANONICAL_PARAMETERS`, `_COMPACT_WORKFLOW`,
+  and `_PERFORMANCE_BLOCK` into the sha256 input.
+- **`summary` mode emitted a warning about a suppressed field.** The
+  `invalid_external_link` warning rode along even after the wire stripped
+  `external_links` from `variant_info`, leaving callers staring at a code
+  pointing at a field they could not see. Drops the warning in summary mode.
 - **PVS1 flowchart notes parser** now captures the full legend prose for each
   `#N` marker. The previous implementation read only the immediately
   neighbouring tag via `find_next_sibling()`, so `notes['#1']` collapsed to

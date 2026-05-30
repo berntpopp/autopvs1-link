@@ -122,9 +122,7 @@ class TestPVS1FlowchartParsing:
         # Should have notes marked with #1, #2, etc.
         assert len(flowchart.notes) > 0
 
-    def test_parse_pvs1_flowchart_notes_capture_full_legend_text(
-        self, client, variant_soup
-    ):
+    def test_parse_pvs1_flowchart_notes_capture_full_legend_text(self, client, variant_soup):
         """Notes legend must capture full prose, not a single neighbour tag.
 
         Regression for an LLM-consumer report that ``notes['#1']`` was just

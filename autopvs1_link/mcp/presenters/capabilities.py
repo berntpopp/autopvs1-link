@@ -21,7 +21,6 @@ from autopvs1_link.mcp.registries import (
 )
 from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 
-
 _SCRAPE_TIER = "expensive_cold_cheap_warm"
 _CHEAP_TIER = "cheap"
 _DEFAULT_CACHE_TTL_SECONDS = 86_400
@@ -116,10 +115,7 @@ _COMPACT_WORKFLOW: list[dict[str, str]] = [
     },
     {
         "step": "Search for an AutoPVS1 ID",
-        "when": (
-            "The caller has a gene symbol, partial variant ID, or "
-            "upstream-supported query."
-        ),
+        "when": ("The caller has a gene symbol, partial variant ID, or upstream-supported query."),
     },
     {
         "step": "Score one variant or CNV",

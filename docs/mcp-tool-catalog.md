@@ -3300,7 +3300,7 @@ not clinical decision support.
               "type": "string"
             },
             "pagination": {
-              "description": "Opaque pagination block for ``search_variants``.\n\nCursors are opaque base64url-encoded tokens; callers must not parse\nor construct them. ``offset`` is echoed for operator visibility only.\n``total_count_kind`` documents how to interpret ``total_count`` on the\nsurrounding ``SearchMCPData``: ``upstream_page`` means the count is\nonly what the upstream returned for this query (no guarantee of\nexhaustiveness); ``upstream_total`` means the upstream guarantees the\nfull result set was returned.",
+              "description": "Opaque pagination block for ``search_variants``.\n\nCursors are opaque base64url-encoded tokens; callers must not parse\nor construct them. ``offset`` is echoed for operator visibility only.\n``total_count_kind`` documents how to interpret ``total_count`` on the\nsurrounding ``SearchMCPData``: ``upstream_page`` means the count is\nonly what the upstream returned for this query (no guarantee of\nexhaustiveness); ``upstream_total`` means the upstream guarantees the\nfull result set was returned.\n\n``previous_cursor`` and ``next_cursor`` carry ``= None`` defaults so\nthe published JSON schema marks them non-required. The wire payload\nstrips null fields (``exclude_none=True``) and the MCP client\nvalidates structured content against that schema \u2014 without the\ndefaults, page 1 (no previous) and the last page (no next) would\nfail validation.",
               "properties": {
                 "has_more": {
                   "title": "Has More",
@@ -3315,6 +3315,7 @@ not clinical decision support.
                       "type": "null"
                     }
                   ],
+                  "default": null,
                   "title": "Next Cursor"
                 },
                 "offset": {
@@ -3330,6 +3331,7 @@ not clinical decision support.
                       "type": "null"
                     }
                   ],
+                  "default": null,
                   "title": "Previous Cursor"
                 },
                 "total_count_kind": {
@@ -3343,8 +3345,6 @@ not clinical decision support.
                 }
               },
               "required": [
-                "previous_cursor",
-                "next_cursor",
                 "has_more",
                 "offset"
               ],
