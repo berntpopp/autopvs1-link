@@ -168,6 +168,40 @@ def test_capabilities_version_is_memoized_after_first_call() -> None:
     assert info.misses == 1
 
 
+def test_capabilities_version_invalidates_on_known_error_codes_mutation(
+    monkeypatch,
+) -> None:
+    """Item 7c: an accidental change to KNOWN_ERROR_CODES (e.g. someone
+    renames invalid_variant_id to invalid_variant_identifier without
+    auditing the wire contract) must yield a different
+    capabilities_version. Otherwise the hash lies about registry state
+    and cache-aware clients keyed on it never invalidate.
+
+    Mutation is scoped via monkeypatch.setattr against a fresh copy of
+    the dict so the registries module state is restored on test
+    teardown — no leakage into downstream tests.
+    """
+    from autopvs1_link.mcp import registries as registries_module
+
+    capabilities_version.cache_clear()
+    before = capabilities_version()
+
+    # Swap exactly one entry to verify the hash is sensitive to message
+    # content too (not just key set). Use a copy so monkeypatch can
+    # restore the original dict on teardown.
+    mutated = dict(registries_module.KNOWN_ERROR_CODES)
+    mutated["invalid_variant_id"] = "Mutated message for hash test."
+    monkeypatch.setattr(registries_module, "KNOWN_ERROR_CODES", mutated)
+
+    capabilities_version.cache_clear()
+    after = capabilities_version()
+    assert before != after
+
+    # Cleanup — drop the cached mutated value so downstream tests recompute
+    # against the restored (original) KNOWN_ERROR_CODES.
+    capabilities_version.cache_clear()
+
+
 def test_capabilities_version_blends_server_version_into_hash(monkeypatch) -> None:
     """Item 3 provenance: bumping SERVER_VERSION must yield a different
     capabilities_version so deployments are correlatable. Without the blend,

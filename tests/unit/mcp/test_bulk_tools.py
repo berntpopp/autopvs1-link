@@ -549,6 +549,75 @@ async def test_bulk_per_item_multi_emission_stays_unaggregated(mocker) -> None:
 
 
 @pytest.mark.asyncio
+async def test_bulk_mixed_code_aggregation_keeps_distinct_index_sets(mocker) -> None:
+    """Item 7b: mixed-code aggregation.
+
+    Item 0 emits only code A (invalid_external_link). Item 1 emits BOTH
+    code A (invalid_external_link) and code B (pvs1_not_applicable).
+    Item 2 emits only code B. Top-level meta.warnings must contain:
+    - one A warning with count=2 and affected_indices=[0, 1]
+    - one B warning with count=2 and affected_indices=[1, 2]
+    Order must be first-seen-code-first (A before B because A is seen
+    at item 0; B is not seen until item 1).
+    """
+
+    def _make_parsed(*, with_invalid_link: bool, with_not_applicable: bool) -> AutoPVS1Data:
+        invalid_links = {"ClinVar": "https://bad/"} if with_invalid_link else {}
+        final_strength = "PVS1_Not_Applicable" if with_not_applicable else "Strong"
+        return AutoPVS1Data(
+            genome_build="hg19",
+            variant_info=VariantInfo(
+                variant_id="X-1-A-T",
+                variant_type="Nonsense",
+                gene_symbol="GENE",
+                external_links={"gnomAD": "https://example.test/variant"},
+                invalid_external_links=invalid_links,
+            ),
+            pvs1_flowchart=PVS1Flowchart(
+                preliminary_decision_path="NF",
+                final_strength=final_strength,
+                decision_tree=[],
+                notes={},
+            ),
+            disease_mechanisms=[],
+        )
+
+    item_0 = _make_parsed(with_invalid_link=True, with_not_applicable=False)
+    item_1 = _make_parsed(with_invalid_link=True, with_not_applicable=True)
+    item_2 = _make_parsed(with_invalid_link=False, with_not_applicable=True)
+
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(side_effect=[item_0, item_1, item_2]),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variants_pvs1_data_bulk",
+        {
+            "items": [
+                {"genome_build": "hg19", "variant_id": "X-1-A-T"},
+                {"genome_build": "hg19", "variant_id": "X-2-G-A"},
+                {"genome_build": "hg19", "variant_id": "X-3-T-C"},
+            ]
+        },
+    )
+    warnings = result.structured_content["meta"]["warnings"]
+    codes_in_order = [w["code"] for w in warnings]
+    # First-seen-code-first ordering.
+    assert codes_in_order.index("invalid_external_link") < codes_in_order.index(
+        "pvs1_not_applicable"
+    ), codes_in_order
+
+    by_code = {w["code"]: w for w in warnings}
+    a = by_code["invalid_external_link"]
+    assert a["count"] == 2
+    assert a["affected_indices"] == [0, 1]
+    b = by_code["pvs1_not_applicable"]
+    assert b["count"] == 2
+    assert b["affected_indices"] == [1, 2]
+
+
+@pytest.mark.asyncio
 async def test_bulk_cnvs_aggregated_warning_carries_count_and_affected_indices(mocker) -> None:
     """3 CNV items each emit pvs1_not_applicable → 1 aggregated warning
     with count=3 and affected_indices=[0,1,2]. Mirrors the variant test

@@ -359,6 +359,31 @@ def test_present_search_ids_only_omits_suggestions_block() -> None:
     assert payload.get("suggestions", []) == []
 
 
+def test_search_pagination_has_no_previous_cursor_on_first_page() -> None:
+    """Item 7a: counterpart to has_no_next_cursor_on_last_page. The
+    first page (offset=0) must not advertise a previous_cursor; without
+    this assertion the presenter could silently regress to encoding
+    previous_cursor=encode(-N) or encode(0) and clients would loop."""
+    parsed = AutoPVS1SearchResults(
+        query="BRCA1",
+        genome_version="hg38",
+        results=[_result(index) for index in range(15)],
+    )
+    data, _ = present_search(
+        parsed,
+        query="BRCA1",
+        genome_build="hg38",
+        limit=10,
+        offset=0,
+        inherited_warnings=[],
+    )
+    pagination = data.model_dump(mode="json")["pagination"]
+    assert pagination["offset"] == 0
+    assert pagination["previous_cursor"] is None
+    # And next_cursor IS set because there's a second page.
+    assert pagination["next_cursor"] is not None
+
+
 def test_search_pagination_has_no_next_cursor_on_last_page() -> None:
     parsed = _make_results(5)
     data, _ = present_search(
