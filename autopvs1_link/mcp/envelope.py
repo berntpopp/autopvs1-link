@@ -97,13 +97,19 @@ class MCPError(BaseModel):
 
 
 class MCPMeta(BaseModel):
-    """Common metadata on every MCP tool envelope."""
+    """Common metadata on every MCP tool envelope.
+
+    ``effective_chars`` is the byte length of the serialized ``data`` field
+    (compact JSON). It lets LLM callers calibrate against the advertised
+    per-mode ``char_budget`` after the first call instead of guessing.
+    """
 
     request_id: str = Field(default_factory=lambda: correlation_id.get() or str(uuid4()))
     server_version: str = __version__
     research_use_only: bool = True
     recommended_citation: RecommendedCitation = Field(default_factory=RecommendedCitation)
     warnings: list[MCPWarning] = Field(default_factory=list)
+    effective_chars: int | None = None
 
 
 class MCPEnvelope[DataT](BaseModel):
@@ -191,11 +197,12 @@ def ok_envelope(
         payload = data.model_dump(mode="json", exclude_none=True)
     else:
         payload = data
+    effective_chars = len(json.dumps(payload, separators=(",", ":")))
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=True,
         data=payload,
         error=None,
-        meta=MCPMeta(warnings=warnings or []),
+        meta=MCPMeta(warnings=warnings or [], effective_chars=effective_chars),
     )
     out = _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
     cleaned = _strip_none_error_details(out)

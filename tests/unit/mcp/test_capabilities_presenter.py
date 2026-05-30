@@ -259,6 +259,41 @@ def test_detailed_capabilities_documents_bulk_behavior_contract() -> None:
     assert bulk["accounting_invariant"] == "total == attempted + skipped"
 
 
+def test_detailed_capabilities_documents_per_tool_performance_block() -> None:
+    """Each tool advertises a cost_tier + cold/warm latency hint.
+
+    The LLM-consumer feedback flagged that AutoPVS1's HTML-scrape upstream
+    makes the first call structurally slow (~few seconds) but subsequent
+    calls hit the in-process cache and complete in milliseconds. Surfacing
+    this distinction in capabilities lets agents plan: batch when uncached,
+    re-call freely when warm. ``get_server_health`` is the cheap-only path.
+    """
+    detailed = detailed_capabilities_resource()
+    perf = detailed["performance"]
+    expected_tools = {
+        "get_variant_pvs1_data",
+        "get_cnv_pvs1_data",
+        "search_variants",
+        "get_variants_pvs1_data_bulk",
+        "get_cnvs_pvs1_data_bulk",
+        "get_server_health",
+        "get_server_capabilities",
+    }
+    assert expected_tools.issubset(set(perf)), (
+        f"missing tools in performance: {expected_tools - set(perf)}"
+    )
+    # Scrape-then-cache tools advertise the warm/cold differential.
+    scrape_tools = ["get_variant_pvs1_data", "get_cnv_pvs1_data", "search_variants"]
+    for tool in scrape_tools:
+        block = perf[tool]
+        assert block["cost_tier"] == "expensive_cold_cheap_warm", tool
+        assert block["cold_call_seconds"] > block["warm_call_seconds"], tool
+        assert block["cache_ttl_seconds"] > 0, tool
+    # Local-only tools are cheap.
+    assert perf["get_server_health"]["cost_tier"] == "cheap"
+    assert perf["get_server_capabilities"]["cost_tier"] == "cheap"
+
+
 def test_detailed_capabilities_documents_warning_aggregation_policy() -> None:
     """Item 4: callers consuming meta.warnings from a bulk call need to know
     exactly when count and affected_indices are populated so they can

@@ -247,4 +247,62 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "Unsupported HGVS-like free-text search may return no results.",
             "Outputs are research-use data and require domain review.",
         ],
+        "performance": _PERFORMANCE_BLOCK,
     }
+
+
+_SCRAPE_TIER = "expensive_cold_cheap_warm"
+_CHEAP_TIER = "cheap"
+_DEFAULT_CACHE_TTL_SECONDS = 86_400
+
+_PERFORMANCE_BLOCK: dict[str, Any] = {
+    "note": (
+        "cost_tier is a coarse latency hint. AutoPVS1 scrapes upstream HTML "
+        "so the first uncached call costs cold_call_seconds; subsequent calls "
+        "hit the in-process cache and complete in warm_call_seconds. "
+        "Plan accordingly: batch first contact, re-call freely when warm."
+    ),
+    "cost_tiers": [_CHEAP_TIER, "moderate", _SCRAPE_TIER],
+    "get_variant_pvs1_data": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 3.5,
+        "warm_call_seconds": 0.05,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+    },
+    "get_cnv_pvs1_data": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 3.5,
+        "warm_call_seconds": 0.05,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+    },
+    "search_variants": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 3.0,
+        "warm_call_seconds": 0.05,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+    },
+    "get_variants_pvs1_data_bulk": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 10.0,
+        "warm_call_seconds": 0.5,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+        "note": "Wall time scales linearly with cold-uncached items at ~1 req/s.",
+    },
+    "get_cnvs_pvs1_data_bulk": {
+        "cost_tier": _SCRAPE_TIER,
+        "cold_call_seconds": 10.0,
+        "warm_call_seconds": 0.5,
+        "cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
+        "note": "Wall time scales linearly with cold-uncached items at ~1 req/s.",
+    },
+    "get_server_health": {
+        "cost_tier": _CHEAP_TIER,
+        "warm_call_seconds": 0.001,
+        "note": "No upstream call; reads in-process state.",
+    },
+    "get_server_capabilities": {
+        "cost_tier": _CHEAP_TIER,
+        "warm_call_seconds": 0.001,
+        "note": "No upstream call; hash-memoized capabilities_version.",
+    },
+}

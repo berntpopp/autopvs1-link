@@ -1,5 +1,6 @@
 """Tests for MCP envelope metadata, warnings, and errors."""
 
+import json
 from uuid import UUID
 
 from autopvs1_link.mcp.contracts import ClearCacheData, ClearCacheMCPEnvelope
@@ -75,6 +76,20 @@ def test_mcp_warning_serializes_without_aggregate_fields_when_unset() -> None:
     warning = MCPWarning(code="invalid_external_link", message="X link nulled.")
     payload = warning.model_dump(mode="json", exclude_none=True)
     assert payload == {"code": "invalid_external_link", "message": "X link nulled."}
+
+
+def test_ok_envelope_meta_echoes_effective_chars_count() -> None:
+    """Meta echoes effective_chars so callers learn the actual wire cost.
+
+    The advertised char_budget on each payload_mode tier is theoretical;
+    the echoed count is what the LLM actually paid. Letting clients
+    calibrate after the first call is a peer-server pattern from HNF1B.
+    """
+    envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
+    chars = envelope["meta"]["effective_chars"]
+    assert isinstance(chars, int)
+    expected = len(json.dumps(envelope["data"], separators=(",", ":")))
+    assert chars == expected, f"effective_chars {chars} != actual data bytes {expected}"
 
 
 def test_mcp_warning_with_aggregate_fields_serializes_count_and_indices() -> None:
