@@ -318,3 +318,86 @@ async def test_classify_cnv_prompt_renders_canonical_tool_guidance() -> None:
     assert "get_cnv_pvs1_data" in message
     assert "search_variants" in message
     assert "clear_cache" not in message
+
+
+@pytest.mark.asyncio
+async def test_classify_variant_prompt_explains_payload_sizing_and_error_handling() -> None:
+    mcp: FastMCP = build_mcp_server()
+    rendered = await mcp.render_prompt(
+        "classify_variant",
+        {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
+    )
+    body = rendered.messages[0].content.text
+    assert "response_mode" in body
+    assert "summary" in body
+    assert "pvs1_not_applicable" in body
+    assert "not_found" in body
+    assert "upstream_timeout" in body
+    assert "isError" in body
+
+
+@pytest.mark.asyncio
+async def test_classify_cnv_prompt_explains_payload_sizing_and_error_handling() -> None:
+    mcp: FastMCP = build_mcp_server()
+    rendered = await mcp.render_prompt(
+        "classify_cnv",
+        {"genome_build": "hg19", "cnv_id": "17-15000000-20000000-DEL"},
+    )
+    body = rendered.messages[0].content.text
+    assert "response_mode" in body
+    assert "pvs1_not_applicable" in body
+    assert "invalid_cnv_id" in body
+
+
+@pytest.mark.asyncio
+async def test_pvs1_workflow_help_prompt_is_registered_with_arguments() -> None:
+    mcp: FastMCP = build_mcp_server()
+    prompts = {prompt.name: prompt for prompt in await mcp.list_prompts()}
+    assert "pvs1_workflow_help" in prompts
+    help_prompt = prompts["pvs1_workflow_help"]
+    assert help_prompt.title
+    assert help_prompt.description
+    args = {arg.name: arg for arg in help_prompt.arguments or []}
+    assert "task" in args
+    assert args["task"].description
+    assert any(
+        token in (args["task"].description or "")
+        for token in ("clinical_review", "batch_screen", "search_first")
+    )
+
+
+@pytest.mark.asyncio
+async def test_pvs1_workflow_help_clinical_review_describes_tool_chain() -> None:
+    mcp: FastMCP = build_mcp_server()
+    rendered = await mcp.render_prompt(
+        "pvs1_workflow_help",
+        {"task": "clinical_review"},
+    )
+    body = rendered.messages[0].content.text
+    assert "get_variant_pvs1_data" in body
+    assert "response_mode" in body
+    assert "research-use" in body or "research use" in body
+
+
+@pytest.mark.asyncio
+async def test_pvs1_workflow_help_batch_screen_describes_bulk_chain() -> None:
+    mcp: FastMCP = build_mcp_server()
+    rendered = await mcp.render_prompt(
+        "pvs1_workflow_help",
+        {"task": "batch_screen"},
+    )
+    body = rendered.messages[0].content.text
+    assert "get_variants_pvs1_data_bulk" in body
+    assert "continue_on_error" in body
+
+
+@pytest.mark.asyncio
+async def test_pvs1_workflow_help_search_first_describes_resolution_chain() -> None:
+    mcp: FastMCP = build_mcp_server()
+    rendered = await mcp.render_prompt(
+        "pvs1_workflow_help",
+        {"task": "search_first"},
+    )
+    body = rendered.messages[0].content.text
+    assert "search_variants" in body
+    assert "next_cursor" in body

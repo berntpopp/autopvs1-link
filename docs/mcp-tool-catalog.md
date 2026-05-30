@@ -3308,6 +3308,18 @@ Provide as a JSON string matching the following schema: {"type":"string"}
 
 Provide as a JSON string matching the following schema: {"type":"string"}
 
+### `pvs1_workflow_help`
+
+Title: AutoPVS1 Workflow Guidance
+
+Return concrete tool-chain guidance for one of three tasks: clinical_review, batch_screen, or search_first.
+
+#### Arguments
+
+- `task` (required): One of clinical_review, batch_screen, or search_first.
+
+Provide as a JSON string matching the following schema: {"type":"string"}
+
 ## Resources
 
 - `autopvs1-link://cache/statistics` - Read-only snapshot of in-memory cache hit/miss/eviction counts and timing per cached service method (variant, CNV, search).
