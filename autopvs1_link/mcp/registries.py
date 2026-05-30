@@ -39,6 +39,11 @@ KNOWN_ERROR_CODES: dict[str, str] = {
     "upstream_unavailable": "Upstream unreachable or HTTP 5xx.",
     "destructive_disabled": ("clear_cache requires AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true."),
     "internal_error": "Unexpected server error; retry once with backoff.",
+    "requires_disambiguation": (
+        "Auto-resolution of an rsID/HGVS input returned multiple "
+        "candidates; caller must pick one. details.candidates carries "
+        "id + gene + variant_type + genome_build + resource_uri rows."
+    ),
 }
 
 KNOWN_WARNING_CODES: dict[str, str] = {
@@ -49,6 +54,11 @@ KNOWN_WARNING_CODES: dict[str, str] = {
     "pvs1_not_applicable": "Upstream returned a non-scorable sentinel.",
     "search_results_truncated": "Page truncated; use next_cursor.",
     "unsupported_hgvs_like_search": "HGVS-like text returned zero results.",
+    "auto_resolved": (
+        "An rsID/HGVS variant_id was auto-resolved to canonical SPDI via "
+        "search_variants. The warning carries the original input, the "
+        "resolved id, and the detected input form."
+    ),
 }
 
 PAYLOAD_MODES: dict[str, PayloadModeSpec] = {

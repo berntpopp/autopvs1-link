@@ -840,6 +840,152 @@ async def test_variant_standard_mode_drops_null_default_fields_from_wire(mocker)
 
 
 @pytest.mark.asyncio
+async def test_variant_auto_resolves_rsid_to_canonical_with_warning(mocker) -> None:
+    """rsID input triggers internal search + scores the sole hit + warns.
+
+    LLM-consumer reclaim from pass-2 (8.8/10): "An rsID or HGVS would
+    force search_variants first. Auto-resolving common ID forms in
+    get_variant_pvs1_data would save a round-trip." Single-hit case.
+    """
+    search_fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(
+            query="rs80357906",
+            genome_version="hg38",
+            results=[
+                SearchResult(
+                    variant_id="17-43094692-G-A",
+                    gene="BRCA1",
+                    variant_type="Nonsense",
+                    genome_build="hg38",
+                    url="https://autopvs1.bgi.com/variant/hg38/17-43094692-G-A",
+                ),
+            ],
+        )
+    )
+    score_fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "rs80357906"},
+    )
+    payload = result.structured_content
+    assert payload["ok"] is True, payload
+    codes = [w["code"] for w in payload["meta"]["warnings"]]
+    assert "auto_resolved" in codes
+    # Score call uses the resolved canonical id, not the raw rsID.
+    score_fake.assert_awaited_once_with("hg38", "17-43094692-G-A")
+    # Search call uses caller's genome_build (build-drift mitigation).
+    search_fake.assert_awaited_once_with("rs80357906", "hg38")
+
+
+@pytest.mark.asyncio
+async def test_variant_auto_resolution_requires_disambiguation_on_multi(mocker) -> None:
+    """Multiple resolver hits MUST surface as ``requires_disambiguation``.
+
+    Mitigates the silent-multi-allelic mis-scoring failure mode (VEP #989):
+    never collapse to "best guess" by ALT-allele frequency. Always force the
+    caller to pick.
+    """
+    search_fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(
+            query="NM_007294.4:c.5266dup",
+            genome_version="hg38",
+            results=[
+                SearchResult(
+                    variant_id="17-43094692-G-A",
+                    gene="BRCA1",
+                    variant_type="Nonsense",
+                    genome_build="hg38",
+                    url="https://autopvs1.bgi.com/variant/hg38/17-43094692-G-A",
+                ),
+                SearchResult(
+                    variant_id="17-43094692-GC-G",
+                    gene="BRCA1",
+                    variant_type="Frameshift",
+                    genome_build="hg38",
+                    url="https://autopvs1.bgi.com/variant/hg38/17-43094692-GC-G",
+                ),
+            ],
+        )
+    )
+    score_fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "NM_007294.4:c.5266dup"},
+    )
+    payload = result.structured_content
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "requires_disambiguation"
+    candidates = payload["error"]["details"]["candidates"]
+    assert {c["id"] for c in candidates} == {"17-43094692-G-A", "17-43094692-GC-G"}
+    # Disambiguators must include gene + variant_type (peer pattern, SysNDD shape).
+    assert all("gene" in c and "variant_type" in c for c in candidates)
+    # No score call was made — disambiguation must NOT silently best-guess.
+    score_fake.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_variant_auto_resolution_zero_hits_returns_not_found(mocker) -> None:
+    """rsID with no resolver hits surfaces as ``not_found``.
+
+    The error suggestion points the caller at search_variants so the LLM
+    can broaden the query without inventing a different tool to call.
+    """
+    search_fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(
+            query="rs0000000000",
+            genome_version="hg38",
+            results=[],
+        )
+    )
+    score_fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "rs0000000000"},
+    )
+    payload = result.structured_content
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "not_found"
+    score_fake.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_variant_canonical_id_does_not_call_search(mocker) -> None:
+    """Canonical input must NOT trigger an extra upstream search call.
+
+    Mitigates the hidden-cost-spike failure mode: only non-canonical
+    forms pay the extra upstream hop.
+    """
+    search_fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(query="x", genome_version="hg38", results=[])
+    )
+    score_fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "X-82763936-A-T"},
+    )
+    payload = result.structured_content
+    assert payload["ok"] is True
+    score_fake.assert_awaited_once_with("hg38", "X-82763936-A-T")
+    search_fake.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_search_clamped_limit_emits_warning(mocker) -> None:
     fake = AsyncMock(
         return_value=AutoPVS1SearchResults(query="MYH9", genome_version="hg38", results=[])

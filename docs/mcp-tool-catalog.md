@@ -1822,6 +1822,12 @@ Return local MCP server health without contacting AutoPVS1 upstream.
 
 Score one SNV/indel variant with the AutoPVS1 PVS1 rules.
 
+Auto-resolves non-canonical inputs (rsID, HGVS c./p./g.) into
+canonical SPDI via one upstream search call before scoring;
+emits an ``auto_resolved`` warning. Ambiguous resolutions return
+``requires_disambiguation`` with ranked candidates instead of
+silently picking one (mitigates multi-allelic mis-scoring).
+
 First-turn LLM callers: pass ``response_mode='summary'`` to receive
 the verdict (preliminary path + final strength) under ~1.5KB.
 Widen to ``response_mode='standard'`` only when the user asks for
@@ -1869,7 +1875,7 @@ clinical decision support.
       "type": "string"
     },
     "variant_id": {
-      "description": "Variant identifier, for example X-82763936-A-T.",
+      "description": "Variant identifier. Canonical SPDI (CHROM-POS-REF-ALT, e.g. X-82763936-A-T) scores in one upstream call. rsID (rs80357906) or HGVS (NM_007294.4:c.5266dup, NP_000050.2:p.Glu1756fs, GRCh38(NC_000017.11):g.43091983C>A) auto-resolves via search_variants then scores. Multiple resolver hits return error.code='requires_disambiguation' with candidates in details.candidates \u2014 caller picks one.",
       "type": "string"
     }
   },

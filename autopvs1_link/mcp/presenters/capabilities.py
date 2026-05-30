@@ -323,4 +323,40 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "Outputs are research-use data and require domain review.",
         ],
         "performance": _PERFORMANCE_BLOCK,
+        "auto_resolution": _AUTO_RESOLUTION_BLOCK,
     }
+
+
+_AUTO_RESOLUTION_BLOCK: dict[str, Any] = {
+    "tool": "get_variant_pvs1_data",
+    "summary": (
+        "Auto-resolves non-canonical variant_id inputs (rsID, HGVS c./p./g.) "
+        "to canonical CHROM-POS-REF-ALT via one upstream search_variants "
+        "call before scoring."
+    ),
+    "accepted_forms": {
+        "canonical": "CHROM-POS-REF-ALT (e.g. X-82763936-A-T) — no extra upstream call",
+        "rsid": "rs<digits> (lowercase rs required, e.g. rs80357906)",
+        "hgvs_c": "NM_*/NR_*/ENST*:c.* or :n.* (e.g. NM_007294.4(BRCA1):c.5266dup)",
+        "hgvs_p": "NP_*/ENSP*:p.* (e.g. NP_000050.2:p.Glu1756fs)",
+        "hgvs_g": "[GRCh3[78](]NC_*:g.* (e.g. GRCh38(NC_000017.11):g.43091983C>A)",
+    },
+    "outcomes": {
+        "single_hit": (
+            "Scored with the resolved canonical id; auto_resolved warning "
+            "carries the original input + resolved id + detected form."
+        ),
+        "zero_hits": "error.code='not_found' with search_variants suggestion.",
+        "multi_hit": (
+            "error.code='requires_disambiguation' with candidates list in "
+            "details.candidates. Each candidate: id, gene, variant_type, "
+            "genome_build, resource_uri. Caller picks one and re-calls. "
+            "Server never silently best-guesses to avoid multi-allelic "
+            "mis-scoring (Ensembl VEP #989 failure mode)."
+        ),
+    },
+    "build_safety": (
+        "Resolver call is build-scoped to caller's genome_build so "
+        "resolution and scoring share the same coordinate frame."
+    ),
+}

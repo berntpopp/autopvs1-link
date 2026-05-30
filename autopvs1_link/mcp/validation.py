@@ -5,12 +5,80 @@ from __future__ import annotations
 import base64
 import json
 import re
+from typing import Literal
 
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.errors import MCPInputError
 
 VALID_GENOME_BUILDS = {"hg19", "hg38"}
 VARIANT_ID_RE = re.compile(r"^(?:[1-9]|1[0-9]|2[0-2]|X|Y|MT)-[1-9][0-9]*-[ACGTN]+-[ACGTN]+$")
+
+# Sniffer regexes for non-canonical variant inputs. These detect the input
+# FORM only — real validation is the upstream search_variants call. The
+# patterns intentionally permit slightly noisier inputs than the HGVS
+# spec strictly allows (e.g. ``chr`` prefix on canonical SPDI) because
+# the LLM-facing surface should be forgiving while staying unambiguous.
+#
+# Authoritative refs:
+# - HGVS Nomenclature (https://hgvs-nomenclature.org/stable/recommendations/general/)
+# - NCBI dbSNP rsID format: lowercase ``rs`` + digits (no length cap, but
+#   12 covers every assigned id and protects against pathological inputs)
+_CANONICAL_SPDI_LOOSE_RE = re.compile(
+    r"^(?:chr)?(?:[1-9]|1[0-9]|2[0-2]|X|Y|M|MT)-[1-9][0-9]*-[ACGTN]+-[ACGTN]+$",
+    re.IGNORECASE,
+)
+_RSID_RE = re.compile(r"^rs\d{1,12}$")  # lowercase 'rs' required per dbSNP FAQ
+_HGVS_C_RE = re.compile(
+    # NM/NR/LRG use ``_`` separator (NM_000059); Ensembl uses no separator
+    # (ENST00000357654). Gene parenthetical is optional. Cover ``n.`` too —
+    # noncoding RNA HGVS uses NR_ + n.* on the same shape.
+    r"^(?:(?:NM|NR|LRG)_|ENST)\d+(?:\.\d+)?(?:\([A-Z0-9-]+\))?:[cn]\.\S+$",
+    re.IGNORECASE,
+)
+_HGVS_P_RE = re.compile(
+    r"^(?:NP_|ENSP)\d+(?:\.\d+)?(?:\([A-Z0-9-]+\))?:p\.\S+$",
+    re.IGNORECASE,
+)
+_HGVS_G_RE = re.compile(
+    r"^(?:GRCh3[78]\()?NC_\d+(?:\.\d+)?\)?:g\.\S+$",
+    re.IGNORECASE,
+)
+
+VariantInputForm = Literal["canonical", "rsid", "hgvs_c", "hgvs_p", "hgvs_g", "unknown"]
+
+
+def classify_variant_input(text: object) -> VariantInputForm:
+    """Classify a variant_id input as canonical SPDI, rsID, HGVS, or unknown.
+
+    Whitespace inside ``text`` is rejected (returns ``unknown``) because
+    HGVS Nomenclature forbids internal spaces and an embedded space in
+    any of these forms is overwhelmingly a copy-paste artefact, not a
+    real id. Leading/trailing whitespace is tolerated and stripped.
+
+    Uppercase ``RS123`` is intentionally rejected: per the dbSNP FAQ,
+    the canonical form is lowercase ``rs``, and silently lowercasing the
+    input hides a normalization bug from the LLM caller. Surface as
+    ``unknown`` so the variant tool returns a clean invalid_variant_id
+    pointing at the canonical form.
+    """
+    if not isinstance(text, str):
+        return "unknown"
+    stripped = text.strip()
+    if not stripped or any(c.isspace() for c in stripped):
+        return "unknown"
+    if _CANONICAL_SPDI_LOOSE_RE.fullmatch(stripped):
+        return "canonical"
+    if _RSID_RE.fullmatch(stripped):  # case-sensitive — rejects "RS123"
+        return "rsid"
+    if _HGVS_C_RE.fullmatch(stripped):
+        return "hgvs_c"
+    if _HGVS_P_RE.fullmatch(stripped):
+        return "hgvs_p"
+    if _HGVS_G_RE.fullmatch(stripped):
+        return "hgvs_g"
+    return "unknown"
+
+
 CNV_ID_RE = re.compile(
     r"^(?P<chrom>[1-9]|1[0-9]|2[0-2]|X|Y|MT)-(?P<start>[1-9][0-9]*)-"
     r"(?P<end>[1-9][0-9]*)-(?P<type>DEL|DUP)$"

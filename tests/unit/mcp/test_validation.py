@@ -9,12 +9,61 @@ from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.validation import (
     _decode_cursor,
     _encode_cursor,
+    classify_variant_input,
     normalize_cnv_id,
     normalize_genome_builds,
     normalize_limit_cursor,
     normalize_search_query,
     normalize_variant_id,
 )
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        # Canonical SPDI with chrom variants and chr prefix.
+        ("X-82763936-A-T", "canonical"),
+        ("chr1-12345-A-T", "canonical"),
+        ("MT-100-G-C", "canonical"),
+        ("M-100-G-C", "canonical"),
+        # Leading/trailing whitespace tolerated.
+        ("  17-12345-AC-A  ", "canonical"),
+        # rsID — lowercase required per dbSNP FAQ.
+        ("rs80357906", "rsid"),
+        ("RS80357906", "unknown"),
+        ("rs0", "rsid"),
+        ("rs", "unknown"),
+        ("rs1234567890123", "unknown"),
+        # HGVS coding: NM_/NR_/LRG_ with underscore; ENST without; gene parenthetical.
+        ("NM_000059.3:c.5266dup", "hgvs_c"),
+        ("NM_007294.4(BRCA1):c.5266dup", "hgvs_c"),
+        ("ENST00000357654:c.5266dup", "hgvs_c"),
+        ("NR_002196.2:n.123A>G", "hgvs_c"),
+        # HGVS protein.
+        ("NP_000050.2:p.Glu1756fs", "hgvs_p"),
+        ("ENSP00000350283:p.Glu1756fs", "hgvs_p"),
+        # HGVS genomic with and without GRCh build wrapper.
+        ("NC_000017.10:g.41197709C>A", "hgvs_g"),
+        ("GRCh38(NC_000017.11):g.43091983C>A", "hgvs_g"),
+        # Whitespace inside is rejected (HGVS forbids).
+        ("rs 12345", "unknown"),
+        ("NM_000059.3:c.5266 dup", "unknown"),
+        # Empty / non-string / junk.
+        ("", "unknown"),
+        ("   ", "unknown"),
+        ("not a variant", "unknown"),
+        ("BRCA1", "unknown"),
+    ],
+)
+def test_classify_variant_input_covers_canonical_rsid_hgvs_and_junk(
+    text: str, expected: str
+) -> None:
+    assert classify_variant_input(text) == expected
+
+
+def test_classify_variant_input_rejects_non_string() -> None:
+    assert classify_variant_input(None) == "unknown"
+    assert classify_variant_input(12345) == "unknown"
 
 
 def test_normalize_variant_id_accepts_autopvs1_examples() -> None:

@@ -6,6 +6,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Auto-resolution of non-canonical `variant_id` inputs** in
+  `get_variant_pvs1_data`. rsID (`rs80357906`), HGVS coding
+  (`NM_007294.4(BRCA1):c.5266dup`), HGVS protein
+  (`NP_000050.2:p.Glu1756fs`), and HGVS genomic
+  (`GRCh38(NC_000017.11):g.43091983C>A`) are now recognized by a
+  pre-flight sniffer that classifies the form, then a single
+  build-scoped `search_variants` call resolves to canonical SPDI.
+  Single-hit case scores immediately and emits an `auto_resolved`
+  warning carrying the original input + resolved id + detected form.
+  Multi-hit case returns the new structured error
+  `requires_disambiguation` with candidate rows ({id, gene,
+  variant_type, genome_build, resource_uri}) in `details.candidates`
+  — the server **never silently best-guesses**, which mitigates the
+  multi-allelic mis-scoring failure mode (Ensembl VEP #989). Canonical
+  inputs are unchanged: zero extra upstream calls. Documented on the
+  detailed capabilities resource under `auto_resolution`.
+- **`meta.elapsed_ms` and `meta.cache_status`** echoed on every ok
+  envelope when an upstream call ran. The cache wrapper records into
+  a task-local `ContextVar`; the envelope reads it when assembling
+  meta. `cache_status` is one of `hit | miss | bypass`. Both fields
+  default `None` and drop from the wire for cheap tools
+  (`get_server_health`, `get_server_capabilities`) so LLM consumers
+  don't read misleading 0 ms readings.
+
 ### Fixed
 
 - **`search_variants` was completely broken on page 1.** The new
