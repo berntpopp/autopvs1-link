@@ -46,7 +46,18 @@ def register_metadata(mcp: FastMCP) -> None:
         """Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow."""
         return ok_envelope(present_compact_capabilities())
 
-    @mcp.resource("autopvs1-link://capabilities")
+    @mcp.resource(
+        "autopvs1-link://capabilities",
+        name="capabilities",
+        title="AutoPVS1-Link Capabilities Reference",
+        description=(
+            "Detailed MCP usage guidance: accepted formats, examples, search "
+            "behavior, error envelope, stable error and warning codes, cache "
+            "statistics URI, destructive-tool gating, citation, and known "
+            "upstream limitations."
+        ),
+        mime_type="application/json",
+    )
     def capabilities() -> dict[str, Any]:
         """Detailed MCP usage guidance, examples, limitations, and citation."""
         return detailed_capabilities_resource()

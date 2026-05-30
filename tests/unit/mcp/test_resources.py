@@ -39,6 +39,24 @@ async def test_initialize_advertises_listchanged_false() -> None:
 
 
 @pytest.mark.asyncio
+async def test_resources_advertise_json_mime_and_metadata() -> None:
+    """Spec (MCP 2025-06-18 / server/resources §Data Types — Resource):
+
+    Resource declarations should set mimeType, title, and description so
+    clients can present and parse them correctly.
+    """
+    mcp = build_mcp_server()
+    resources = await mcp.list_resources()
+    by_uri = {str(r.uri): r for r in resources}
+    cap = by_uri["autopvs1-link://capabilities"]
+    cache = by_uri["autopvs1-link://cache/statistics"]
+    for resource in (cap, cache):
+        assert resource.mime_type == "application/json"
+        assert resource.title
+        assert resource.description
+
+
+@pytest.mark.asyncio
 async def test_capabilities_tool_and_resource_are_not_duplicates() -> None:
     mcp = build_mcp_server()
 
