@@ -329,3 +329,103 @@ def test_every_recovery_hint_is_non_empty_and_actionable() -> None:
             assert isinstance(step, str) and step.strip(), (
                 f"{code}[{index}]: empty / non-string step {step!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Error-envelope cost-hint honesty (v1.2)
+# ---------------------------------------------------------------------------
+
+
+def test_error_envelope_drops_cost_tier_for_input_errors() -> None:
+    """Permanent input errors short-circuit before upstream — drop the cost hint.
+
+    Pre-fix: invalid_genome_build echoed cost_tier='expensive_cold_cheap_warm'
+    and rate_limit_floor_ms=1000 even though no upstream call happened.
+    That misled cost-aware LLM dispatchers into budgeting a cost the
+    call never paid. The transient error codes (which DO hit upstream
+    and whose retry will too) keep the hints.
+    """
+    envelope = error_envelope(
+        code="invalid_genome_build",
+        message="bad build",
+        retryable=False,
+        tool_name="get_variant_pvs1_data",
+    )
+    assert "cost_tier" not in envelope["meta"]
+    assert "rate_limit_floor_ms" not in envelope["meta"]
+
+
+def test_error_envelope_drops_cost_tier_for_invalid_variant_id() -> None:
+    envelope = error_envelope(
+        code="invalid_variant_id",
+        message="bad",
+        retryable=False,
+        tool_name="get_variant_pvs1_data",
+    )
+    assert "cost_tier" not in envelope["meta"]
+    assert "rate_limit_floor_ms" not in envelope["meta"]
+
+
+def test_error_envelope_drops_cost_tier_for_requires_disambiguation() -> None:
+    """Multi-candidate resolver outcome doesn't retry — drop cost hints."""
+    envelope = error_envelope(
+        code="requires_disambiguation",
+        message="multi",
+        retryable=False,
+        tool_name="get_variant_pvs1_data",
+    )
+    assert "cost_tier" not in envelope["meta"]
+    assert "rate_limit_floor_ms" not in envelope["meta"]
+
+
+def test_error_envelope_keeps_cost_tier_for_upstream_unavailable() -> None:
+    """Transient upstream errors keep cost hints for retry budgeting."""
+    envelope = error_envelope(
+        code="upstream_unavailable",
+        message="down",
+        retryable=True,
+        tool_name="get_variant_pvs1_data",
+    )
+    assert envelope["meta"]["cost_tier"] == "expensive_cold_cheap_warm"
+    assert envelope["meta"]["rate_limit_floor_ms"] == 1000
+    assert envelope["meta"]["retry_after_ms"] == 1000
+
+
+def test_error_envelope_keeps_cost_tier_for_external_resolver_unavailable() -> None:
+    envelope = error_envelope(
+        code="external_resolver_unavailable",
+        message="recoder down",
+        retryable=True,
+        tool_name="get_variant_pvs1_data",
+    )
+    assert envelope["meta"]["cost_tier"] == "expensive_cold_cheap_warm"
+    assert envelope["meta"]["rate_limit_floor_ms"] == 1000
+
+
+def test_ok_envelope_bulk_mixed_aggregate_overrides_telemetry() -> None:
+    """ok_envelope must let bulk supply an aggregate, ignoring the ContextVar."""
+    from autopvs1_link.mcp.telemetry import record_upstream_call, reset_call_telemetry
+    from autopvs1_link.models.autopvs1_models import CNVInfo
+
+    # Seed the ContextVar to a per-item value the bulk tool wants to override.
+    record_upstream_call(elapsed_ms=99.0, cache_status="hit")
+    try:
+        envelope = ok_envelope(
+            CNVInfo(
+                cnv_id="11-2797090-2869333-DEL",
+                cnv_type="Deletion",
+                gene_symbol="GENE",
+                coordinates="11-2797090-2869333-DEL",
+            ),
+            tool_name="get_variants_pvs1_data_bulk",
+            cache_status_override="mixed",
+            elapsed_ms_override=1505.0,
+            cached_count=1,
+            uncached_count=1,
+        )
+        assert envelope["meta"]["cache_status"] == "mixed"
+        assert envelope["meta"]["elapsed_ms"] == 1505.0
+        assert envelope["meta"]["cached_count"] == 1
+        assert envelope["meta"]["uncached_count"] == 1
+    finally:
+        reset_call_telemetry()

@@ -14,11 +14,8 @@ from autopvs1_link.mcp.envelope import MCPError, MCPWarning
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import ResponseMode
 from autopvs1_link.mcp.presenters.variant import present_cnv, present_variant
-from autopvs1_link.mcp.validation import (
-    normalize_cnv_id,
-    normalize_genome_build,
-    normalize_variant_id,
-)
+from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
+from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
 
 def _retryable(status_code: int) -> bool:
@@ -58,10 +55,24 @@ async def run_variant_pvs1(
     response_mode: ResponseMode,
     include_unmet: Any,
 ) -> tuple[VariantMCPData | None, list[MCPWarning], MCPError | None]:
-    """Score one variant. Return (data, warnings, error) — exactly one of data/error is non-None."""
+    """Score one variant. Return (data, warnings, error) — exactly one of data/error is non-None.
+
+    Auto-resolves non-canonical inputs (rsID, HGVS c./p./g.) via Ensembl
+    Variant Recoder before scoring, matching the single-tool behavior so
+    bulk callers don't silently regress on identifiers that worked
+    one-at-a-time. Multi-candidate resolutions return a per-item
+    ``requires_disambiguation`` error so the caller picks the canonical
+    id and re-calls; resolver outage returns the retryable
+    ``external_resolver_unavailable`` code.
+    """
     try:
         normalized_build = normalize_genome_build(genome_build)
-        normalized_variant_id = normalize_variant_id(variant_id)
+    except MCPInputError as exc:
+        return None, [], _from_input_error(exc)
+    try:
+        normalized_variant_id, resolution_warnings = await resolve_or_normalize_variant_id(
+            variant_id, normalized_build
+        )
     except MCPInputError as exc:
         return None, [], _from_input_error(exc)
     try:
@@ -72,7 +83,7 @@ async def run_variant_pvs1(
             response_mode=response_mode,
             include_unmet=include_unmet,
         )
-        return data, warnings, None
+        return data, resolution_warnings + warnings, None
     except httpx.TimeoutException:
         return (
             None,

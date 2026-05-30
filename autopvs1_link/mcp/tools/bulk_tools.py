@@ -13,6 +13,7 @@ from autopvs1_link.mcp.contracts import (
     BulkCNVPVS1ResultItem,
     BulkCNVsMCPData,
     BulkCNVsMCPEnvelope,
+    BulkPerItemMeta,
     BulkVariantPVS1InputItem,
     BulkVariantPVS1ResultItem,
     BulkVariantsMCPData,
@@ -25,8 +26,47 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_meta_mode,
     normalize_response_mode,
 )
+from autopvs1_link.mcp.telemetry import get_call_telemetry, reset_call_telemetry
 from autopvs1_link.mcp.tools._pvs1_runners import run_cnv_pvs1, run_variant_pvs1
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
+
+_WARM_CACHE_STATUSES = frozenset({"hit", "coalesced"})
+_COLD_CACHE_STATUSES = frozenset({"miss", "bypass"})
+
+
+def _aggregate_cache(
+    per_item_statuses: list[str | None],
+    per_item_elapsed: list[float | None],
+) -> dict[str, Any]:
+    """Compute aggregate cache observability from per-item telemetry.
+
+    Returns kwargs ready to spread into :func:`ok_envelope`. The aggregate
+    ``cache_status`` is the single underlying value when all items agree
+    and ``"mixed"`` otherwise. ``cached_count`` / ``uncached_count`` are
+    populated only on a mixed batch so unanimous batches stay clean.
+    ``elapsed_ms_override`` is the SUM of per-item elapsed_ms (the
+    honest aggregate for a sequential bulk wall-time), or ``None`` when
+    no item touched upstream.
+    """
+    observed = [s for s in per_item_statuses if s is not None]
+    if not observed:
+        return {}
+    if len(set(observed)) == 1:
+        aggregate_status = observed[0]
+        kwargs: dict[str, Any] = {"cache_status_override": aggregate_status}
+    else:
+        cached = sum(1 for s in observed if s in _WARM_CACHE_STATUSES)
+        uncached = sum(1 for s in observed if s in _COLD_CACHE_STATUSES)
+        kwargs = {
+            "cache_status_override": "mixed",
+            "cached_count": cached,
+            "uncached_count": uncached,
+        }
+    elapsed_sum = sum(ms for ms in per_item_elapsed if ms is not None)
+    if elapsed_sum:
+        kwargs["elapsed_ms_override"] = round(elapsed_sum, 2)
+    return kwargs
+
 
 BULK_MAX_ITEMS = 10
 _VARIANTS_BULK_TOOL = "get_variants_pvs1_data_bulk"
@@ -227,12 +267,31 @@ def register(mcp: FastMCP) -> None:
         uncached 10-item batch can take ~10s wall time and a fully cached
         one returns in milliseconds.
 
-        Per-item envelope: each result has ``{ok, input, data, error}``.
-        Output items preserve input order. ``response_mode`` and
-        ``include_unmet`` apply per item; ``meta_mode`` applies to the outer
-        envelope only. Per-item input or upstream failures do not stop the
-        batch unless ``continue_on_error=false``. Bulk dispatch errors
-        (malformed ``items``) use error code ``invalid_bulk_input``.
+        Auto-resolution applies per item: non-canonical inputs (rsID,
+        HGVS c./p./g.) round-trip through Ensembl Variant Recoder before
+        scoring, mirroring ``get_variant_pvs1_data``. Multi-candidate
+        resolutions return per-item ``requires_disambiguation`` with
+        allele-keyed candidates so the caller picks one and re-calls that
+        single item; a resolver outage returns the retryable
+        ``external_resolver_unavailable`` code.
+
+        Per-item envelope: each result has ``{ok, input, data, error,
+        meta}`` where ``meta.cache_status`` and ``meta.elapsed_ms`` echo
+        that one upstream call's outcome (absent when the item
+        short-circuited before upstream). Output items preserve input
+        order. ``response_mode`` and ``include_unmet`` apply per item;
+        the outer ``meta_mode`` controls the envelope. Per-item failures
+        do not stop the batch unless ``continue_on_error=false``. Bulk
+        dispatch errors (malformed ``items``) use error code
+        ``invalid_bulk_input``.
+
+        Aggregate cache observability: top-level ``meta.cache_status``
+        echoes the unanimous status when every item agrees; on a mixed
+        batch it is ``"mixed"`` and ``meta.cached_count`` /
+        ``meta.uncached_count`` split items by warm
+        (``hit``+``coalesced``) vs cold (``miss``+``bypass``).
+        ``meta.elapsed_ms`` is the SUM of per-item upstream wall-clocks
+        (the honest total for a sequential bulk).
 
         Warning aggregation: per-item warnings are NOT echoed; they are
         collapsed into ``meta.warnings`` at the top level. A warning code
@@ -267,13 +326,30 @@ def register(mcp: FastMCP) -> None:
 
         results: list[BulkVariantPVS1ResultItem] = []
         aggregated_warnings: list[tuple[int, MCPWarning]] = []
+        per_item_cache_status: list[str | None] = []
+        per_item_elapsed_ms: list[float | None] = []
         keep_going = bool(continue_on_error) if isinstance(continue_on_error, bool) else True
         for index, item in enumerate(parsed_items):
+            # Reset BEFORE each item so the ContextVar reflects only this
+            # item's upstream call (or stays None for items that
+            # short-circuited before upstream).
+            reset_call_telemetry()
             data, warnings, error = await run_variant_pvs1(
                 genome_build=item.genome_build,
                 variant_id=item.variant_id,
                 response_mode=normalized_response_mode,
                 include_unmet=include_unmet,
+            )
+            item_elapsed, item_cache = get_call_telemetry()
+            per_item_cache_status.append(item_cache)
+            per_item_elapsed_ms.append(item_elapsed)
+            item_meta = (
+                BulkPerItemMeta(
+                    cache_status=item_cache,
+                    elapsed_ms=round(item_elapsed, 2) if item_elapsed is not None else None,
+                )
+                if item_cache is not None
+                else None
             )
             results.append(
                 BulkVariantPVS1ResultItem(
@@ -281,6 +357,7 @@ def register(mcp: FastMCP) -> None:
                     input=item,
                     data=data,
                     error=error,
+                    meta=item_meta,
                 )
             )
             aggregated_warnings.extend((index, w) for w in warnings)
@@ -300,11 +377,13 @@ def register(mcp: FastMCP) -> None:
             failed=failed,
             items=results,
         )
+        aggregate_kwargs = _aggregate_cache(per_item_cache_status, per_item_elapsed_ms)
         return ok_envelope(
             payload,
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_VARIANTS_BULK_TOOL,
+            **aggregate_kwargs,
         )
 
     @mcp.tool(
@@ -370,11 +449,18 @@ def register(mcp: FastMCP) -> None:
         For LLM batch screens, default to ``response_mode='summary'`` so
         10 verdicts share one turn budget. Same semantics as
         ``get_variants_pvs1_data_bulk``: sequential server-side, respects
-        upstream rate limit + cache; per-item ``{ok, input, data,
-        error}``; output items preserve input order; ``response_mode``
-        and ``include_unmet`` apply per item; ``meta_mode`` applies to
-        the outer envelope only. Per-item failures do not stop the batch
-        unless ``continue_on_error=false``.
+        upstream rate limit + cache; per-item ``{ok, input, data, error,
+        meta}`` with ``meta.cache_status`` + ``meta.elapsed_ms`` echoing
+        each item's upstream outcome; output items preserve input order;
+        ``response_mode`` and ``include_unmet`` apply per item; the outer
+        ``meta_mode`` controls the envelope. Per-item failures do not
+        stop the batch unless ``continue_on_error=false``.
+
+        Aggregate cache observability: top-level ``meta.cache_status``
+        is ``"mixed"`` when items had varied outcomes (with
+        ``cached_count`` / ``uncached_count``) or echoes the unanimous
+        status. ``meta.elapsed_ms`` is the SUM of per-item upstream
+        wall-clocks.
 
         Warning aggregation: per-item warnings collapse into
         ``meta.warnings``; codes emitted by more than one distinct item
@@ -406,13 +492,27 @@ def register(mcp: FastMCP) -> None:
 
         results: list[BulkCNVPVS1ResultItem] = []
         aggregated_warnings: list[tuple[int, MCPWarning]] = []
+        per_item_cache_status: list[str | None] = []
+        per_item_elapsed_ms: list[float | None] = []
         keep_going = bool(continue_on_error) if isinstance(continue_on_error, bool) else True
         for index, item in enumerate(parsed_items):
+            reset_call_telemetry()
             data, warnings, error = await run_cnv_pvs1(
                 genome_build=item.genome_build,
                 cnv_id=item.cnv_id,
                 response_mode=normalized_response_mode,
                 include_unmet=include_unmet,
+            )
+            item_elapsed, item_cache = get_call_telemetry()
+            per_item_cache_status.append(item_cache)
+            per_item_elapsed_ms.append(item_elapsed)
+            item_meta = (
+                BulkPerItemMeta(
+                    cache_status=item_cache,
+                    elapsed_ms=round(item_elapsed, 2) if item_elapsed is not None else None,
+                )
+                if item_cache is not None
+                else None
             )
             results.append(
                 BulkCNVPVS1ResultItem(
@@ -420,6 +520,7 @@ def register(mcp: FastMCP) -> None:
                     input=item,
                     data=data,
                     error=error,
+                    meta=item_meta,
                 )
             )
             aggregated_warnings.extend((index, w) for w in warnings)
@@ -439,9 +540,11 @@ def register(mcp: FastMCP) -> None:
             failed=failed,
             items=results,
         )
+        aggregate_kwargs = _aggregate_cache(per_item_cache_status, per_item_elapsed_ms)
         return ok_envelope(
             payload,
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_CNVS_BULK_TOOL,
+            **aggregate_kwargs,
         )

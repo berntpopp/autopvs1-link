@@ -49,6 +49,42 @@ def format_pli_score(value: float | None) -> str | None:
     return f"{value:.4g}"
 
 
+_AMBIGUOUS_VERDICT_STRENGTHS = frozenset(
+    {
+        "Moderate",
+        "Supporting",
+        "Unmet",
+        "PVS1_Not_Applicable",
+        "PVS1_Not_Determined",
+    }
+)
+
+
+def _terminal_note(
+    *,
+    presented_steps: list[dict[str, Any]],
+    notes: dict[str, str],
+    preliminary_decision_path: str,
+) -> str | None:
+    """Return the one-line rationale for the leaf of the decision tree.
+
+    Prefers the last step's hoisted ``note_text`` because that is the
+    actual leaf the path landed on. Falls back to
+    ``notes[preliminary_decision_path]`` when the upstream tree is empty
+    (some non-applicable verdicts arrive with no steps). Returns ``None``
+    when neither source provides a non-empty note so callers can drop the
+    field instead of shipping an empty string.
+    """
+    for step in reversed(presented_steps):
+        text = step.get("note_text")
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+    fallback = notes.get(preliminary_decision_path)
+    if isinstance(fallback, str) and fallback.strip():
+        return fallback.strip()
+    return None
+
+
 def _present_flowchart(
     flowchart: BaseModel | dict[str, Any],
     *,
@@ -95,11 +131,26 @@ def _present_flowchart(
 
     raw["decision_tree"] = presented_steps
     if response_mode == "summary":
-        raw = {
+        summary: dict[str, Any] = {
             "preliminary_decision_path": raw["preliminary_decision_path"],
             "final_strength": raw["final_strength"],
             "final_strength_source": raw["final_strength_source"],
         }
+        # Surface the leaf rationale when the verdict is ambiguous so a
+        # summary-mode caller can explain why a non-Strong/Very-Strong
+        # outcome landed where it did, without paying the round-trip to
+        # widen to standard. Strong / Very_Strong verdicts already
+        # convey the rationale via the path code and the note adds no
+        # signal worth ~80 bytes.
+        if final_strength in _AMBIGUOUS_VERDICT_STRENGTHS:
+            note = _terminal_note(
+                presented_steps=presented_steps,
+                notes=notes,
+                preliminary_decision_path=raw["preliminary_decision_path"],
+            )
+            if note is not None:
+                summary["terminal_note"] = note
+        raw = summary
     elif response_mode == "full":
         raw["decision_tree_raw"] = raw_decision_tree
     else:

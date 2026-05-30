@@ -88,8 +88,10 @@ _TOOL_SUMMARIES: dict[str, dict[str, Any]] = {
     "get_variants_pvs1_data_bulk": {
         "purpose": (
             "Bulk PVS1 scoring for 1-10 SNV/indel variants in one "
-            "call. Default response_mode is 'summary' so 10 verdicts "
-            "fit one turn budget."
+            "call. Auto-resolves rsID and HGVS inputs per item via "
+            "Ensembl Variant Recoder (same as get_variant_pvs1_data). "
+            "Default response_mode is 'summary' so 10 verdicts fit "
+            "one turn budget."
         ),
         "example": {
             "items": [
@@ -303,6 +305,17 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "the caller overrides it (e.g. from a 429 Retry-After "
                 "header)."
             ),
+            "cost_hint_semantics": (
+                "meta.cost_tier and meta.rate_limit_floor_ms appear on "
+                "an error envelope ONLY when the call drove an upstream "
+                "request whose retry will too — i.e. the transient codes "
+                "upstream_timeout, upstream_unavailable, and "
+                "external_resolver_unavailable. Permanent input errors "
+                "(invalid_*, requires_disambiguation, not_found, "
+                "destructive_disabled) short-circuit before upstream and "
+                "drop the cost hints so callers do not budget a cost "
+                "this call never paid."
+            ),
         },
         "payload_modes": {
             mode: {"char_budget": spec["char_budget"], "note": spec["note"]}
@@ -322,6 +335,16 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "Empty list in summary; present in standard and full. "
                 "Use standard tier when an LLM needs to explain the path."
             ),
+            "pvs1_flowchart.terminal_note": (
+                "Surfaced in summary mode when final_strength is "
+                "ambiguous (Moderate, Supporting, Unmet, or one of the "
+                "PVS1_Not_* sentinels). Hoisted from the leaf step's "
+                "note_text — explains why the verdict landed where it "
+                "did so summary-mode callers don't need to widen to "
+                "standard just to read the rationale. Absent for "
+                "Strong / Very_Strong verdicts whose path code already "
+                "conveys the rationale."
+            ),
         },
         "bulk_behavior": {
             "max_items": 10,
@@ -331,11 +354,25 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "worst_case_latency_seconds": 10,
             "continue_on_error_default": True,
             "ordering": "preserves input order",
+            "auto_resolves_per_item": True,
+            "auto_resolution_note": (
+                "Each item is routed through the same Ensembl Variant "
+                "Recoder resolver as get_variant_pvs1_data, so rsID and "
+                "HGVS inputs work uniformly across the single and bulk "
+                "surfaces. Multi-candidate resolutions emit per-item "
+                "requires_disambiguation; resolver outage emits per-item "
+                "external_resolver_unavailable (retryable)."
+            ),
             "per_item_envelope": {
                 "ok": "bool",
                 "input": "object",
                 "data": "object|null",
                 "error": "object|null",
+                "meta": (
+                    "object|null — {cache_status, elapsed_ms} for this "
+                    "one item's upstream call; absent when the item "
+                    "short-circuited before upstream."
+                ),
             },
             "applies_response_mode_per_item": True,
             "applies_meta_mode_top_level_only": True,
@@ -346,11 +383,20 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "fields": ("count and affected_indices populated; absent on single-item codes"),
                 "ordering": "first-seen-code-first",
             },
+            "cache_status_aggregation": (
+                "Top-level meta.cache_status echoes the unanimous "
+                "per-item status when every item agrees, or 'mixed' "
+                "when items had varied outcomes. On 'mixed', "
+                "meta.cached_count and meta.uncached_count split items "
+                "by warm (hit+coalesced) vs cold (miss+bypass). "
+                "Top-level meta.elapsed_ms is the SUM of per-item "
+                "upstream wall-clocks (honest sequential bulk total)."
+            ),
         },
         "cache_statistics": {
             "resource": "autopvs1-link://cache/statistics",
             "semantics": ("Method-keyed counters with stable keys and cache key shapes."),
-            "wire_cache_status_values": ["hit", "miss", "coalesced", "bypass"],
+            "wire_cache_status_values": ["hit", "miss", "coalesced", "bypass", "mixed"],
             "wire_cache_status_notes": (
                 "meta.cache_status on each ok envelope is one of: 'hit' "
                 "(cache pre-populated; instant return), 'miss' (we drove "
@@ -358,9 +404,13 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "'coalesced' (another concurrent call's miss was already "
                 "in flight; we shared its future and waited — elapsed_ms "
                 "reflects the populator's wait, NOT a true hit), 'bypass' "
-                "(caching disabled). Honest 'coalesced' protects LLM "
-                "consumers from concluding that hits are slow when they "
-                "are really waiting on a sibling's miss."
+                "(caching disabled). The bulk surfaces additionally emit "
+                "'mixed' at the top level when per-item outcomes vary "
+                "and pair it with cached_count + uncached_count so an "
+                "LLM dispatcher can forecast cost without parsing every "
+                "item. Honest 'coalesced' protects LLM consumers from "
+                "concluding that hits are slow when they are really "
+                "waiting on a sibling's miss."
             ),
         },
         "destructive_tools": {

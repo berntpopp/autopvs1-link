@@ -213,7 +213,7 @@ not clinical decision support.
             "pvs1_flowchart": {
               "anyOf": [
                 {
-                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
+                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
                   "properties": {
                     "decision_tree": {
                       "items": {
@@ -316,6 +316,18 @@ not clinical decision support.
                     "preliminary_decision_path": {
                       "title": "Preliminary Decision Path",
                       "type": "string"
+                    },
+                    "terminal_note": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Terminal Note"
                     }
                   },
                   "required": [
@@ -400,7 +412,7 @@ not clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -413,6 +425,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Count"
         },
         "cost_tier": {
           "anyOf": [
@@ -542,6 +566,18 @@ not clinical decision support.
           "title": "Server Version",
           "type": "string"
         },
+        "uncached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncached Count"
+        },
         "warnings": {
           "items": {
             "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
@@ -620,11 +656,18 @@ Prefer this over ``get_cnv_pvs1_data`` when you have 2+ CNV IDs.
 For LLM batch screens, default to ``response_mode='summary'`` so
 10 verdicts share one turn budget. Same semantics as
 ``get_variants_pvs1_data_bulk``: sequential server-side, respects
-upstream rate limit + cache; per-item ``{ok, input, data,
-error}``; output items preserve input order; ``response_mode``
-and ``include_unmet`` apply per item; ``meta_mode`` applies to
-the outer envelope only. Per-item failures do not stop the batch
-unless ``continue_on_error=false``.
+upstream rate limit + cache; per-item ``{ok, input, data, error,
+meta}`` with ``meta.cache_status`` + ``meta.elapsed_ms`` echoing
+each item's upstream outcome; output items preserve input order;
+``response_mode`` and ``include_unmet`` apply per item; the outer
+``meta_mode`` controls the envelope. Per-item failures do not
+stop the batch unless ``continue_on_error=false``.
+
+Aggregate cache observability: top-level ``meta.cache_status``
+is ``"mixed"`` when items had varied outcomes (with
+``cached_count`` / ``uncached_count``) or echoes the unanimous
+status. ``meta.elapsed_ms`` is the SUM of per-item upstream
+wall-clocks.
 
 Warning aggregation: per-item warnings collapse into
 ``meta.warnings``; codes emitted by more than one distinct item
@@ -866,7 +909,7 @@ not. Order is first-seen-code-first.
                           "pvs1_flowchart": {
                             "anyOf": [
                               {
-                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
+                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
                                 "properties": {
                                   "decision_tree": {
                                     "items": {
@@ -969,6 +1012,18 @@ not. Order is first-seen-code-first.
                                   "preliminary_decision_path": {
                                     "title": "Preliminary Decision Path",
                                     "type": "string"
+                                  },
+                                  "terminal_note": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Terminal Note"
                                   }
                                 },
                                 "required": [
@@ -1077,6 +1132,51 @@ not. Order is first-seen-code-first.
                     "title": "BulkCNVPVS1InputItem",
                     "type": "object"
                   },
+                  "meta": {
+                    "anyOf": [
+                      {
+                        "description": "Per-item cost/cache observability for bulk PVS1 result items.\n\nTop-level ``meta.cache_status`` aggregates the batch (\"mixed\" when\nitems had varying outcomes) \u2014 agents that need to forecast cost on a\nper-item basis read this block. Absent when the item short-circuited\nbefore any upstream call (e.g. invalid input).",
+                        "properties": {
+                          "cache_status": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "hit",
+                                  "miss",
+                                  "coalesced",
+                                  "bypass"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Cache Status"
+                          },
+                          "elapsed_ms": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Elapsed Ms"
+                          }
+                        },
+                        "title": "BulkPerItemMeta",
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
                   "ok": {
                     "title": "Ok",
                     "type": "boolean"
@@ -1159,7 +1259,7 @@ not. Order is first-seen-code-first.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1172,6 +1272,18 @@ not. Order is first-seen-code-first.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Count"
         },
         "cost_tier": {
           "anyOf": [
@@ -1300,6 +1412,18 @@ not. Order is first-seen-code-first.
           "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "uncached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncached Count"
         },
         "warnings": {
           "items": {
@@ -1552,7 +1676,7 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1565,6 +1689,18 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Count"
         },
         "cost_tier": {
           "anyOf": [
@@ -1693,6 +1829,18 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "uncached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncached Count"
         },
         "warnings": {
           "items": {
@@ -1889,7 +2037,7 @@ cold scoring call.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1902,6 +2050,18 @@ cold scoring call.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Count"
         },
         "cost_tier": {
           "anyOf": [
@@ -2030,6 +2190,18 @@ cold scoring call.
           "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "uncached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncached Count"
         },
         "warnings": {
           "items": {
@@ -2258,7 +2430,7 @@ not clinical decision support.
             "pvs1_flowchart": {
               "anyOf": [
                 {
-                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
+                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
                   "properties": {
                     "decision_tree": {
                       "items": {
@@ -2361,6 +2533,18 @@ not clinical decision support.
                     "preliminary_decision_path": {
                       "title": "Preliminary Decision Path",
                       "type": "string"
+                    },
+                    "terminal_note": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Terminal Note"
                     }
                   },
                   "required": [
@@ -2635,7 +2819,7 @@ not clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -2648,6 +2832,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Count"
         },
         "cost_tier": {
           "anyOf": [
@@ -2777,6 +2973,18 @@ not clinical decision support.
           "title": "Server Version",
           "type": "string"
         },
+        "uncached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncached Count"
+        },
         "warnings": {
           "items": {
             "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
@@ -2860,12 +3068,31 @@ limit (default ~1 req/s) plus the existing cache, so a fully
 uncached 10-item batch can take ~10s wall time and a fully cached
 one returns in milliseconds.
 
-Per-item envelope: each result has ``{ok, input, data, error}``.
-Output items preserve input order. ``response_mode`` and
-``include_unmet`` apply per item; ``meta_mode`` applies to the outer
-envelope only. Per-item input or upstream failures do not stop the
-batch unless ``continue_on_error=false``. Bulk dispatch errors
-(malformed ``items``) use error code ``invalid_bulk_input``.
+Auto-resolution applies per item: non-canonical inputs (rsID,
+HGVS c./p./g.) round-trip through Ensembl Variant Recoder before
+scoring, mirroring ``get_variant_pvs1_data``. Multi-candidate
+resolutions return per-item ``requires_disambiguation`` with
+allele-keyed candidates so the caller picks one and re-calls that
+single item; a resolver outage returns the retryable
+``external_resolver_unavailable`` code.
+
+Per-item envelope: each result has ``{ok, input, data, error,
+meta}`` where ``meta.cache_status`` and ``meta.elapsed_ms`` echo
+that one upstream call's outcome (absent when the item
+short-circuited before upstream). Output items preserve input
+order. ``response_mode`` and ``include_unmet`` apply per item;
+the outer ``meta_mode`` controls the envelope. Per-item failures
+do not stop the batch unless ``continue_on_error=false``. Bulk
+dispatch errors (malformed ``items``) use error code
+``invalid_bulk_input``.
+
+Aggregate cache observability: top-level ``meta.cache_status``
+echoes the unanimous status when every item agrees; on a mixed
+batch it is ``"mixed"`` and ``meta.cached_count`` /
+``meta.uncached_count`` split items by warm
+(``hit``+``coalesced``) vs cold (``miss``+``bypass``).
+``meta.elapsed_ms`` is the SUM of per-item upstream wall-clocks
+(the honest total for a sequential bulk).
 
 Warning aggregation: per-item warnings are NOT echoed; they are
 collapsed into ``meta.warnings`` at the top level. A warning code
@@ -3047,7 +3274,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                           "pvs1_flowchart": {
                             "anyOf": [
                               {
-                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
+                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
                                 "properties": {
                                   "decision_tree": {
                                     "items": {
@@ -3150,6 +3377,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                                   "preliminary_decision_path": {
                                     "title": "Preliminary Decision Path",
                                     "type": "string"
+                                  },
+                                  "terminal_note": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Terminal Note"
                                   }
                                 },
                                 "required": [
@@ -3448,6 +3687,51 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                     "title": "BulkVariantPVS1InputItem",
                     "type": "object"
                   },
+                  "meta": {
+                    "anyOf": [
+                      {
+                        "description": "Per-item cost/cache observability for bulk PVS1 result items.\n\nTop-level ``meta.cache_status`` aggregates the batch (\"mixed\" when\nitems had varying outcomes) \u2014 agents that need to forecast cost on a\nper-item basis read this block. Absent when the item short-circuited\nbefore any upstream call (e.g. invalid input).",
+                        "properties": {
+                          "cache_status": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "hit",
+                                  "miss",
+                                  "coalesced",
+                                  "bypass"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Cache Status"
+                          },
+                          "elapsed_ms": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Elapsed Ms"
+                          }
+                        },
+                        "title": "BulkPerItemMeta",
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
                   "ok": {
                     "title": "Ok",
                     "type": "boolean"
@@ -3530,7 +3814,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -3543,6 +3827,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Count"
         },
         "cost_tier": {
           "anyOf": [
@@ -3671,6 +3967,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "uncached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncached Count"
         },
         "warnings": {
           "items": {
@@ -4046,7 +4354,7 @@ not clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -4059,6 +4367,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Count"
         },
         "cost_tier": {
           "anyOf": [
@@ -4187,6 +4507,18 @@ not clinical decision support.
           "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "uncached_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncached Count"
         },
         "warnings": {
           "items": {

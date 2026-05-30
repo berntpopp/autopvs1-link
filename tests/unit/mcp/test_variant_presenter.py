@@ -788,3 +788,106 @@ def test_present_cnv_ids_only_keeps_only_cnv_id_genome_build_and_source_url() ->
     assert "pvs1_flowchart" not in payload
     assert payload.get("disease_mechanisms", []) == []
     assert warnings == []
+
+
+# ---------------------------------------------------------------------------
+# Summary-mode terminal_note for ambiguous verdicts (v1.2 polish)
+# ---------------------------------------------------------------------------
+
+
+def test_present_variant_summary_emits_terminal_note_for_moderate_verdict() -> None:
+    """An ambiguous verdict must hoist the leaf rationale into summary mode.
+
+    Pre-fix: rs80357906-style Moderate verdicts shipped summary with an
+    empty decision_tree and no rationale, forcing a second round-trip to
+    standard tier just to read the why. Now the leaf step's note_text
+    rides along under ``terminal_note`` for Moderate / Supporting /
+    Unmet / PVS1_Not_* sentinels.
+    """
+    parsed = AutoPVS1Data(
+        genome_build="hg38",
+        variant_info=VariantInfo(
+            variant_id="X-1-A-T",
+            variant_type="Nonsense",
+            gene_symbol="GENE",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF6",
+            final_strength="Moderate",
+            final_strength_inferred=True,
+            decision_tree=[FlowchartStep(code="NF6", note_id="#6")],
+            notes={"#6": "Truncated > 10% of CDS but downstream of distal-disease cutoff."},
+        ),
+    )
+
+    data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg38/X-1-A-T",
+        response_mode="summary",
+    )
+
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["pvs1_flowchart"]["final_strength"] == "Moderate"
+    assert payload["pvs1_flowchart"]["terminal_note"].startswith("Truncated > 10%")
+
+
+def test_present_variant_summary_omits_terminal_note_for_strong_verdict() -> None:
+    """Strong/Very_Strong verdicts already convey rationale via path code.
+
+    No need to spend ~80 bytes echoing the leaf note when the verdict is
+    unambiguous — keep summary mode lean for the common case.
+    """
+    parsed = AutoPVS1Data(
+        genome_build="hg38",
+        variant_info=VariantInfo(
+            variant_id="X-1-A-T",
+            variant_type="Nonsense",
+            gene_symbol="GENE",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF1",
+            final_strength="Strong",
+            decision_tree=[FlowchartStep(code="NF1", note_id="#1")],
+            notes={"#1": "Stop codon in canonical NMD-target exon."},
+        ),
+    )
+
+    data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg38/X-1-A-T",
+        response_mode="summary",
+    )
+
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert "terminal_note" not in payload["pvs1_flowchart"]
+
+
+def test_present_variant_summary_terminal_note_falls_back_to_notes_legend() -> None:
+    """When the decision tree is empty, fall back to notes[preliminary_decision_path].
+
+    Some non-applicable verdicts arrive with no steps but a populated
+    notes legend keyed by the path code.
+    """
+    parsed = AutoPVS1Data(
+        genome_build="hg38",
+        variant_info=VariantInfo(
+            variant_id="X-1-A-T",
+            variant_type="Nonsense",
+            gene_symbol="GENE",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="not_applicable",
+            final_strength="PVS1_Not_Applicable",
+            decision_tree=[],
+            notes={"not_applicable": "PVS1 does not apply: gene is not LoF-intolerant."},
+        ),
+    )
+
+    data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg38/X-1-A-T",
+        response_mode="summary",
+    )
+
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["pvs1_flowchart"]["terminal_note"].startswith("PVS1 does not apply")

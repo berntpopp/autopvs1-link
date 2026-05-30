@@ -256,15 +256,26 @@ def test_detailed_capabilities_documents_bulk_behavior_contract() -> None:
     assert bulk["worst_case_latency_seconds"] == 10
     assert bulk["continue_on_error_default"] is True
     assert bulk["ordering"] == "preserves input order"
-    assert bulk["per_item_envelope"] == {
-        "ok": "bool",
-        "input": "object",
-        "data": "object|null",
-        "error": "object|null",
-    }
+    per_item = bulk["per_item_envelope"]
+    assert per_item["ok"] == "bool"
+    assert per_item["input"] == "object"
+    assert per_item["data"] == "object|null"
+    assert per_item["error"] == "object|null"
+    # Per-item meta carries cache_status + elapsed_ms so LLM dispatchers
+    # can forecast cost per item, not just across the batch.
+    assert "cache_status" in per_item["meta"]
+    assert "elapsed_ms" in per_item["meta"]
     assert bulk["applies_response_mode_per_item"] is True
     assert bulk["applies_meta_mode_top_level_only"] is True
     assert bulk["accounting_invariant"] == "total == attempted + skipped"
+    # Bulk auto-resolves rsID/HGVS per item so the surface stays symmetric
+    # with the single tool.
+    assert bulk["auto_resolves_per_item"] is True
+    assert "Ensembl Variant Recoder" in bulk["auto_resolution_note"]
+    # Aggregate cache observability is documented for "mixed" batches.
+    assert "mixed" in bulk["cache_status_aggregation"]
+    assert "cached_count" in bulk["cache_status_aggregation"]
+    assert "uncached_count" in bulk["cache_status_aggregation"]
 
 
 def test_capabilities_version_invalidates_on_tool_summary_mutation(monkeypatch) -> None:

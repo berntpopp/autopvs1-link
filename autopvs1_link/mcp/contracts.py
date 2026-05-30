@@ -99,6 +99,14 @@ class PVS1FlowchartMCP(MCPContractModel):
     hoisted form. It is therefore ``None`` (and dropped on the wire) in
     ``summary``/``standard`` modes and only present in ``full`` mode for
     auditors who want the canonical legend alongside the decision tree.
+
+    ``terminal_note`` is the one-line rationale for the verdict, hoisted
+    from the leaf step's note_text (or ``notes[preliminary_decision_path]``
+    when the decision tree is empty). Populated in summary mode for
+    callers that need to explain non-Strong / non-Very-Strong outcomes
+    without re-fetching the full decision tree. Absent when the upstream
+    note is empty or the verdict is unambiguous (PVS1_Strong /
+    PVS1_Very_Strong) and the rationale adds no new signal.
     """
 
     preliminary_decision_path: str
@@ -107,6 +115,7 @@ class PVS1FlowchartMCP(MCPContractModel):
     decision_tree: list[FlowchartStepMCP] = Field(default_factory=list)
     notes: dict[str, str] | None = None
     decision_tree_raw: list[dict[str, Any]] | None = None
+    terminal_note: str | None = None
 
 
 class DiseaseMechanismMCP(MCPContractModel):
@@ -380,6 +389,19 @@ class BulkCNVPVS1InputItem(BaseModel):
     )
 
 
+class BulkPerItemMeta(BaseModel):
+    """Per-item cost/cache observability for bulk PVS1 result items.
+
+    Top-level ``meta.cache_status`` aggregates the batch ("mixed" when
+    items had varying outcomes) — agents that need to forecast cost on a
+    per-item basis read this block. Absent when the item short-circuited
+    before any upstream call (e.g. invalid input).
+    """
+
+    cache_status: Literal["hit", "miss", "coalesced", "bypass"] | None = None
+    elapsed_ms: float | None = None
+
+
 class BulkVariantPVS1ResultItem(BaseModel):
     """Per-item result for a bulk variant PVS1 request."""
 
@@ -387,6 +409,7 @@ class BulkVariantPVS1ResultItem(BaseModel):
     input: BulkVariantPVS1InputItem
     data: VariantMCPData | None = None
     error: MCPError | None = None
+    meta: BulkPerItemMeta | None = None
 
 
 class BulkCNVPVS1ResultItem(BaseModel):
@@ -396,6 +419,7 @@ class BulkCNVPVS1ResultItem(BaseModel):
     input: BulkCNVPVS1InputItem
     data: CNVMCPData | None = None
     error: MCPError | None = None
+    meta: BulkPerItemMeta | None = None
 
 
 class BulkVariantsMCPData(BaseModel):

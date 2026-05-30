@@ -739,3 +739,117 @@ async def test_bulk_cnvs_invalid_mode_returns_top_level_error() -> None:
     payload = result.structured_content
     assert payload["ok"] is False
     assert payload["error"]["code"] == "invalid_meta_mode"
+
+
+# ---------------------------------------------------------------------------
+# Bulk auto-resolution + per-item cache observability + mixed aggregate (v1.2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_bulk_variants_auto_resolves_rsid_per_item(mocker) -> None:
+    """A non-canonical rsID in bulk must route through Ensembl Variant Recoder.
+
+    Pre-fix the bulk tool rejected rsID inputs with a generic
+    invalid_variant_id while the single tool resolved them — silent
+    asymmetry that broke 'one-at-a-time worked, batch failed' workflows.
+    """
+    from autopvs1_link.api.variant_recoder import RecoderCandidate
+
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.recode_variant",
+        new=AsyncMock(
+            return_value=[
+                RecoderCandidate(
+                    variant_id="X-100-A-T",
+                    spdi="NC_000023.10:99:A:T",
+                    allele_key="A>T",
+                    synonym_ids=("rs12345",),
+                )
+            ]
+        ),
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(return_value=_variant_fixture("X-100-A-T")),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variants_pvs1_data_bulk",
+        {"items": [{"genome_build": "hg19", "variant_id": "rs12345"}]},
+    )
+    payload = result.structured_content
+    assert payload["ok"] is True
+    item = payload["data"]["items"][0]
+    assert item["ok"] is True
+    # The auto_resolved warning aggregates into top-level meta.warnings.
+    warning_codes = {w["code"] for w in payload["meta"]["warnings"]}
+    assert "auto_resolved" in warning_codes
+
+
+@pytest.mark.asyncio
+async def test_bulk_variants_per_item_cache_status_and_aggregate_mixed(mocker) -> None:
+    """A mixed warm/cold batch must surface aggregate AND per-item cache_status."""
+    from autopvs1_link.mcp.telemetry import record_upstream_call
+
+    call_counter = {"n": 0}
+
+    async def fake_get_variant(genome_build: str, variant_id: str):
+        call_counter["n"] += 1
+        # First item: warm hit; second: cold miss.
+        if call_counter["n"] == 1:
+            record_upstream_call(elapsed_ms=5.0, cache_status="hit")
+        else:
+            record_upstream_call(elapsed_ms=1500.0, cache_status="miss")
+        return _variant_fixture(variant_id)
+
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake_get_variant)
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variants_pvs1_data_bulk",
+        {
+            "items": [
+                {"genome_build": "hg19", "variant_id": "X-1-A-T"},
+                {"genome_build": "hg19", "variant_id": "X-2-G-A"},
+            ]
+        },
+    )
+    payload = result.structured_content
+    # Aggregate cache_status is "mixed" with the counts split correctly.
+    assert payload["meta"]["cache_status"] == "mixed"
+    assert payload["meta"]["cached_count"] == 1
+    assert payload["meta"]["uncached_count"] == 1
+    # elapsed_ms is the honest SUM of per-item upstream wall-clocks.
+    assert payload["meta"]["elapsed_ms"] == 1505.0
+    # Per-item meta carries each item's own cache_status + elapsed_ms.
+    items = payload["data"]["items"]
+    assert items[0]["meta"]["cache_status"] == "hit"
+    assert items[1]["meta"]["cache_status"] == "miss"
+    assert items[0]["meta"]["elapsed_ms"] == 5.0
+    assert items[1]["meta"]["elapsed_ms"] == 1500.0
+
+
+@pytest.mark.asyncio
+async def test_bulk_variants_unanimous_cache_status_does_not_emit_counts(mocker) -> None:
+    """A unanimous batch echoes the single status with no counts noise."""
+    from autopvs1_link.mcp.telemetry import record_upstream_call
+
+    async def fake_get_variant(genome_build: str, variant_id: str):
+        record_upstream_call(elapsed_ms=3.0, cache_status="hit")
+        return _variant_fixture(variant_id)
+
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake_get_variant)
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variants_pvs1_data_bulk",
+        {
+            "items": [
+                {"genome_build": "hg19", "variant_id": "X-1-A-T"},
+                {"genome_build": "hg19", "variant_id": "X-2-G-A"},
+            ]
+        },
+    )
+    payload = result.structured_content
+    assert payload["meta"]["cache_status"] == "hit"
+    assert "cached_count" not in payload["meta"]
+    assert "uncached_count" not in payload["meta"]

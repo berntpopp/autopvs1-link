@@ -143,6 +143,14 @@ class MCPMeta(BaseModel):
     on every error envelope so a failing LLM dispatcher can pick the
     next move without paying a ToolSearch round-trip to re-discover
     the surface; absent on success envelopes.
+
+    ``cached_count`` and ``uncached_count`` populate only on bulk
+    success envelopes when items had mixed cache outcomes. In that
+    case ``cache_status='mixed'`` and the counts split items by
+    whether they returned warm (``hit`` + ``coalesced``) or cold
+    (``miss`` + ``bypass``). Unanimous batches emit the single
+    underlying status and drop both counts. Cheap and single-tool
+    envelopes never carry these.
     """
 
     request_id: str = Field(default_factory=lambda: correlation_id.get() or str(uuid4()))
@@ -158,6 +166,8 @@ class MCPMeta(BaseModel):
     next_call_earliest_at: str | None = None
     retry_after_ms: int | None = None
     next_actions: list[str] | None = None
+    cached_count: int | None = None
+    uncached_count: int | None = None
 
 
 class MCPEnvelope[DataT](BaseModel):
@@ -230,6 +240,8 @@ def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
             "next_call_earliest_at",
             "retry_after_ms",
             "next_actions",
+            "cached_count",
+            "uncached_count",
         ):
             if meta.get(key) is None:
                 meta.pop(key, None)
@@ -290,6 +302,10 @@ def ok_envelope(
     *,
     meta_mode: Any = "full",
     tool_name: str | None = None,
+    cache_status_override: str | None = None,
+    elapsed_ms_override: float | None = None,
+    cached_count: int | None = None,
+    uncached_count: int | None = None,
 ) -> dict[str, Any]:
     """Return a successful MCP envelope as a JSON-ready dict.
 
@@ -304,13 +320,25 @@ def ok_envelope(
     ``"get_variant_pvs1_data"``) so the envelope can look up the
     tier registered in :mod:`autopvs1_link.mcp.cost_tiers` without each
     caller hard-coding the value.
+
+    ``cache_status_override`` and ``elapsed_ms_override`` let bulk tools
+    supply an aggregate across per-item upstream calls instead of the
+    ContextVar telemetry's last-call-only signal. Pass
+    ``cache_status='mixed'`` plus the matching ``cached_count`` /
+    ``uncached_count`` to document a batch with heterogeneous cache
+    outcomes. When unset, single-tool callers get the existing
+    ContextVar-driven behavior.
     """
     if isinstance(data, BaseModel):
         payload = data.model_dump(mode="json", exclude_none=True)
     else:
         payload = data
     effective_chars = len(json.dumps(payload, separators=(",", ":")))
-    elapsed_ms, cache_status = get_call_telemetry()
+    telemetry_elapsed_ms, telemetry_cache_status = get_call_telemetry()
+    cache_status = (
+        cache_status_override if cache_status_override is not None else telemetry_cache_status
+    )
+    elapsed_ms = elapsed_ms_override if elapsed_ms_override is not None else telemetry_elapsed_ms
     cost_tier, rate_limit_floor_ms, next_call_earliest_at = _cost_hints_for(tool_name, cache_status)
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=True,
@@ -324,6 +352,8 @@ def ok_envelope(
             cost_tier=cost_tier,
             rate_limit_floor_ms=rate_limit_floor_ms,
             next_call_earliest_at=next_call_earliest_at,
+            cached_count=cached_count,
+            uncached_count=uncached_count,
         ),
     )
     out = _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
@@ -358,9 +388,22 @@ def error_envelope(
     default ``retry_after_ms`` to the rate-limit floor when the caller
     did not supply one, so an LLM client retrying immediately does not
     just block on the floor.
+
+    For permanent input errors (``invalid_variant_id``,
+    ``invalid_genome_build``, ``requires_disambiguation``, …) the call
+    short-circuited before any upstream contact: ``cost_tier`` and
+    ``rate_limit_floor_ms`` are dropped because they would otherwise
+    advertise a cost the caller never paid and a clock that never reset.
+    The transient error codes — which DID hit upstream and whose retry
+    will hit upstream again — keep the cost hints so an LLM scheduling a
+    retry sees the real cost.
     """
     tier = cost_tier_for(tool_name)
-    rate_limit_floor_ms = _rate_limit_floor_ms() if tier == SCRAPE_TIER else None
+    upstream_was_contacted = code in _RETRYABLE_TRANSIENT_CODES
+    rate_limit_floor_ms = (
+        _rate_limit_floor_ms() if tier == SCRAPE_TIER and upstream_was_contacted else None
+    )
+    cost_tier = tier if upstream_was_contacted else None
     if (
         retry_after_ms is None
         and retryable
@@ -380,7 +423,7 @@ def error_envelope(
         ),
         meta=MCPMeta(
             warnings=warnings or [],
-            cost_tier=tier,
+            cost_tier=cost_tier,
             rate_limit_floor_ms=rate_limit_floor_ms,
             retry_after_ms=retry_after_ms,
             next_actions=next_actions_for(code),
