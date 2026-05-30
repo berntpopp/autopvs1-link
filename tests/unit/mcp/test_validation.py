@@ -163,6 +163,41 @@ def test_decode_cursor_rejects_negative_offset() -> None:
     assert exc.value.code == "invalid_search_cursor"
 
 
+def test_decode_cursor_rejects_empty_string() -> None:
+    with pytest.raises(MCPInputError) as exc:
+        _decode_cursor("")
+    assert exc.value.code == "invalid_search_cursor"
+
+
+def test_decode_cursor_rejects_base64_decoding_to_non_json() -> None:
+    """Valid base64url that decodes to bytes that aren't JSON must error."""
+    bad = base64.urlsafe_b64encode(b"not json bytes").decode().rstrip("=")
+    with pytest.raises(MCPInputError) as exc:
+        _decode_cursor(bad)
+    assert exc.value.code == "invalid_search_cursor"
+
+
+@pytest.mark.parametrize(
+    "bad_offset_value",
+    [
+        True,  # bool is an int subclass - must be rejected to keep semantics tight.
+        False,
+        "5",  # string offset.
+        1.5,  # float offset.
+        None,  # null offset.
+    ],
+)
+def test_decode_cursor_rejects_non_integer_offset(bad_offset_value: object) -> None:
+    bad = (
+        base64.urlsafe_b64encode(json.dumps({"offset": bad_offset_value}).encode())
+        .decode()
+        .rstrip("=")
+    )
+    with pytest.raises(MCPInputError) as exc:
+        _decode_cursor(bad)
+    assert exc.value.code == "invalid_search_cursor"
+
+
 def test_normalize_limit_cursor_accepts_opaque_cursor() -> None:
     bounded, offset, requested = normalize_limit_cursor(10, _encode_cursor(20))
     assert (bounded, offset, requested) == (10, 20, 10)

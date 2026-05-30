@@ -563,7 +563,124 @@ async def test_search_non_integer_limit_returns_invalid_search_query_envelope(mo
 
 
 @pytest.mark.asyncio
-async def test_search_numeric_cursor_returns_invalid_search_query_envelope(mocker) -> None:
+async def test_error_envelopes_set_is_error_true_on_wire(mocker) -> None:
+    """Spec requirement (MCP 2025-06-18 / server/tools §Error Handling):
+
+    Tool execution errors MUST set CallToolResult.isError=true so clients
+    can distinguish failed calls without parsing the structured payload.
+    """
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg99", "variant_id": "X-1-A-T"},
+    )
+    # The wire-level CallToolResult.isError is what spec-aware clients read.
+    mcp_result = result.to_mcp_result()
+    assert getattr(mcp_result, "isError", False) is True
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+
+
+@pytest.mark.asyncio
+async def test_success_envelopes_remain_is_error_false(mocker) -> None:
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(return_value=_variant_result()),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "X-1-A-T"},
+    )
+    # to_mcp_result returns either CallToolResult or a tuple for content-only;
+    # for our successful envelope it's the (content, structured) tuple form
+    # because we don't override the helper. Either way isError must not be true.
+    mcp_result = result.to_mcp_result()
+    is_error = getattr(mcp_result, "isError", False) if hasattr(mcp_result, "isError") else False
+    assert is_error is False
+    assert result.structured_content["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_variant_summary_mode_drops_null_default_fields(mocker) -> None:
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(return_value=_variant_result()),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {
+            "genome_build": "hg38",
+            "variant_id": "X-1-A-T",
+            "response_mode": "summary",
+        },
+    )
+    variant_info = result.structured_content["data"]["variant_info"]
+    # In summary mode, fields that default to None must NOT serialize.
+    assert "chgvs" not in variant_info
+    assert "phgvs" not in variant_info
+    assert "pli_score" not in variant_info
+    assert "gene_url" not in variant_info
+    # Real values still present.
+    assert variant_info["variant_id"] == "X-1-A-T"
+    assert variant_info["gene_symbol"] == "GENE"
+
+
+@pytest.mark.asyncio
+async def test_variant_standard_mode_preserves_null_default_fields(mocker) -> None:
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(return_value=_variant_result()),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "X-1-A-T"},
+    )
+    variant_info = result.structured_content["data"]["variant_info"]
+    # In standard mode, the typed schema's null defaults stay visible.
+    assert "chgvs" in variant_info and variant_info["chgvs"] is None
+
+
+@pytest.mark.asyncio
+async def test_search_clamped_limit_emits_warning(mocker) -> None:
+    fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(query="MYH9", genome_version="hg38", results=[])
+    )
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": 999})
+    codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
+    assert "limit_clamped" in codes
+
+
+@pytest.mark.asyncio
+async def test_search_clamped_zero_limit_emits_warning(mocker) -> None:
+    fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(query="MYH9", genome_version="hg38", results=[])
+    )
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": 0})
+    codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
+    assert "limit_clamped" in codes
+
+
+@pytest.mark.asyncio
+async def test_search_unclamped_limit_no_warning(mocker) -> None:
+    fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(query="MYH9", genome_version="hg38", results=[])
+    )
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": 25})
+    codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
+    assert "limit_clamped" not in codes
+
+
+@pytest.mark.asyncio
+async def test_search_numeric_cursor_returns_invalid_search_cursor_envelope(mocker) -> None:
     fake = AsyncMock()
     mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
 
@@ -572,7 +689,7 @@ async def test_search_numeric_cursor_returns_invalid_search_query_envelope(mocke
 
     fake.assert_not_awaited()
     assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_search_query"
+    assert result.structured_content["error"]["code"] == "invalid_search_cursor"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -904,3 +1021,58 @@ async def test_cache_resource_returns_stable_method_keys(mocker) -> None:
         "search_with_redirect_detection",
         "resolve_hgvs_notation",
     }
+
+
+@pytest.mark.asyncio
+async def test_search_variants_wire_returns_pagination_block_with_five_fields(mocker) -> None:
+    """End-to-end: search_variants via mcp.call_tool returns a pagination
+    block carrying all five SearchPaginationMCP fields with correct types.
+    Round-trips the opaque next_cursor through a second call and asserts the
+    decoded offset advances."""
+    fake_results = AutoPVS1SearchResults(
+        query="POU3F4",
+        genome_version="hg38",
+        results=[
+            SearchResult(
+                variant_id=f"X-{i}-A-T",
+                gene="POU3F4",
+                variant_type="Nonsense",
+                genome_build="hg38",
+                url=f"https://autopvs1.bgi.com/variant/hg38/X-{i}-A-T",
+            )
+            for i in range(25)
+        ],
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.search_variants",
+        new=AsyncMock(return_value=fake_results),
+    )
+    mcp = build_mcp_server()
+
+    page_one = await mcp.call_tool(
+        "search_variants",
+        {"query": "POU3F4", "genome_build": "hg38", "limit": 10},
+    )
+    data_one = page_one.structured_content["data"]
+    pagination_one = data_one["pagination"]
+    # Pagination block carries all five fields with the right types.
+    assert isinstance(pagination_one["next_cursor"], str)
+    assert pagination_one["previous_cursor"] is None
+    assert pagination_one["has_more"] is True
+    assert pagination_one["offset"] == 0
+    assert pagination_one["total_count_kind"] == "upstream_page"
+
+    # Round-trip: passing the opaque next_cursor back yields page 2.
+    page_two = await mcp.call_tool(
+        "search_variants",
+        {
+            "query": "POU3F4",
+            "genome_build": "hg38",
+            "limit": 10,
+            "cursor": pagination_one["next_cursor"],
+        },
+    )
+    pagination_two = page_two.structured_content["data"]["pagination"]
+    assert pagination_two["offset"] == 10
+    assert pagination_two["has_more"] is True
+    assert pagination_two["previous_cursor"] is not None

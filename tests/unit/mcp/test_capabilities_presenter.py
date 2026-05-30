@@ -104,6 +104,20 @@ def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> N
     assert detailed["payload_modes"]["full"]["char_budget"] == 12000
 
 
+def test_search_behavior_documents_pagination_block_fields() -> None:
+    detailed = detailed_capabilities_resource()
+    assert "pagination_block" in detailed["search_behavior"]
+    pagination_blurb = detailed["search_behavior"]["pagination_block"]
+    for field in (
+        "previous_cursor",
+        "next_cursor",
+        "has_more",
+        "offset",
+        "total_count_kind",
+    ):
+        assert field in pagination_blurb, field
+
+
 def test_compact_capabilities_includes_capabilities_version_hash() -> None:
     payload = present_compact_capabilities().model_dump(mode="json")
     version = payload["capabilities_version"]
