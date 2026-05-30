@@ -94,7 +94,12 @@ def register(mcp: FastMCP) -> None:
                 response_mode=normalized_response_mode,
                 include_unmet=include_unmet,
             )
-            return ok_envelope(data, warnings=warnings, meta_mode=normalized_meta_mode)
+            return ok_envelope(
+                data,
+                warnings=warnings,
+                meta_mode=normalized_meta_mode,
+                compact_data=normalized_response_mode == "summary",
+            )
         except InvalidMCPModeError as exc:
             return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)
         except MCPInputError as exc:
@@ -103,6 +108,7 @@ def register(mcp: FastMCP) -> None:
                 message=str(exc),
                 retryable=exc.retryable,
                 suggestions=exc.suggestions,
+                details=exc.details or None,
                 meta_mode=normalized_meta_mode,
             )
         except httpx.TimeoutException:
