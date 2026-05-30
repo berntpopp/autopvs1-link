@@ -5,6 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from autopvs1_link.mcp.contracts import CompactCapabilitiesData, ToolSummaryMCP, WorkflowStepMCP
+from autopvs1_link.mcp.registries import (
+    KNOWN_ERROR_CODES,
+    KNOWN_WARNING_CODES,
+    PAYLOAD_MODES,
+)
 from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 
 
@@ -47,12 +52,30 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
                 purpose="Read local server health and enabled feature flags without upstream calls.",
                 example={},
             ),
+            "get_variants_pvs1_data_bulk": ToolSummaryMCP(
+                purpose="Bulk PVS1 scoring for 1-10 SNV/indel variants in one call.",
+                example={
+                    "items": [
+                        {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
+                    ],
+                },
+            ),
+            "get_cnvs_pvs1_data_bulk": ToolSummaryMCP(
+                purpose="Bulk PVS1 scoring for 1-10 CNVs in one call.",
+                example={
+                    "items": [
+                        {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
+                    ],
+                },
+            ),
         },
         canonical_parameters={
             "get_variant_pvs1_data": ["genome_build", "variant_id"],
             "get_cnv_pvs1_data": ["genome_build", "cnv_id"],
             "search_variants": ["query", "genome_build", "limit", "cursor"],
             "get_server_health": [],
+            "get_variants_pvs1_data_bulk": ["items"],
+            "get_cnvs_pvs1_data_bulk": ["items"],
         },
         compact_workflow=[
             WorkflowStepMCP(
@@ -67,7 +90,14 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
             ),
             WorkflowStepMCP(
                 step="Score one variant or CNV",
-                when="The caller has a normalized AutoPVS1 variant_id or cnv_id.",
+                when="The caller has a single normalized AutoPVS1 variant_id or cnv_id.",
+            ),
+            WorkflowStepMCP(
+                step="Score multiple variants or CNVs in one call",
+                when=(
+                    "The caller has 2 to 10 IDs of the same kind; use "
+                    "get_variants_pvs1_data_bulk or get_cnvs_pvs1_data_bulk."
+                ),
             ),
             WorkflowStepMCP(
                 step="Report research-use output",
@@ -104,6 +134,17 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "limit": 10,
                 "cursor": None,
             },
+            "get_variants_pvs1_data_bulk": {
+                "items": [
+                    {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
+                    {"genome_build": "hg19", "variant_id": "11-2768881-C-T"},
+                ],
+            },
+            "get_cnvs_pvs1_data_bulk": {
+                "items": [
+                    {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
+                ],
+            },
         },
         "search_behavior": {
             "ordering": "upstream",
@@ -115,18 +156,12 @@ def detailed_capabilities_resource() -> dict[str, Any]:
         },
         "error_envelope": {
             "required_fields": ["ok", "data", "error", "meta"],
-            "stable_error_codes": [
-                "invalid_genome_build",
-                "invalid_variant_id",
-                "invalid_cnv_id",
-                "invalid_search_query",
-                "not_found",
-                "upstream_unavailable",
-                "upstream_timeout",
-                "parse_error",
-                "destructive_disabled",
-                "internal_error",
-            ],
+            "stable_error_codes": sorted(KNOWN_ERROR_CODES),
+            "stable_warning_codes": sorted(KNOWN_WARNING_CODES),
+        },
+        "payload_modes": {
+            mode: {"char_budget": spec["char_budget"], "note": spec["note"]}
+            for mode, spec in PAYLOAD_MODES.items()
         },
         "cache_statistics": {
             "resource": "autopvs1-link://cache/statistics",

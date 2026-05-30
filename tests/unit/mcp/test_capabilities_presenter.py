@@ -50,13 +50,25 @@ def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
         },
         {
             "step": "Score one variant or CNV",
-            "when": "The caller has a normalized AutoPVS1 variant_id or cnv_id.",
+            "when": "The caller has a single normalized AutoPVS1 variant_id or cnv_id.",
+        },
+        {
+            "step": "Score multiple variants or CNVs in one call",
+            "when": (
+                "The caller has 2 to 10 IDs of the same kind; use "
+                "get_variants_pvs1_data_bulk or get_cnvs_pvs1_data_bulk."
+            ),
         },
         {
             "step": "Report research-use output",
             "when": "Summarizing any AutoPVS1 result for a user.",
         },
     ]
+    assert payload["tool_summaries"]["get_variants_pvs1_data_bulk"]["example"] == {
+        "items": [{"genome_build": "hg19", "variant_id": "X-82763936-A-T"}],
+    }
+    assert "get_variants_pvs1_data_bulk" in compact.canonical_parameters
+    assert "get_cnvs_pvs1_data_bulk" in compact.canonical_parameters
 
 
 def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> None:
@@ -72,3 +84,18 @@ def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> N
         "meta",
     ]
     assert detailed != compact
+    assert set(detailed["error_envelope"]["stable_error_codes"]) >= {
+        "invalid_variant_id",
+        "invalid_cnv_id",
+        "invalid_genome_build",
+        "invalid_search_cursor",
+        "destructive_disabled",
+    }
+    assert set(detailed["error_envelope"]["stable_warning_codes"]) >= {
+        "invalid_external_link",
+        "pvs1_not_applicable",
+        "limit_clamped",
+        "search_results_truncated",
+    }
+    assert detailed["payload_modes"]["summary"]["char_budget"] == 1500
+    assert detailed["payload_modes"]["full"]["char_budget"] == 12000
