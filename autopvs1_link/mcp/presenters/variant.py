@@ -94,6 +94,10 @@ def _present_flowchart(
         }
     elif response_mode == "full":
         raw["decision_tree_raw"] = raw_decision_tree
+    else:
+        # standard: notes legend is duplicative because decision_tree
+        # steps already carry note_text; drop it from the wire payload.
+        raw.pop("notes", None)
     return raw, warnings
 
 

@@ -194,19 +194,20 @@ def test_present_variant_summary_omits_mechanisms_and_emits_no_warnings() -> Non
         response_mode="summary",
     )
 
-    payload = data.model_dump(mode="json")
+    payload = data.model_dump(mode="json", exclude_none=True)
     assert payload["genome_build"] == "hg38"
     assert payload["variant_info"]["variant_id"] == "X-1-A-T"
     assert payload["variant_info"]["gene_symbol"] == "GENE"
     # Summary trims variant_info to {variant_id, variant_type, gene_symbol}
-    # so external_links drops to its widened None default; standard mode
-    # still surfaces the dict explicitly.
-    assert payload["variant_info"]["external_links"] is None
-    assert payload["variant_info"]["chgvs"] is None
+    # and the wire payload drops null-default keys, so external_links and
+    # chgvs disappear entirely.
+    assert "external_links" not in payload["variant_info"]
+    assert "chgvs" not in payload["variant_info"]
     assert payload["pvs1_flowchart"]["final_strength"] == "Strong"
     assert payload["pvs1_flowchart"]["final_strength_source"] == "inferred"
     assert payload["pvs1_flowchart"]["decision_tree"] == []
-    assert payload["pvs1_flowchart"]["notes"] == {}
+    # ``notes`` is duplicative in summary mode and drops from the wire.
+    assert "notes" not in payload["pvs1_flowchart"]
     assert payload["disease_mechanisms"] == []
     assert payload["source_url"] == "https://autopvs1.bgi.com/variant/hg38/X-1-A-T"
     assert payload["upstream_service"] == "AutoPVS1"
@@ -488,6 +489,47 @@ def test_present_variant_standard_omits_raw_fields() -> None:
     payload = data.model_dump(mode="json", exclude_none=False)
     assert payload["variant_info"].get("external_links_raw") is None
     assert payload["pvs1_flowchart"].get("decision_tree_raw") is None
+
+
+def test_present_variant_standard_drops_notes_dict_because_steps_carry_text() -> None:
+    """``notes`` is duplicative in standard mode; ``note_text`` is hoisted per step.
+
+    Regression for an LLM-consumer report that the top-level ``notes`` dict
+    repeated content already on each ``decision_tree`` step, costing tokens
+    for no parseability gain. Audit-trail use cases keep the dict via
+    ``response_mode='full'``.
+    """
+    parsed = _canonical_parsed()
+    data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="standard",
+    )
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert "notes" not in payload["pvs1_flowchart"], (
+        "standard mode must drop notes dict (steps carry note_text)"
+    )
+    # The resolved note text still has to ride along on each step.
+    note_texts = [
+        step.get("note_text") for step in payload["pvs1_flowchart"]["decision_tree"]
+    ]
+    assert "Note one." in note_texts
+    assert "Note two." in note_texts
+
+
+def test_present_variant_full_keeps_notes_dict_for_audit() -> None:
+    """``notes`` survives in full mode so auditors can cross-check the legend."""
+    parsed = _canonical_parsed()
+    data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="full",
+    )
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["pvs1_flowchart"]["notes"] == {
+        "#1": "Note one.",
+        "#2": "Note two.",
+    }
 
 
 def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:

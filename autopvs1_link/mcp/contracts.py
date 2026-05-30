@@ -92,13 +92,20 @@ class FlowchartStepMCP(MCPContractModel):
 
 
 class PVS1FlowchartMCP(MCPContractModel):
-    """Typed PVS1 flowchart decision path and outcome."""
+    """Typed PVS1 flowchart decision path and outcome.
+
+    ``notes`` is the legend dict ``#1 -> prose`` and is duplicative in
+    standard mode because ``decision_tree[*].note_text`` is the already-
+    hoisted form. It is therefore ``None`` (and dropped on the wire) in
+    ``summary``/``standard`` modes and only present in ``full`` mode for
+    auditors who want the canonical legend alongside the decision tree.
+    """
 
     preliminary_decision_path: str
     final_strength: str
     final_strength_source: Literal["asserted", "inferred"] = "asserted"
     decision_tree: list[FlowchartStepMCP] = Field(default_factory=list)
-    notes: dict[str, str] = Field(default_factory=dict)
+    notes: dict[str, str] | None = None
     decision_tree_raw: list[dict[str, Any]] | None = None
 
 
