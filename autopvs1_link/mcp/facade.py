@@ -6,6 +6,7 @@ Builds the FastMCP instance and registers tools/resources.
 from __future__ import annotations
 
 from fastmcp import FastMCP
+from mcp.server.lowlevel.server import NotificationOptions
 
 from autopvs1_link.mcp.metadata import (
     SERVER_DESCRIPTION,
@@ -21,6 +22,15 @@ def build_mcp_server() -> FastMCP:
         name=SERVER_NAME,
         version=SERVER_VERSION,
         instructions=SERVER_DESCRIPTION,
+    )
+    # Spec compliance (MCP 2025-06-18 / basic/lifecycle §Capability Negotiation):
+    # advertise listChanged=False because this server never emits
+    # notifications/{tools,resources,prompts}/list_changed. Clients can then
+    # trust the negotiated capability shape.
+    mcp._mcp_server.notification_options = NotificationOptions(
+        prompts_changed=False,
+        resources_changed=False,
+        tools_changed=False,
     )
 
     from autopvs1_link.mcp import prompts, resources

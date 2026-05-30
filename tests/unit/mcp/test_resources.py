@@ -17,6 +17,28 @@ async def test_build_mcp_server_registers_cache_resource() -> None:
 
 
 @pytest.mark.asyncio
+async def test_initialize_advertises_listchanged_false() -> None:
+    """Spec (MCP 2025-06-18 / basic/lifecycle §Capability Negotiation):
+
+    Both parties MUST 'Only use capabilities that were successfully negotiated.'
+    This server never emits list_changed notifications; the advertised
+    capability must say so.
+    """
+    from fastmcp.client import Client
+
+    mcp = build_mcp_server()
+    async with Client(mcp) as client:
+        caps = client.initialize_result.capabilities
+        assert caps.tools is not None
+        assert caps.tools.listChanged is False
+        assert caps.resources is not None
+        assert caps.resources.listChanged is False
+        assert caps.resources.subscribe is False
+        assert caps.prompts is not None
+        assert caps.prompts.listChanged is False
+
+
+@pytest.mark.asyncio
 async def test_capabilities_tool_and_resource_are_not_duplicates() -> None:
     mcp = build_mcp_server()
 
