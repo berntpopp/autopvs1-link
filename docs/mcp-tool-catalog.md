@@ -1566,14 +1566,25 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
 
 ### `get_server_health`
 
-Return local MCP server health without contacting AutoPVS1 upstream.
+Return local MCP server health.
+
+Default behaviour: no upstream call, sub-millisecond. Pass
+``check_upstream=true`` for an opt-in HEAD probe — useful when an
+agent wants to confirm AutoPVS1 is reachable before scheduling a
+cold scoring call.
 
 #### Input Schema
 
 ```json
 {
   "additionalProperties": false,
-  "properties": {},
+  "properties": {
+    "check_upstream": {
+      "default": false,
+      "description": "When true, issue one short HEAD probe against the AutoPVS1 base URL and report reachability in data.upstream_reachable. Default false keeps the cheap-tool contract (no upstream cost, sub-ms).",
+      "type": "boolean"
+    }
+  },
   "type": "object"
 }
 ```
@@ -1587,7 +1598,7 @@ Return local MCP server health without contacting AutoPVS1 upstream.
     "data": {
       "anyOf": [
         {
-          "description": "Local MCP server health status.",
+          "description": "Local MCP server health status.\n\n``upstream_reachable`` and ``upstream_status`` are populated only when\nthe caller passes ``check_upstream=true``; otherwise the fields stay\nat their default ``False`` / ``\"not_checked\"`` so the cheap-tool\ncontract (no upstream cost, sub-millisecond) is preserved.",
           "properties": {
             "destructive_tools_enabled": {
               "default": false,
@@ -1610,9 +1621,18 @@ Return local MCP server health without contacting AutoPVS1 upstream.
               "title": "Upstream Checked",
               "type": "boolean"
             },
+            "upstream_reachable": {
+              "default": false,
+              "title": "Upstream Reachable",
+              "type": "boolean"
+            },
             "upstream_status": {
-              "const": "not_checked",
               "default": "not_checked",
+              "enum": [
+                "not_checked",
+                "reachable",
+                "unreachable"
+              ],
               "title": "Upstream Status",
               "type": "string"
             },
@@ -1823,9 +1843,12 @@ Return local MCP server health without contacting AutoPVS1 upstream.
 Score one SNV/indel variant with the AutoPVS1 PVS1 rules.
 
 Auto-resolves non-canonical inputs (rsID, HGVS c./p./g.) into
-canonical SPDI via one upstream search call before scoring;
-emits an ``auto_resolved`` warning. Ambiguous resolutions return
-``requires_disambiguation`` with ranked candidates instead of
+canonical SPDI via one Ensembl Variant Recoder REST call before
+scoring (build-scoped — GRCh37 host for hg19, GRCh38 host for
+hg38). Emits an ``auto_resolved`` warning carrying the input,
+the resolved id, and the resolver source. Ambiguous resolutions
+return ``requires_disambiguation`` with allele-keyed candidates
+instead of
 silently picking one (mitigates multi-allelic mis-scoring).
 
 First-turn LLM callers: pass ``response_mode='summary'`` to receive
@@ -1875,7 +1898,7 @@ clinical decision support.
       "type": "string"
     },
     "variant_id": {
-      "description": "Variant identifier. Canonical SPDI (CHROM-POS-REF-ALT, e.g. X-82763936-A-T) scores in one upstream call. rsID (rs80357906) or HGVS (NM_007294.4:c.5266dup, NP_000050.2:p.Glu1756fs, GRCh38(NC_000017.11):g.43091983C>A) auto-resolves via search_variants then scores. Multiple resolver hits return error.code='requires_disambiguation' with candidates in details.candidates \u2014 caller picks one.",
+      "description": "Variant identifier. Canonical SPDI (CHROM-POS-REF-ALT, e.g. X-82763936-A-T) scores in one upstream call. rsID (rs80357906) or HGVS (NM_007294.4:c.5266dup, NP_000050.2:p.Glu1756fs, NC_000017.11:g.43091983C>A) auto-resolves via Ensembl Variant Recoder REST (build-scoped) then scores. Multiple resolver candidates return error.code='requires_disambiguation' with allele-keyed rows in details.candidates \u2014 caller picks one. Recoder offline returns error.code='external_resolver_unavailable' (retryable).",
       "type": "string"
     }
   },

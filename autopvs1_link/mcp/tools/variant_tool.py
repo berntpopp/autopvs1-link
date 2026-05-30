@@ -9,6 +9,10 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from autopvs1_link.api.autopvs1_urls import variant_url
+from autopvs1_link.api.variant_recoder import (
+    RecoderNotFoundError,
+    RecoderUnavailableError,
+)
 from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
@@ -37,6 +41,11 @@ def _is_retryable_status(status_code: int) -> bool:
     return status_code in {408, 429} or status_code >= 500
 
 
+def _autopvs1_variant_uri(genome_build: str, variant_id: str) -> str:
+    """Compose the AutoPVS1 web page URI for a resolved canonical id."""
+    return variant_url(settings.api.base_url, genome_build, variant_id)
+
+
 async def _resolve_or_normalize_variant_id(
     variant_id: str,
     genome_build: str,
@@ -44,12 +53,21 @@ async def _resolve_or_normalize_variant_id(
     """Resolve a possibly non-canonical variant_id to canonical SPDI.
 
     Canonical input → no upstream call; ``normalize_variant_id`` handles
-    strict format checks. rsID / HGVS input → one ``search_variants``
-    upstream call, build-scoped so resolution and scoring share the same
-    genome build (mitigates rsID/HGVS coords-vs-build drift). Multi-hit
-    → ``requires_disambiguation`` (never silently best-guess). Zero-hit
-    → ``not_found``. ``unknown`` form → ``invalid_variant_id`` raised by
+    strict format checks. rsID / HGVS input → one Ensembl Variant
+    Recoder call (build-scoped so the GRCh37 vs GRCh38 host matches the
+    caller's ``genome_build``; the SAME rsID returns different
+    coordinates between the two hosts). Multi-allele or multi-candidate
+    result → ``requires_disambiguation`` (never silently best-guess —
+    mitigates the multi-allelic mis-scoring failure mode, VEP #989).
+    Zero candidates / Ensembl 'not found' → ``not_found``. Recoder
+    timeout / 5xx / network error → ``external_resolver_unavailable``
+    (retryable). ``unknown`` form → ``invalid_variant_id`` raised by
     ``normalize_variant_id``.
+
+    AutoPVS1's own search endpoint is not used for rsID/HGVS resolution
+    because it does not index dbSNP rsIDs and only partially handles
+    HGVS via redirect; Ensembl REST is the authoritative resolver and
+    its result is then passed to AutoPVS1 for scoring as canonical SPDI.
     """
     form = classify_variant_input(variant_id)
     if form == "canonical":
@@ -60,61 +78,112 @@ async def _resolve_or_normalize_variant_id(
         raise AssertionError("unreachable: unknown form should have raised")
 
     raw_query = variant_id.strip()
-    search_result = await service_adapters.search_variants(raw_query, genome_build)
-    rows = list(getattr(search_result, "results", []) or [])
-
-    if not rows:
+    try:
+        candidates = await service_adapters.recode_variant(raw_query, genome_build)
+    except RecoderNotFoundError as exc:
         raise MCPInputError(
             code="not_found",
             message=(
-                f"AutoPVS1 returned no matches for {raw_query!r} on "
-                f"genome_build={genome_build}. Confirm the identifier or "
-                f"broaden the query via search_variants."
+                f"Ensembl Variant Recoder did not recognize {raw_query!r} "
+                f"on genome_build={genome_build}. Confirm the identifier "
+                f"or supply a canonical CHROM-POS-REF-ALT variant_id."
             ),
             suggestions=[
-                "Call search_variants with a gene symbol or broader text.",
+                "Confirm the rsID/HGVS exists in current dbSNP / RefSeq.",
                 "Confirm the genome_build matches the source identifier.",
+                "Supply a canonical CHROM-POS-REF-ALT variant_id directly.",
             ],
+            details={
+                "original_input": raw_query,
+                "form": form,
+                "genome_build": genome_build,
+                "resolver_source": "ensembl_variant_recoder",
+                "resolver_message": str(exc),
+            },
+        ) from exc
+    except RecoderUnavailableError as exc:
+        raise MCPInputError(
+            code="external_resolver_unavailable",
+            message=(
+                "Ensembl Variant Recoder is currently unreachable while "
+                f"resolving {raw_query!r}. The rest of AutoPVS1-Link is "
+                "unaffected — retry shortly or supply a canonical "
+                "CHROM-POS-REF-ALT variant_id to skip resolution."
+            ),
+            retryable=True,
+            suggestions=[
+                "Retry the call in a few seconds.",
+                "Supply a canonical CHROM-POS-REF-ALT variant_id (no resolver hop needed).",
+            ],
+            details={
+                "original_input": raw_query,
+                "form": form,
+                "genome_build": genome_build,
+                "resolver_source": "ensembl_variant_recoder",
+                "resolver_message": str(exc),
+            },
+        ) from exc
+
+    if not candidates:
+        raise MCPInputError(
+            code="not_found",
+            message=(
+                f"Ensembl Variant Recoder returned no canonical-chrom "
+                f"candidates for {raw_query!r} on genome_build={genome_build}."
+            ),
+            suggestions=[
+                "Confirm the rsID/HGVS resolves to a primary-assembly chromosome.",
+                "Supply a canonical CHROM-POS-REF-ALT variant_id directly.",
+            ],
+            details={
+                "original_input": raw_query,
+                "form": form,
+                "genome_build": genome_build,
+                "resolver_source": "ensembl_variant_recoder",
+            },
         )
 
-    if len(rows) > 1:
-        candidates = [
+    if len(candidates) > 1:
+        candidate_rows = [
             {
-                "id": row.variant_id,
-                "gene": row.gene,
-                "variant_type": row.variant_type,
-                "genome_build": row.genome_build,
-                "resource_uri": row.url,
+                "id": c.variant_id,
+                "spdi": c.spdi,
+                "allele_key": c.allele_key,
+                "synonym_ids": list(c.synonym_ids),
+                "genome_build": genome_build,
+                "resource_uri": _autopvs1_variant_uri(genome_build, c.variant_id),
             }
-            for row in rows[:5]
+            for c in candidates[:5]
         ]
         raise MCPInputError(
             code="requires_disambiguation",
             message=(
                 f"Auto-resolution of {raw_query!r} returned "
-                f"{len(rows)} candidates; caller must pick one and "
-                f"re-call get_variant_pvs1_data with the canonical id."
+                f"{len(candidates)} canonical candidates; caller must "
+                f"pick one and re-call get_variant_pvs1_data with that "
+                f"variant_id."
             ),
             suggestions=[
-                f"Re-call with variant_id={c['id']!r} (gene={c['gene']}, type={c['variant_type']})."
-                for c in candidates[:3]
+                f"Re-call with variant_id={c['id']!r} (allele={c['allele_key']})."
+                for c in candidate_rows[:3]
             ],
             details={
-                "candidates": candidates,
+                "candidates": candidate_rows,
                 "original_input": raw_query,
                 "form": form,
                 "genome_build": genome_build,
+                "resolver_source": "ensembl_variant_recoder",
             },
         )
 
-    sole = rows[0]
+    sole = candidates[0]
     return sole.variant_id, [
         MCPWarning(
             code="auto_resolved",
             message=(
                 f"Resolved {raw_query!r} -> {sole.variant_id} via "
-                f"search_variants (form={form}, "
-                f"genome_build={genome_build})."
+                f"Ensembl Variant Recoder (form={form}, "
+                f"genome_build={genome_build}, allele={sole.allele_key})."
             ),
         )
     ]
@@ -144,10 +213,13 @@ def register(mcp: FastMCP) -> None:
                     "Variant identifier. Canonical SPDI (CHROM-POS-REF-ALT, "
                     "e.g. X-82763936-A-T) scores in one upstream call. "
                     "rsID (rs80357906) or HGVS (NM_007294.4:c.5266dup, "
-                    "NP_000050.2:p.Glu1756fs, GRCh38(NC_000017.11):g.43091983C>A) "
-                    "auto-resolves via search_variants then scores. Multiple "
-                    "resolver hits return error.code='requires_disambiguation' "
-                    "with candidates in details.candidates — caller picks one."
+                    "NP_000050.2:p.Glu1756fs, NC_000017.11:g.43091983C>A) "
+                    "auto-resolves via Ensembl Variant Recoder REST "
+                    "(build-scoped) then scores. Multiple resolver "
+                    "candidates return error.code='requires_disambiguation' "
+                    "with allele-keyed rows in details.candidates — caller "
+                    "picks one. Recoder offline returns "
+                    "error.code='external_resolver_unavailable' (retryable)."
                 ),
             ),
         ],
@@ -184,9 +256,12 @@ def register(mcp: FastMCP) -> None:
         """Score one SNV/indel variant with the AutoPVS1 PVS1 rules.
 
         Auto-resolves non-canonical inputs (rsID, HGVS c./p./g.) into
-        canonical SPDI via one upstream search call before scoring;
-        emits an ``auto_resolved`` warning. Ambiguous resolutions return
-        ``requires_disambiguation`` with ranked candidates instead of
+        canonical SPDI via one Ensembl Variant Recoder REST call before
+        scoring (build-scoped — GRCh37 host for hg19, GRCh38 host for
+        hg38). Emits an ``auto_resolved`` warning carrying the input,
+        the resolved id, and the resolver source. Ambiguous resolutions
+        return ``requires_disambiguation`` with allele-keyed candidates
+        instead of
         silently picking one (mitigates multi-allelic mis-scoring).
 
         First-turn LLM callers: pass ``response_mode='summary'`` to receive

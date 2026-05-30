@@ -53,7 +53,9 @@ _TOOL_SUMMARIES: dict[str, dict[str, Any]] = {
         "purpose": (
             "Search AutoPVS1 by gene symbol, partial variant ID, or "
             "upstream-supported query. Use response_mode='ids_only' "
-            "to resolve to a variant_id with minimum bytes."
+            "to save ~40% per row (variant_id + url only). For rsID/HGVS, "
+            "call get_variant_pvs1_data directly — its built-in Ensembl "
+            "Variant Recoder resolver is more accurate than search."
         ),
         "example": {
             "query": "BRCA1",
@@ -279,6 +281,21 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             mode: {"char_budget": spec["char_budget"], "note": spec["note"]}
             for mode, spec in PAYLOAD_MODES.items()
         },
+        "tier_specific_fields": {
+            "cnv_info.size": (
+                "Derived end-start span. Present in standard and full tiers "
+                "for get_cnv_pvs1_data and get_cnvs_pvs1_data_bulk; dropped "
+                "from summary and ids_only tiers to stay under budget."
+            ),
+            "variant_info.external_links": (
+                "Present in standard and full tiers only. ids_only and "
+                "summary tiers drop the link block to stay token-cheap."
+            ),
+            "pvs1_flowchart.decision_tree": (
+                "Empty list in summary; present in standard and full. "
+                "Use standard tier when an LLM needs to explain the path."
+            ),
+        },
         "bulk_behavior": {
             "max_items": 10,
             "execution": "sequential",
@@ -306,6 +323,18 @@ def detailed_capabilities_resource() -> dict[str, Any]:
         "cache_statistics": {
             "resource": "autopvs1-link://cache/statistics",
             "semantics": ("Method-keyed counters with stable keys and cache key shapes."),
+            "wire_cache_status_values": ["hit", "miss", "coalesced", "bypass"],
+            "wire_cache_status_notes": (
+                "meta.cache_status on each ok envelope is one of: 'hit' "
+                "(cache pre-populated; instant return), 'miss' (we drove "
+                "the upstream call; elapsed_ms reflects the round trip), "
+                "'coalesced' (another concurrent call's miss was already "
+                "in flight; we shared its future and waited — elapsed_ms "
+                "reflects the populator's wait, NOT a true hit), 'bypass' "
+                "(caching disabled). Honest 'coalesced' protects LLM "
+                "consumers from concluding that hits are slow when they "
+                "are really waiting on a sibling's miss."
+            ),
         },
         "destructive_tools": {
             "clear_cache": (
@@ -331,32 +360,55 @@ _AUTO_RESOLUTION_BLOCK: dict[str, Any] = {
     "tool": "get_variant_pvs1_data",
     "summary": (
         "Auto-resolves non-canonical variant_id inputs (rsID, HGVS c./p./g.) "
-        "to canonical CHROM-POS-REF-ALT via one upstream search_variants "
-        "call before scoring."
+        "to canonical CHROM-POS-REF-ALT via Ensembl Variant Recoder REST "
+        "before scoring. Build-scoped: GRCh37 host for hg19, GRCh38 host "
+        "for hg38."
     ),
+    "resolver": {
+        "source": "ensembl_variant_recoder",
+        "hosts": {
+            "hg19": "https://grch37.rest.ensembl.org",
+            "hg38": "https://rest.ensembl.org",
+        },
+        "endpoint": "/variant_recoder/human/{id}",
+        "rate_limit": "Ensembl REST: ~15 req/s shared across all endpoints",
+        "result_cache_ttl_seconds": 86_400,
+    },
     "accepted_forms": {
         "canonical": "CHROM-POS-REF-ALT (e.g. X-82763936-A-T) — no extra upstream call",
         "rsid": "rs<digits> (lowercase rs required, e.g. rs80357906)",
         "hgvs_c": "NM_*/NR_*/ENST*:c.* or :n.* (e.g. NM_007294.4(BRCA1):c.5266dup)",
         "hgvs_p": "NP_*/ENSP*:p.* (e.g. NP_000050.2:p.Glu1756fs)",
-        "hgvs_g": "[GRCh3[78](]NC_*:g.* (e.g. GRCh38(NC_000017.11):g.43091983C>A)",
+        "hgvs_g": "NC_*:g.* (e.g. NC_000017.11:g.43091983C>A)",
     },
     "outcomes": {
         "single_hit": (
             "Scored with the resolved canonical id; auto_resolved warning "
-            "carries the original input + resolved id + detected form."
+            "carries the original input, resolved id, resolver source, "
+            "detected form, and Ensembl allele key."
         ),
-        "zero_hits": "error.code='not_found' with search_variants suggestion.",
+        "zero_hits": (
+            "error.code='not_found' with concrete suggestions (confirm rsID "
+            "exists in current dbSNP; confirm genome_build; or supply a "
+            "canonical CHROM-POS-REF-ALT directly to skip resolution)."
+        ),
         "multi_hit": (
             "error.code='requires_disambiguation' with candidates list in "
-            "details.candidates. Each candidate: id, gene, variant_type, "
-            "genome_build, resource_uri. Caller picks one and re-calls. "
-            "Server never silently best-guesses to avoid multi-allelic "
-            "mis-scoring (Ensembl VEP #989 failure mode)."
+            "details.candidates. Each candidate: id, spdi, allele_key, "
+            "synonym_ids, genome_build, resource_uri. Caller picks one "
+            "and re-calls. Server never silently best-guesses to avoid "
+            "multi-allelic mis-scoring (Ensembl VEP #989 failure mode)."
+        ),
+        "resolver_unavailable": (
+            "error.code='external_resolver_unavailable' (retryable=true) "
+            "when Ensembl REST times out, rate-limits, or returns 5xx. "
+            "Distinguishes transient failure from permanent not_found."
         ),
     },
     "build_safety": (
         "Resolver call is build-scoped to caller's genome_build so "
-        "resolution and scoring share the same coordinate frame."
+        "resolution and scoring share the same coordinate frame. The "
+        "SAME rsID returns DIFFERENT coordinates between GRCh37 and "
+        "GRCh38 hosts — the resolver picks the correct host."
     ),
 }

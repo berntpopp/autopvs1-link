@@ -42,7 +42,13 @@ KNOWN_ERROR_CODES: dict[str, str] = {
     "requires_disambiguation": (
         "Auto-resolution of an rsID/HGVS input returned multiple "
         "candidates; caller must pick one. details.candidates carries "
-        "id + gene + variant_type + genome_build + resource_uri rows."
+        "id + spdi + allele_key + resource_uri rows."
+    ),
+    "external_resolver_unavailable": (
+        "Ensembl Variant Recoder was unreachable, rate-limited, or "
+        "returned a 5xx while resolving an rsID/HGVS input. Retryable; "
+        "callers can re-issue or supply a pre-resolved canonical "
+        "CHROM-POS-REF-ALT variant_id."
     ),
 }
 
@@ -56,8 +62,9 @@ KNOWN_WARNING_CODES: dict[str, str] = {
     "unsupported_hgvs_like_search": "HGVS-like text returned zero results.",
     "auto_resolved": (
         "An rsID/HGVS variant_id was auto-resolved to canonical SPDI via "
-        "search_variants. The warning carries the original input, the "
-        "resolved id, and the detected input form."
+        "the Ensembl Variant Recoder REST API. The warning carries the "
+        "original input, the resolved id, the detected input form, and "
+        "the resolver source so consumers can audit the resolution path."
     ),
 }
 

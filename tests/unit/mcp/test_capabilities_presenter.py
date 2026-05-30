@@ -41,7 +41,9 @@ def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
         "purpose": (
             "Search AutoPVS1 by gene symbol, partial variant ID, or "
             "upstream-supported query. Use response_mode='ids_only' "
-            "to resolve to a variant_id with minimum bytes."
+            "to save ~40% per row (variant_id + url only). For rsID/HGVS, "
+            "call get_variant_pvs1_data directly — its built-in Ensembl "
+            "Variant Recoder resolver is more accurate than search."
         ),
         "example": {
             "query": "BRCA1",

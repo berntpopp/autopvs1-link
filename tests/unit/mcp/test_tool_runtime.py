@@ -7,6 +7,11 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
+from autopvs1_link.api.variant_recoder import (
+    RecoderCandidate,
+    RecoderNotFoundError,
+    RecoderUnavailableError,
+)
 from autopvs1_link.mcp.facade import build_mcp_server
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
@@ -19,6 +24,20 @@ from autopvs1_link.models.autopvs1_models import (
     SearchResult,
     VariantInfo,
 )
+
+
+def _recoder_candidate(
+    variant_id: str = "17-43057065-G-GG",
+    allele_key: str = "G",
+    spdi: str = "NC_000017.11:43057065::G",
+    synonyms: tuple[str, ...] = ("rs80357906",),
+) -> RecoderCandidate:
+    return RecoderCandidate(
+        variant_id=variant_id,
+        allele_key=allele_key,
+        spdi=spdi,
+        synonym_ids=synonyms,
+    )
 
 
 class _FakeResult(BaseModel):
@@ -840,30 +859,21 @@ async def test_variant_standard_mode_drops_null_default_fields_from_wire(mocker)
 
 
 @pytest.mark.asyncio
-async def test_variant_auto_resolves_rsid_to_canonical_with_warning(mocker) -> None:
-    """rsID input triggers internal search + scores the sole hit + warns.
+async def test_variant_auto_resolves_rsid_via_recoder_with_warning(mocker) -> None:
+    """rsID input is resolved via Ensembl Variant Recoder, then scored.
 
-    LLM-consumer reclaim from pass-2 (8.8/10): "An rsID or HGVS would
-    force search_variants first. Auto-resolving common ID forms in
-    get_variant_pvs1_data would save a round-trip." Single-hit case.
+    LLM-consumer reclaim (pass-3, 8.4/10 → 10/10 push): the previous
+    AutoPVS1-search-based resolver returned ``not_found`` for rsIDs
+    because AutoPVS1's search index does not include dbSNP rsIDs. The
+    new resolver delegates to Ensembl's Variant Recoder REST API, which
+    is the authoritative public mapping from rsID/HGVS to canonical
+    SPDI. The resolved id is then sent to AutoPVS1 for PVS1 scoring,
+    and an ``auto_resolved`` warning carries the audit trail (input,
+    resolved id, resolver source, allele key).
     """
-    search_fake = AsyncMock(
-        return_value=AutoPVS1SearchResults(
-            query="rs80357906",
-            genome_version="hg38",
-            results=[
-                SearchResult(
-                    variant_id="17-43094692-G-A",
-                    gene="BRCA1",
-                    variant_type="Nonsense",
-                    genome_build="hg38",
-                    url="https://autopvs1.bgi.com/variant/hg38/17-43094692-G-A",
-                ),
-            ],
-        )
-    )
+    recoder_fake = AsyncMock(return_value=[_recoder_candidate()])
     score_fake = AsyncMock(return_value=_variant_result())
-    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recoder_fake)
     mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
 
     mcp = build_mcp_server()
@@ -873,46 +883,35 @@ async def test_variant_auto_resolves_rsid_to_canonical_with_warning(mocker) -> N
     )
     payload = result.structured_content
     assert payload["ok"] is True, payload
-    codes = [w["code"] for w in payload["meta"]["warnings"]]
-    assert "auto_resolved" in codes
+    by_code = {w["code"]: w for w in payload["meta"]["warnings"]}
+    assert "auto_resolved" in by_code
+    assert "ensembl variant recoder" in by_code["auto_resolved"]["message"].lower()
     # Score call uses the resolved canonical id, not the raw rsID.
-    score_fake.assert_awaited_once_with("hg38", "17-43094692-G-A")
-    # Search call uses caller's genome_build (build-drift mitigation).
-    search_fake.assert_awaited_once_with("rs80357906", "hg38")
+    score_fake.assert_awaited_once_with("hg38", "17-43057065-G-GG")
+    # Recoder is build-scoped to caller's genome_build (build-drift mitigation).
+    recoder_fake.assert_awaited_once_with("rs80357906", "hg38")
 
 
 @pytest.mark.asyncio
-async def test_variant_auto_resolution_requires_disambiguation_on_multi(mocker) -> None:
-    """Multiple resolver hits MUST surface as ``requires_disambiguation``.
+async def test_variant_auto_resolves_hgvs_c_via_recoder_with_warning(mocker) -> None:
+    """HGVS-c input is resolved via the recoder just like rsID.
 
-    Mitigates the silent-multi-allelic mis-scoring failure mode (VEP #989):
-    never collapse to "best guess" by ALT-allele frequency. Always force the
-    caller to pick.
+    The previous implementation tried AutoPVS1's search box with an
+    HGVS string and got 0 hits more often than not. Ensembl's recoder
+    handles HGVS-c/p/g uniformly so the resolver path is unified.
     """
-    search_fake = AsyncMock(
-        return_value=AutoPVS1SearchResults(
-            query="NM_007294.4:c.5266dup",
-            genome_version="hg38",
-            results=[
-                SearchResult(
-                    variant_id="17-43094692-G-A",
-                    gene="BRCA1",
-                    variant_type="Nonsense",
-                    genome_build="hg38",
-                    url="https://autopvs1.bgi.com/variant/hg38/17-43094692-G-A",
-                ),
-                SearchResult(
-                    variant_id="17-43094692-GC-G",
-                    gene="BRCA1",
-                    variant_type="Frameshift",
-                    genome_build="hg38",
-                    url="https://autopvs1.bgi.com/variant/hg38/17-43094692-GC-G",
-                ),
-            ],
-        )
+    recoder_fake = AsyncMock(
+        return_value=[
+            _recoder_candidate(
+                variant_id="17-43057063-G-GG",
+                allele_key="G",
+                spdi="NC_000017.11:43057063::G",
+                synonyms=(),
+            )
+        ]
     )
     score_fake = AsyncMock(return_value=_variant_result())
-    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recoder_fake)
     mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
 
     mcp = build_mcp_server()
@@ -921,57 +920,130 @@ async def test_variant_auto_resolution_requires_disambiguation_on_multi(mocker) 
         {"genome_build": "hg38", "variant_id": "NM_007294.4:c.5266dup"},
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "requires_disambiguation"
-    candidates = payload["error"]["details"]["candidates"]
-    assert {c["id"] for c in candidates} == {"17-43094692-G-A", "17-43094692-GC-G"}
-    # Disambiguators must include gene + variant_type (peer pattern, SysNDD shape).
-    assert all("gene" in c and "variant_type" in c for c in candidates)
-    # No score call was made — disambiguation must NOT silently best-guess.
-    score_fake.assert_not_awaited()
+    assert payload["ok"] is True, payload
+    codes = [w["code"] for w in payload["meta"]["warnings"]]
+    assert "auto_resolved" in codes
+    score_fake.assert_awaited_once_with("hg38", "17-43057063-G-GG")
+    recoder_fake.assert_awaited_once_with("NM_007294.4:c.5266dup", "hg38")
 
 
 @pytest.mark.asyncio
-async def test_variant_auto_resolution_zero_hits_returns_not_found(mocker) -> None:
-    """rsID with no resolver hits surfaces as ``not_found``.
+async def test_variant_recoder_multi_allele_returns_requires_disambiguation(
+    mocker,
+) -> None:
+    """Multi-allelic recoder response MUST surface as ``requires_disambiguation``.
 
-    The error suggestion points the caller at search_variants so the LLM
-    can broaden the query without inventing a different tool to call.
+    Mitigates the silent-multi-allelic mis-scoring failure mode (VEP #989):
+    never collapse to "best guess" by ALT-allele frequency. The recoder
+    returns one candidate per ALT key under one array element; we surface
+    them all and force the caller to pick.
     """
-    search_fake = AsyncMock(
-        return_value=AutoPVS1SearchResults(
-            query="rs0000000000",
-            genome_version="hg38",
-            results=[],
-        )
-    )
+    candidates = [
+        _recoder_candidate(
+            variant_id="9-133256042-C-T",
+            allele_key="T",
+            spdi="NC_000009.12:133256041:C:T",
+            synonyms=("rs56116432",),
+        ),
+        _recoder_candidate(
+            variant_id="9-133256042-C-A",
+            allele_key="A",
+            spdi="NC_000009.12:133256041:C:A",
+            synonyms=("rs56116432",),
+        ),
+    ]
+    recoder_fake = AsyncMock(return_value=candidates)
     score_fake = AsyncMock(return_value=_variant_result())
-    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recoder_fake)
     mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
 
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "get_variant_pvs1_data",
-        {"genome_build": "hg38", "variant_id": "rs0000000000"},
+        {"genome_build": "hg38", "variant_id": "rs56116432"},
     )
     payload = result.structured_content
     assert payload["ok"] is False
-    assert payload["error"]["code"] == "not_found"
+    assert payload["error"]["code"] == "requires_disambiguation"
+    candidates_payload = payload["error"]["details"]["candidates"]
+    assert {c["id"] for c in candidates_payload} == {
+        "9-133256042-C-T",
+        "9-133256042-C-A",
+    }
+    # Disambiguators must include allele_key + resource_uri (LLM-actionable).
+    assert all("allele_key" in c and "resource_uri" in c for c in candidates_payload)
+    # No score call — disambiguation must NOT silently best-guess.
     score_fake.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_variant_canonical_id_does_not_call_search(mocker) -> None:
-    """Canonical input must NOT trigger an extra upstream search call.
+async def test_variant_recoder_not_found_returns_not_found(mocker) -> None:
+    """Ensembl 400 'not found' is mapped to ``error.code='not_found'``.
+
+    The suggestion points the caller at confirming the rsID/HGVS exists
+    or supplying a canonical CHROM-POS-REF-ALT, so the LLM has a
+    concrete remediation path without guessing at a different tool.
+    """
+    recoder_fake = AsyncMock(
+        side_effect=RecoderNotFoundError("No variant found with ID 'rs99999999999'")
+    )
+    score_fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recoder_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "rs99999999999"},
+    )
+    payload = result.structured_content
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "not_found"
+    assert "canonical CHROM-POS-REF-ALT" in " ".join(payload["error"]["suggestions"])
+    score_fake.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_variant_recoder_unavailable_returns_external_resolver_unavailable(
+    mocker,
+) -> None:
+    """Recoder timeout/5xx maps to ``external_resolver_unavailable`` (retryable).
+
+    Distinguishes a permanent 'not found' from a transient upstream
+    failure so an LLM caller can decide whether to retry vs. ask the
+    user for a different identifier.
+    """
+    recoder_fake = AsyncMock(
+        side_effect=RecoderUnavailableError(
+            "Variant Recoder timed out resolving 'rs80357906' on hg38"
+        )
+    )
+    score_fake = AsyncMock(return_value=_variant_result())
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recoder_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": "rs80357906"},
+    )
+    payload = result.structured_content
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "external_resolver_unavailable"
+    assert payload["error"]["retryable"] is True
+    score_fake.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_variant_canonical_id_does_not_call_recoder(mocker) -> None:
+    """Canonical input must NOT trigger an extra recoder call.
 
     Mitigates the hidden-cost-spike failure mode: only non-canonical
     forms pay the extra upstream hop.
     """
-    search_fake = AsyncMock(
-        return_value=AutoPVS1SearchResults(query="x", genome_version="hg38", results=[])
-    )
+    recoder_fake = AsyncMock(return_value=[_recoder_candidate()])
     score_fake = AsyncMock(return_value=_variant_result())
-    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=search_fake)
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recoder_fake)
     mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=score_fake)
 
     mcp = build_mcp_server()
@@ -982,7 +1054,7 @@ async def test_variant_canonical_id_does_not_call_search(mocker) -> None:
     payload = result.structured_content
     assert payload["ok"] is True
     score_fake.assert_awaited_once_with("hg38", "X-82763936-A-T")
-    search_fake.assert_not_awaited()
+    recoder_fake.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1272,6 +1344,83 @@ async def test_get_server_health_is_local_read_only_and_does_not_call_upstream(m
     assert result.structured_content["data"]["status"] == "ok"
     assert result.structured_content["data"]["upstream_checked"] is False
     assert result.structured_content["meta"]["research_use_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_server_health_check_upstream_true_probes_and_reports_reachable(
+    mocker,
+) -> None:
+    """With ``check_upstream=true`` the tool issues one short HEAD probe.
+
+    LLM-consumer reclaim: "upstream_checked is always false with no param
+    to flip it — either add an opt-in check_upstream=true or drop the
+    field." Opt-in (default False) keeps the no-cost contract for cheap
+    callers; explicit True surfaces an honest reachability signal so an
+    agent can decide whether to attempt a scoring call.
+    """
+
+    class _FakeResp:
+        status_code = 200
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self.aclose_called = False
+
+        async def __aenter__(self) -> "_FakeClient":
+            return self
+
+        async def __aexit__(self, *args) -> None:
+            self.aclose_called = True
+
+        async def head(self, url: str, **kwargs) -> _FakeResp:
+            self.requested_url = url
+            return _FakeResp()
+
+    mocker.patch("autopvs1_link.mcp.tools.health_tool.httpx.AsyncClient", _FakeClient)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("get_server_health", {"check_upstream": True})
+
+    assert result.structured_content["ok"] is True
+    data = result.structured_content["data"]
+    assert data["upstream_checked"] is True
+    assert data["upstream_reachable"] is True
+    assert data["upstream_status"] == "reachable"
+
+
+@pytest.mark.asyncio
+async def test_get_server_health_check_upstream_true_reports_unreachable_on_timeout(
+    mocker,
+) -> None:
+    """Network failure during the probe surfaces as ``unreachable``, NOT an error.
+
+    The health tool keeps its no-throw contract — an unreachable upstream
+    is a reportable state, not a tool failure. LLM callers can branch on
+    ``data.upstream_reachable`` without parsing exception text.
+    """
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs) -> None: ...
+
+        async def __aenter__(self) -> "_FakeClient":
+            return self
+
+        async def __aexit__(self, *args) -> None:
+            return None
+
+        async def head(self, url: str, **kwargs):
+            raise httpx.TimeoutException("probe timed out")
+
+    mocker.patch("autopvs1_link.mcp.tools.health_tool.httpx.AsyncClient", _FakeClient)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("get_server_health", {"check_upstream": True})
+
+    assert result.structured_content["ok"] is True
+    data = result.structured_content["data"]
+    assert data["upstream_checked"] is True
+    assert data["upstream_reachable"] is False
+    assert data["upstream_status"] == "unreachable"
 
 
 @pytest.mark.asyncio
