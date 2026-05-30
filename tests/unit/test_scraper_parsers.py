@@ -122,6 +122,32 @@ class TestPVS1FlowchartParsing:
         # Should have notes marked with #1, #2, etc.
         assert len(flowchart.notes) > 0
 
+    def test_parse_pvs1_flowchart_notes_capture_full_legend_text(
+        self, client, variant_soup
+    ):
+        """Notes legend must capture full prose, not a single neighbour tag.
+
+        Regression for an LLM-consumer report that ``notes['#1']`` was just
+        ``"2"`` and ``notes['#2']`` was ``""``. The walker has to traverse
+        every sibling text + nested tag after a ``#N`` marker until the
+        next ``<br>`` or the next ``#M`` marker.
+        """
+        flowchart = client._parse_pvs1_flowchart(variant_soup)
+
+        note_one = flowchart.notes.get("#1", "")
+        note_two = flowchart.notes.get("#2", "")
+
+        # #1 carries the ClinVar-domain legend with several inline <b>/<a> tags.
+        assert "ClinVar pathogenic missense" in note_one
+        assert "POU-specific" in note_one
+        assert "P49335" in note_one
+        # Regression guard: must NOT collapse to the single neighbour token.
+        assert note_one != "2"
+
+        # #2 is a short legend line; must not collapse to an empty string.
+        assert "No LOF variant is found" in note_two
+        assert note_two != ""
+
     def test_parse_pvs1_flowchart_cleans_steps_and_extracts_note_ids(self, client, variant_soup):
         """Decision-tree codes should be compact, ordered, and carry note IDs separately."""
         flowchart = client._parse_pvs1_flowchart(variant_soup)

@@ -44,6 +44,40 @@ def _collapse_html_text(tag: Tag) -> str:
     return re.sub(r"\s+", " ", tag.get_text(" ", strip=True)).strip()
 
 
+def _is_note_marker(node: object) -> bool:
+    """Return whether ``node`` is a ``<b style='color:#CD5C5C'>#N</b>`` marker."""
+    if not isinstance(node, Tag) or node.name != "b":
+        return False
+    style = node.get("style") or ""
+    if not isinstance(style, str):
+        return False
+    return "color:#CD5C5C" in style.replace(" ", "")
+
+
+def _collect_note_legend_text(note_elem: Tag) -> str:
+    """Collect the prose following a ``#N`` legend marker.
+
+    Walks ``note_elem.next_sibling`` collecting text from NavigableStrings
+    and nested tags until the line ends (``<br>``) or the next legend
+    marker begins. Whitespace is collapsed so inline ``<b>`` and ``<a>``
+    spans concatenate cleanly. Replaces the previous single-sibling read
+    that returned only the immediately neighbouring tag's text.
+    """
+    parts: list[str] = []
+    sibling = note_elem.next_sibling
+    while sibling is not None:
+        if isinstance(sibling, Tag):
+            if sibling.name == "br":
+                break
+            if _is_note_marker(sibling):
+                break
+            parts.append(sibling.get_text(" ", strip=False))
+        else:
+            parts.append(str(sibling))
+        sibling = sibling.next_sibling
+    return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
 def _match_strength_candidate(candidate: str) -> str:
     """Match a strength label at the start of candidate text."""
     candidate = re.sub(r"\s+", " ", candidate).strip()
@@ -289,9 +323,12 @@ def parse_pvs1_flowchart(soup: BeautifulSoup) -> PVS1Flowchart:
         note_id = _collapse_html_text(note_elem)
         if not re.fullmatch(r"#\d+", note_id):
             continue
-        next_elem = note_elem.find_next_sibling()
-        if next_elem and hasattr(next_elem, "text"):
-            notes[note_id] = next_elem.text.strip()
+        # Decision-tree markers (#N inside a <code> step) are already
+        # captured in FlowchartStep.note_id; the legend `notes` dict is
+        # only for the prose that follows each marker outside <code>.
+        if note_elem.find_parent("code") is not None:
+            continue
+        notes[note_id] = _collect_note_legend_text(note_elem)
 
     return PVS1Flowchart(
         preliminary_decision_path=preliminary_path,

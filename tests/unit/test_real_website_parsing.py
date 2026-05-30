@@ -84,10 +84,15 @@ class TestRealWebsiteParsing:
         assert "Nonsense or Frameshift" in decision_codes
         assert "Unmet" in decision_codes
 
-        # Verify notes parsing
+        # Verify notes parsing: legend must capture the FULL prose, not
+        # just the first neighbouring tag.
         assert "#1" in flowchart.notes
         assert "#2" in flowchart.notes
+        assert flowchart.notes["#1"].startswith("Neither mutational hotspot")
+        assert "functional domain is found" in flowchart.notes["#1"]
+        assert "Maximum LOF population frequency" in flowchart.notes["#2"]
         assert "3.30e-02" in flowchart.notes["#2"]
+        assert "threshold (0.1%)" in flowchart.notes["#2"]
 
         # Verify disease mechanisms
         assert len(result.disease_mechanisms) == 3
