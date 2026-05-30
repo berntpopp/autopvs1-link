@@ -8,21 +8,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Real rsID / HGVS auto-resolution via Ensembl Variant Recoder REST**
+  in `get_variant_pvs1_data`. The previous implementation tried to
+  resolve non-canonical inputs by calling AutoPVS1's own search box,
+  but AutoPVS1 does not index dbSNP rsIDs and only partially handles
+  HGVS via redirect, so the documented examples (`rs80357906`,
+  `NM_007294.4:c.5266dup`) returned `not_found`. The new resolver
+  delegates to Ensembl's authoritative recoder (build-scoped:
+  `rest.ensembl.org` for hg38, `grch37.rest.ensembl.org` for hg19) and
+  uses the returned `vcf_string` (already in `CHROM-POS-REF-ALT`
+  format) as the canonical id sent to AutoPVS1 for PVS1 scoring.
+  Recoder results are cached with the same `enhanced_cache` wrapper
+  used for AutoPVS1 calls. Live verification: `rs80357906` resolves
+  to `17-43057065-G-GG` (BRCA1 c.5266dup on hg38) and scores cleanly.
+  Multi-allelic inputs (e.g. `rs56116432`) surface every allele key
+  in `details.candidates` (with `id`, `spdi`, `allele_key`,
+  `synonym_ids`, `genome_build`, `resource_uri`) and force the caller
+  to disambiguate — never silently best-guess. Recoder timeout / 5xx
+  / rate-limit returns the new error code `external_resolver_unavailable`
+  (retryable=true), distinguishing transient upstream failure from
+  permanent `not_found`.
+- **Honest `cache_status="coalesced"`** for concurrent same-key
+  callers. The previous wrapper used `cache_info().hits` deltas as
+  the hit/miss signal, but `async_lru` increments hits synchronously
+  for every waiter that joins an in-flight populator's future — so
+  the populator AND every coalesced waiter both observed
+  `cache_info_after.hits > cache_info_before.hits` and were labelled
+  `hit`, even though one drove the upstream call and the others
+  waited multi-seconds. The wrapper now maintains a per-method
+  in-flight key set and uses miss-delta detection: the originator
+  reports `miss` (true upstream work), latecomers report `coalesced`
+  (waited on someone else's miss), and post-population callers
+  report `hit` (genuine instant cache return). `bypass` is unchanged.
+  Documented on the detailed capabilities resource under
+  `cache_statistics.wire_cache_status_values`.
+- **`get_server_health(check_upstream: bool = False)`** opt-in HEAD
+  probe against the AutoPVS1 base URL. Default `False` preserves the
+  sub-millisecond cheap-tool contract; explicit `True` returns
+  `data.upstream_reachable` + `data.upstream_status` ∈
+  `{reachable, unreachable}` so an LLM agent can confirm AutoPVS1 is
+  up before scheduling a cold scoring call. Network failures degrade
+  to `unreachable` rather than raising.
 - **Auto-resolution of non-canonical `variant_id` inputs** in
-  `get_variant_pvs1_data`. rsID (`rs80357906`), HGVS coding
-  (`NM_007294.4(BRCA1):c.5266dup`), HGVS protein
-  (`NP_000050.2:p.Glu1756fs`), and HGVS genomic
-  (`GRCh38(NC_000017.11):g.43091983C>A`) are now recognized by a
-  pre-flight sniffer that classifies the form, then a single
-  build-scoped `search_variants` call resolves to canonical SPDI.
-  Single-hit case scores immediately and emits an `auto_resolved`
-  warning carrying the original input + resolved id + detected form.
-  Multi-hit case returns the new structured error
-  `requires_disambiguation` with candidate rows ({id, gene,
-  variant_type, genome_build, resource_uri}) in `details.candidates`
-  — the server **never silently best-guesses**, which mitigates the
-  multi-allelic mis-scoring failure mode (Ensembl VEP #989). Canonical
-  inputs are unchanged: zero extra upstream calls. Documented on the
+  `get_variant_pvs1_data` was originally added in this release with a
+  search-based fallback; that path has now been superseded by the
+  Variant Recoder integration above. The sniffer (`classify_variant_input`)
+  and the surface contract (`auto_resolved` warning,
+  `requires_disambiguation` on multi-hit, canonical-bypass) are
+  retained; only the resolver backend changed. Documented on the
   detailed capabilities resource under `auto_resolution`.
 - **`meta.elapsed_ms` and `meta.cache_status`** echoed on every ok
   envelope when an upstream call ran. The cache wrapper records into
