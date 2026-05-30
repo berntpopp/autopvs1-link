@@ -1068,6 +1068,10 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
               "title": "Canonical Parameters",
               "type": "object"
             },
+            "capabilities_version": {
+              "title": "Capabilities Version",
+              "type": "string"
+            },
             "compact_workflow": {
               "items": {
                 "description": "Compact ordered workflow guidance for first-turn discovery.",
@@ -1142,6 +1146,7 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "required": [
             "server",
             "version",
+            "capabilities_version",
             "transport",
             "endpoint",
             "research_use_only",

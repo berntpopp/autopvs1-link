@@ -9,6 +9,7 @@ from autopvs1_link.mcp.registries import (
     KNOWN_ERROR_CODES,
     KNOWN_WARNING_CODES,
     PAYLOAD_MODES,
+    capabilities_version,
 )
 from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 
@@ -18,6 +19,7 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
     return CompactCapabilitiesData(
         server=SERVER_NAME,
         version=SERVER_VERSION,
+        capabilities_version=capabilities_version(),
         transport="streamable-http",
         endpoint="/mcp/",
         research_use_only=True,
@@ -113,6 +115,7 @@ def detailed_capabilities_resource() -> dict[str, Any]:
     return {
         "server": SERVER_NAME,
         "version": SERVER_VERSION,
+        "capabilities_version": capabilities_version(),
         "research_use_only": True,
         "accepted_formats": {
             "variant_id": "{chrom}-{position}-{reference}-{alternate}",

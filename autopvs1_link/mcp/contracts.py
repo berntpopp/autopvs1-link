@@ -238,6 +238,7 @@ class CompactCapabilitiesData(BaseModel):
 
     server: str
     version: str
+    capabilities_version: str
     transport: str
     endpoint: str
     research_use_only: bool

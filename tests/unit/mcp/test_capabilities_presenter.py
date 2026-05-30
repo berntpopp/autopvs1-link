@@ -1,9 +1,12 @@
 """Tests for compact and detailed MCP capabilities payloads."""
 
+import re
+
 from autopvs1_link.mcp.presenters.capabilities import (
     detailed_capabilities_resource,
     present_compact_capabilities,
 )
+from autopvs1_link.mcp.registries import capabilities_version
 
 
 def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
@@ -99,3 +102,23 @@ def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> N
     }
     assert detailed["payload_modes"]["summary"]["char_budget"] == 1500
     assert detailed["payload_modes"]["full"]["char_budget"] == 12000
+
+
+def test_compact_capabilities_includes_capabilities_version_hash() -> None:
+    payload = present_compact_capabilities().model_dump(mode="json")
+    version = payload["capabilities_version"]
+    assert isinstance(version, str)
+    assert re.fullmatch(r"[0-9a-f]{16}", version), version
+    assert version == capabilities_version()
+
+
+def test_capabilities_version_is_stable_across_calls() -> None:
+    a = present_compact_capabilities().capabilities_version
+    b = present_compact_capabilities().capabilities_version
+    assert a == b
+
+
+def test_detailed_capabilities_mirrors_capabilities_version() -> None:
+    detailed = detailed_capabilities_resource()
+    compact = present_compact_capabilities().model_dump(mode="json")
+    assert detailed["capabilities_version"] == compact["capabilities_version"]
