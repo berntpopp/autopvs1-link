@@ -66,6 +66,29 @@ def _classify_cnv_body(genome_build: str, cnv_id: str) -> str:
     )
 
 
+_WORKFLOW_HELP_SUMMARIES: dict[str, str] = {
+    "clinical_review": ("review one variant under PVS1; confirm ID, score it, report."),
+    "batch_screen": ("score 1-10 variants in one bulk call with continue_on_error."),
+    "search_first": ("resolve a gene or HGVS-like string to an AutoPVS1 ID before scoring."),
+}
+
+
+def _workflow_help_menu() -> str:
+    """Render the guided-menu fallback shown when ``task`` is unknown.
+
+    Sourced from ``_WORKFLOW_HELP_SUMMARIES`` so adding a task in one
+    place auto-extends the menu. Format mirrors the brief: a header line,
+    one bullet per task with a short description, a blank line, then a
+    verb-noun CTA telling the caller how to invoke the prompt again.
+    """
+    bullets = "\n".join(f"- {key}: {summary}" for key, summary in _WORKFLOW_HELP_SUMMARIES.items())
+    return (
+        "Unknown task. Pick one to scope the guidance:\n"
+        f"{bullets}\n\n"
+        "Call pvs1_workflow_help again with task=<one of the above>."
+    )
+
+
 _WORKFLOW_HELP_BODIES: dict[str, str] = {
     "clinical_review": (
         "Use AutoPVS1-Link for research-use PVS1 review only - not for "
@@ -162,6 +185,5 @@ def register(mcp: FastMCP) -> None:
         """Return tool-chain guidance keyed by task."""
         body = _WORKFLOW_HELP_BODIES.get(task)
         if body is None:
-            valid = ", ".join(_WORKFLOW_HELP_BODIES)
-            return f"Unknown task. Choose one of: {valid}."
+            return _workflow_help_menu()
         return body

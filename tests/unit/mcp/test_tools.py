@@ -406,18 +406,42 @@ async def test_pvs1_workflow_help_search_first_describes_resolution_chain() -> N
     assert "next_cursor" in body
 
 
+def test_workflow_help_summaries_match_workflow_help_bodies() -> None:
+    """Drift guard: every task with a body must also have a one-line
+    summary so the guided menu fallback covers every supported task."""
+    from autopvs1_link.mcp.prompts import (
+        _WORKFLOW_HELP_BODIES,
+        _WORKFLOW_HELP_SUMMARIES,
+    )
+
+    assert set(_WORKFLOW_HELP_BODIES) == set(_WORKFLOW_HELP_SUMMARIES)
+
+
 @pytest.mark.asyncio
-async def test_pvs1_workflow_help_unknown_task_returns_valid_choices() -> None:
-    """Graceful fallback: when task is not one of the known keys, the
-    prompt should list the valid choices so the caller can recover."""
+async def test_pvs1_workflow_help_unknown_task_returns_guided_menu() -> None:
+    """Item 5: the unknown-task path should be a guided menu, not a terse
+    'pick one of: a, b, c' one-liner. A real LLM caller needs the task
+    name AND a one-line description so it can route the next call without
+    a second discovery turn — and a verb-noun call-to-action so it knows
+    what to do after picking."""
     mcp: FastMCP = build_mcp_server()
     rendered = await mcp.render_prompt(
         "pvs1_workflow_help",
         {"task": "totally_not_a_task"},
     )
     body = rendered.messages[0].content.text
-    assert "Unknown task" in body
-    # All three valid task keys must be advertised so the caller can correct.
-    assert "clinical_review" in body
-    assert "batch_screen" in body
-    assert "search_first" in body
+
+    # All three valid task keys must be advertised.
+    for key in ("clinical_review", "batch_screen", "search_first"):
+        assert key in body, key
+
+    # Each task name must be paired with a short description on the same
+    # bullet line (not just the bare key).
+    for key in ("clinical_review", "batch_screen", "search_first"):
+        marker = f"- {key}:"
+        assert marker in body, f"expected guided-menu bullet '{marker}' in body"
+
+    # Verb-noun CTA at the end so the LLM knows what to do next.
+    body_lower = body.lower()
+    assert "call pvs1_workflow_help" in body_lower
+    assert "task=" in body_lower
