@@ -6,7 +6,13 @@ Auto-generated from `autopvs1_link.mcp.facade.build_mcp_server`. Regenerate with
 
 ### `get_cnv_pvs1_data`
 
-Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
+Score one copy-number variant with the AutoPVS1 PVS1 rules.
+
+First-turn LLM callers: pass ``response_mode='summary'`` to receive
+the verdict (preliminary path + final strength) under ~1.5KB.
+Widen to ``response_mode='standard'`` only when the user asks for
+the decision tree. AutoPVS1 outputs are research-use only, not
+clinical decision support.
 
 #### Input Schema
 
@@ -43,7 +49,7 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level: ids_only, summary, standard, or full.",
+      "description": "Response detail level. LLM-first callers should pass 'summary' (verdict + path + final strength, ~1.5KB); widen to 'standard' (default, full decision tree with hoisted note_text and disease_mechanisms) when the user asks for the tree; use 'full' only for auditors who need the ``*_raw`` upstream fields; 'ids_only' is the batch-screen lookup tier.",
       "enum": [
         "ids_only",
         "summary",
@@ -208,7 +214,7 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
             "pvs1_flowchart": {
               "anyOf": [
                 {
-                  "description": "Typed PVS1 flowchart decision path and outcome.",
+                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
                   "properties": {
                     "decision_tree": {
                       "items": {
@@ -294,11 +300,19 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
                       "type": "string"
                     },
                     "notes": {
-                      "additionalProperties": {
-                        "type": "string"
-                      },
-                      "title": "Notes",
-                      "type": "object"
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Notes"
                     },
                     "preliminary_decision_path": {
                       "title": "Preliminary Decision Path",
@@ -387,8 +401,20 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
       "properties": {
+        "effective_chars": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Chars"
+        },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
           "properties": {
@@ -505,12 +531,14 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
 Score 1-10 CNVs in one call.
 
 Prefer this over ``get_cnv_pvs1_data`` when you have 2+ CNV IDs.
-Same semantics as ``get_variants_pvs1_data_bulk``: sequential
-server-side, respects upstream rate limit + cache; per-item
-``{ok, input, data, error}``; output items preserve input order;
-``response_mode`` and ``include_unmet`` apply per item; ``meta_mode``
-applies to the outer envelope only. Per-item failures do not stop
-the batch unless ``continue_on_error=false``.
+For LLM batch screens, default to ``response_mode='summary'`` so
+10 verdicts share one turn budget. Same semantics as
+``get_variants_pvs1_data_bulk``: sequential server-side, respects
+upstream rate limit + cache; per-item ``{ok, input, data,
+error}``; output items preserve input order; ``response_mode``
+and ``include_unmet`` apply per item; ``meta_mode`` applies to
+the outer envelope only. Per-item failures do not stop the batch
+unless ``continue_on_error=false``.
 
 Warning aggregation: per-item warnings collapse into
 ``meta.warnings``; codes emitted by more than one distinct item
@@ -571,7 +599,7 @@ not. Order is first-seen-code-first.
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level applied to each item.",
+      "description": "Response detail level applied to each item. Default to 'summary' for bulk batch screens \u2014 keeps the per-item payload small enough that 10 items still fit a turn. Widen to 'standard' only when an item needs the full decision tree.",
       "enum": [
         "ids_only",
         "summary",
@@ -752,7 +780,7 @@ not. Order is first-seen-code-first.
                           "pvs1_flowchart": {
                             "anyOf": [
                               {
-                                "description": "Typed PVS1 flowchart decision path and outcome.",
+                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
                                 "properties": {
                                   "decision_tree": {
                                     "items": {
@@ -838,11 +866,19 @@ not. Order is first-seen-code-first.
                                     "type": "string"
                                   },
                                   "notes": {
-                                    "additionalProperties": {
-                                      "type": "string"
-                                    },
-                                    "title": "Notes",
-                                    "type": "object"
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Notes"
                                   },
                                   "preliminary_decision_path": {
                                     "title": "Preliminary Decision Path",
@@ -1037,8 +1073,20 @@ not. Order is first-seen-code-first.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
       "properties": {
+        "effective_chars": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Chars"
+        },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
           "properties": {
@@ -1319,8 +1367,20 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
       "properties": {
+        "effective_chars": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Chars"
+        },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
           "properties": {
@@ -1537,8 +1597,20 @@ Return local MCP server health without contacting AutoPVS1 upstream.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
       "properties": {
+        "effective_chars": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Chars"
+        },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
           "properties": {
@@ -1652,7 +1724,13 @@ Return local MCP server health without contacting AutoPVS1 upstream.
 
 ### `get_variant_pvs1_data`
 
-Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
+Score one SNV/indel variant with the AutoPVS1 PVS1 rules.
+
+First-turn LLM callers: pass ``response_mode='summary'`` to receive
+the verdict (preliminary path + final strength) under ~1.5KB.
+Widen to ``response_mode='standard'`` only when the user asks for
+the decision tree. AutoPVS1 outputs are research-use only, not
+clinical decision support.
 
 #### Input Schema
 
@@ -1685,7 +1763,7 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level: ids_only, summary, standard, or full.",
+      "description": "Response detail level. LLM-first callers should pass 'summary' (verdict + path + final strength, ~1.5KB); widen to 'standard' (default, full decision tree with hoisted note_text and disease_mechanisms) when the user asks for the tree; use 'full' only for auditors who need the ``*_raw`` upstream fields; 'ids_only' is the batch-screen lookup tier.",
       "enum": [
         "ids_only",
         "summary",
@@ -1792,7 +1870,7 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
             "pvs1_flowchart": {
               "anyOf": [
                 {
-                  "description": "Typed PVS1 flowchart decision path and outcome.",
+                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
                   "properties": {
                     "decision_tree": {
                       "items": {
@@ -1878,11 +1956,19 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
                       "type": "string"
                     },
                     "notes": {
-                      "additionalProperties": {
-                        "type": "string"
-                      },
-                      "title": "Notes",
-                      "type": "object"
+                      "anyOf": [
+                        {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Notes"
                     },
                     "preliminary_decision_path": {
                       "title": "Preliminary Decision Path",
@@ -2161,8 +2247,20 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
       "properties": {
+        "effective_chars": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Chars"
+        },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
           "properties": {
@@ -2279,9 +2377,13 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
 Score 1-10 SNV/indel variants in one call.
 
 Prefer this over ``get_variant_pvs1_data`` when you have 2+ variant
-IDs of the same kind. Items run sequentially server-side and respect
-the upstream rate limit (default ~1 req/s) plus the existing cache,
-so a fully uncached 10-item batch can take ~10s wall time.
+IDs of the same kind. For LLM batch screens, default to
+``response_mode='summary'`` so 10 verdicts share one turn budget;
+widen per-item only when reasoning needs the full decision tree.
+Items run sequentially server-side and respect the upstream rate
+limit (default ~1 req/s) plus the existing cache, so a fully
+uncached 10-item batch can take ~10s wall time and a fully cached
+one returns in milliseconds.
 
 Per-item envelope: each result has ``{ok, input, data, error}``.
 Output items preserve input order. ``response_mode`` and
@@ -2351,7 +2453,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level applied to each item.",
+      "description": "Response detail level applied to each item. Default to 'summary' for bulk batch screens \u2014 keeps the per-item payload small enough that 10 items still fit a turn. Widen to 'standard' only when an item needs the full decision tree.",
       "enum": [
         "ids_only",
         "summary",
@@ -2470,7 +2572,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                           "pvs1_flowchart": {
                             "anyOf": [
                               {
-                                "description": "Typed PVS1 flowchart decision path and outcome.",
+                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.",
                                 "properties": {
                                   "decision_tree": {
                                     "items": {
@@ -2556,11 +2658,19 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                                     "type": "string"
                                   },
                                   "notes": {
-                                    "additionalProperties": {
-                                      "type": "string"
-                                    },
-                                    "title": "Notes",
-                                    "type": "object"
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Notes"
                                   },
                                   "preliminary_decision_path": {
                                     "title": "Preliminary Decision Path",
@@ -2945,8 +3055,20 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
       "properties": {
+        "effective_chars": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Chars"
+        },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
           "properties": {
@@ -3060,7 +3182,13 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
 
 ### `search_variants`
 
-Use this to search AutoPVS1 by gene symbol or variant text.
+Search AutoPVS1 by gene symbol or variant text.
+
+Use ``response_mode='ids_only'`` (lowest-bandwidth lookup) to
+resolve a query to an AutoPVS1 ``variant_id`` you can hand to
+``get_variant_pvs1_data``. ``next_cursor`` is opaque base64url;
+pass it back unchanged. AutoPVS1 outputs are research-use only,
+not clinical decision support.
 
 #### Input Schema
 
@@ -3133,7 +3261,7 @@ Use this to search AutoPVS1 by gene symbol or variant text.
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level: ids_only, summary, standard, or full.",
+      "description": "Response detail level. Use 'ids_only' to discover the AutoPVS1 variant_id with minimum bytes; 'summary' drops the result rows (use only with pagination metadata); 'standard' (default) returns rich rows with gene + variant_type; 'full' is identical to 'standard' for search.",
       "enum": [
         "ids_only",
         "summary",
@@ -3356,8 +3484,20 @@ Use this to search AutoPVS1 by gene symbol or variant text.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
       "properties": {
+        "effective_chars": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective Chars"
+        },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
           "properties": {

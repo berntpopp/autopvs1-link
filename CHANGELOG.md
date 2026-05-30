@@ -6,8 +6,46 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **PVS1 flowchart notes parser** now captures the full legend prose for each
+  `#N` marker. The previous implementation read only the immediately
+  neighbouring tag via `find_next_sibling()`, so `notes['#1']` collapsed to
+  the next inline `<b>` token ("2") and `notes['#2']` to an empty `<br>`.
+  Fixture-driven assertions now require the full text, so the regression
+  cannot reappear silently.
+
+### Changed
+
+- **Breaking (LLM consumers):** every successful wire payload now strips null
+  leaves from the inner `data` dump (`exclude_none=True` everywhere, not just
+  in summary/ids_only modes). The standard-mode wire no longer ships
+  `decision_tree_raw: null`, `external_links_raw: null`, per-step
+  `description: null`, or per-step `note_text: null`; per-item bulk envelopes
+  drop `error: null` on success and `data: null` on failure; the search
+  pagination block drops `previous_cursor` on page one. The outer
+  `ok`/`data`/`error`/`meta` shape is unchanged so the documented
+  `required_fields` contract still holds; intentional inner nulls inside
+  `external_links` (an upstream link we nulled and warned about) stay on the
+  wire. Token-efficiency wins ~15-25% on a typical standard-mode call.
+- The duplicative `notes` legend dict is dropped from `pvs1_flowchart` in
+  summary and standard modes; each `decision_tree` step already carries the
+  hoisted `note_text`. Full mode retains the dict for audit-trail use.
+- Tool docstrings and the `response_mode` field descriptions now recommend
+  `summary` (or `ids_only` for search) as the LLM-first response mode. The
+  default response mode stays `standard` so existing callers are unaffected.
+
 ### Added
 
+- `meta.effective_chars` on every ok envelope: the byte length of the compact
+  JSON `data` dump. Lets clients calibrate against the advertised
+  `payload_modes[mode].char_budget` after one call instead of relying on the
+  theoretical budget alone.
+- Per-tool `performance` block on the detailed capabilities resource, with
+  `cost_tier` (`cheap` | `moderate` | `expensive_cold_cheap_warm`),
+  `cold_call_seconds`, `warm_call_seconds`, and `cache_ttl_seconds`. Surfaces
+  the HTML-scrape upstream's structural cold/warm differential so LLM clients
+  can plan first-contact batching and re-call freely once cached.
 - `response_mode='ids_only'` tier on every detail tool (`get_variant_pvs1_data`,
   `get_cnv_pvs1_data`, `search_variants`, plus the two bulk variants) for
   lowest-bandwidth lookup. Emits only the upstream identifier, `genome_build`,
