@@ -78,6 +78,38 @@ def test_mcp_warning_serializes_without_aggregate_fields_when_unset() -> None:
     assert payload == {"code": "invalid_external_link", "message": "X link nulled."}
 
 
+def test_ok_envelope_meta_echoes_telemetry_when_upstream_call_happened() -> None:
+    """If a service adapter ran, meta echoes its elapsed_ms + cache_status.
+
+    The cache wrapper records into a ContextVar; ok_envelope reads it.
+    Without an upstream call (e.g. health/capabilities), the CV stays at
+    its default ``None`` and the fields drop off the wire via
+    ``exclude_none`` on MCPMeta serialization.
+    """
+    from autopvs1_link.mcp.telemetry import record_upstream_call, reset_call_telemetry
+
+    reset_call_telemetry()
+    record_upstream_call(elapsed_ms=42.5, cache_status="hit")
+    envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
+    assert envelope["meta"]["elapsed_ms"] == 42.5
+    assert envelope["meta"]["cache_status"] == "hit"
+
+
+def test_ok_envelope_meta_drops_telemetry_for_no_upstream_call_tools() -> None:
+    """Cheap tools (no service-adapter call) must NOT echo elapsed_ms.
+
+    A ``None`` ContextVar default + ``exclude_none`` keeps the wire clean
+    so callers don't see misleading 0ms readings for tools that never
+    touched the upstream.
+    """
+    from autopvs1_link.mcp.telemetry import reset_call_telemetry
+
+    reset_call_telemetry()
+    envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
+    assert "elapsed_ms" not in envelope["meta"]
+    assert "cache_status" not in envelope["meta"]
+
+
 def test_ok_envelope_meta_echoes_effective_chars_count() -> None:
     """Meta echoes effective_chars so callers learn the actual wire cost.
 

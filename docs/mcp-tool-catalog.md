@@ -401,8 +401,20 @@ clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
       "properties": {
+        "cache_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Status"
+        },
         "effective_chars": {
           "anyOf": [
             {
@@ -414,6 +426,18 @@ clinical decision support.
           ],
           "default": null,
           "title": "Effective Chars"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -1073,8 +1097,20 @@ not. Order is first-seen-code-first.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
       "properties": {
+        "cache_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Status"
+        },
         "effective_chars": {
           "anyOf": [
             {
@@ -1086,6 +1122,18 @@ not. Order is first-seen-code-first.
           ],
           "default": null,
           "title": "Effective Chars"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -1367,8 +1415,20 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
       "properties": {
+        "cache_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Status"
+        },
         "effective_chars": {
           "anyOf": [
             {
@@ -1380,6 +1440,18 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           ],
           "default": null,
           "title": "Effective Chars"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -1597,8 +1669,20 @@ Return local MCP server health without contacting AutoPVS1 upstream.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
       "properties": {
+        "cache_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Status"
+        },
         "effective_chars": {
           "anyOf": [
             {
@@ -1610,6 +1694,18 @@ Return local MCP server health without contacting AutoPVS1 upstream.
           ],
           "default": null,
           "title": "Effective Chars"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -2247,8 +2343,20 @@ clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
       "properties": {
+        "cache_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Status"
+        },
         "effective_chars": {
           "anyOf": [
             {
@@ -2260,6 +2368,18 @@ clinical decision support.
           ],
           "default": null,
           "title": "Effective Chars"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -3055,8 +3175,20 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
       "properties": {
+        "cache_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Status"
+        },
         "effective_chars": {
           "anyOf": [
             {
@@ -3068,6 +3200,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           ],
           "default": null,
           "title": "Effective Chars"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -3484,8 +3628,20 @@ not clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
       "properties": {
+        "cache_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Status"
+        },
         "effective_chars": {
           "anyOf": [
             {
@@ -3497,6 +3653,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Effective Chars"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",

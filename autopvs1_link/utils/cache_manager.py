@@ -12,6 +12,7 @@ import structlog
 from async_lru import AlruCacheLoopResetWarning, alru_cache
 
 from autopvs1_link.config import settings
+from autopvs1_link.mcp.telemetry import record_upstream_call
 
 logger = structlog.get_logger()
 
@@ -173,8 +174,16 @@ class AdvancedCacheManager:
             @wraps(func)
             async def wrapper(*args, **kwargs) -> Any:
                 if not self._enabled:
-                    # Cache disabled, call function directly
-                    return await func(*args, **kwargs)
+                    # Cache disabled — still surface latency to LLM callers via
+                    # the telemetry CV so meta.elapsed_ms is populated regardless
+                    # of whether caching is on.
+                    bypass_start = time.perf_counter()
+                    try:
+                        result = await func(*args, **kwargs)
+                    finally:
+                        elapsed_ms = (time.perf_counter() - bypass_start) * 1000.0
+                        record_upstream_call(elapsed_ms, "bypass")
+                    return result
 
                 # Generate cache key
                 if key_func:
@@ -183,6 +192,7 @@ class AdvancedCacheManager:
                     cache_key = f"{method_name}:{hash((args, tuple(kwargs.items())))}"
 
                 start_time = time.time()
+                perf_start = time.perf_counter()
 
                 try:
                     # Check if result is in cache
@@ -196,12 +206,15 @@ class AdvancedCacheManager:
                     cache_info_after = cached_func.cache_info()
 
                     execution_time = time.time() - start_time
+                    elapsed_ms = (time.perf_counter() - perf_start) * 1000.0
 
                     # Determine if this was a hit or miss
                     if cache_info_after.hits > cache_info_before.hits:
                         self._record_hit(method_name, cache_key, execution_time)
+                        record_upstream_call(elapsed_ms, "hit")
                     else:
                         self._record_miss(method_name, cache_key, execution_time)
+                        record_upstream_call(elapsed_ms, "miss")
 
                     # Check for evictions
                     if cache_info_after.misses > cache_info_before.misses + 1:

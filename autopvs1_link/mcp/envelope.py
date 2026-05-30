@@ -14,6 +14,7 @@ from pydantic.json_schema import SkipJsonSchema
 
 from autopvs1_link import __version__
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
+from autopvs1_link.mcp.telemetry import get_call_telemetry
 
 
 class ErrorToolResult(ToolResult):
@@ -102,6 +103,12 @@ class MCPMeta(BaseModel):
     ``effective_chars`` is the byte length of the serialized ``data`` field
     (compact JSON). It lets LLM callers calibrate against the advertised
     per-mode ``char_budget`` after the first call instead of guessing.
+
+    ``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's
+    wall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).
+    Populated by the cache wrapper via the telemetry ContextVar; both
+    drop from the wire when the tool made no upstream call (e.g.
+    ``get_server_health`` or ``get_server_capabilities``).
     """
 
     request_id: str = Field(default_factory=lambda: correlation_id.get() or str(uuid4()))
@@ -110,6 +117,8 @@ class MCPMeta(BaseModel):
     recommended_citation: RecommendedCitation = Field(default_factory=RecommendedCitation)
     warnings: list[MCPWarning] = Field(default_factory=list)
     effective_chars: int | None = None
+    elapsed_ms: float | None = None
+    cache_status: str | None = None
 
 
 class MCPEnvelope[DataT](BaseModel):
@@ -162,6 +171,22 @@ def _strip_none_error_details(node: Any) -> Any:
     return node
 
 
+def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    """Drop ``elapsed_ms``/``cache_status`` from meta when no upstream call ran.
+
+    Cheap tools (``get_server_health``, ``get_server_capabilities``) never
+    touch the upstream; the telemetry ContextVar stays at its default
+    ``None`` and the fields would otherwise ship as ``null`` and mislead
+    callers reading them as ``0ms``.
+    """
+    meta = payload.get("meta")
+    if isinstance(meta, dict):
+        for key in ("elapsed_ms", "cache_status"):
+            if meta.get(key) is None:
+                meta.pop(key, None)
+    return payload
+
+
 def _strip_none_warning_aggregate_fields(payload: dict[str, Any]) -> dict[str, Any]:
     """Drop ``count``/``affected_indices`` from any warning where they are None.
 
@@ -198,16 +223,23 @@ def ok_envelope(
     else:
         payload = data
     effective_chars = len(json.dumps(payload, separators=(",", ":")))
+    elapsed_ms, cache_status = get_call_telemetry()
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=True,
         data=payload,
         error=None,
-        meta=MCPMeta(warnings=warnings or [], effective_chars=effective_chars),
+        meta=MCPMeta(
+            warnings=warnings or [],
+            effective_chars=effective_chars,
+            elapsed_ms=round(elapsed_ms, 2) if elapsed_ms is not None else None,
+            cache_status=cache_status,
+        ),
     )
     out = _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
     cleaned = _strip_none_error_details(out)
     assert isinstance(cleaned, dict)
     cleaned = _strip_none_warning_aggregate_fields(cleaned)
+    cleaned = _strip_none_telemetry_fields(cleaned)
     return cleaned
 
 
