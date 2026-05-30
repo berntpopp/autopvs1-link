@@ -1,5 +1,7 @@
 """Tests for variant and CNV MCP presenters."""
 
+import json
+
 from autopvs1_link.mcp.presenters.variant import format_pli_score, present_cnv, present_variant
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
@@ -22,7 +24,7 @@ def test_format_pli_score_for_llm_display() -> None:
     assert format_pli_score(0.123456) == "0.1235"
 
 
-def test_present_variant_adds_note_text_invalid_link_warning_and_inference_warning() -> None:
+def test_present_variant_adds_note_text_and_invalid_link_warning() -> None:
     parsed = AutoPVS1Data(
         genome_build="hg19",
         variant_info=VariantInfo(
@@ -59,10 +61,69 @@ def test_present_variant_adds_note_text_invalid_link_warning_and_inference_warni
     assert data.variant_info["pli_score_display"] == "3.29e-20"
     assert data.variant_info["external_links"]["ClinVar"] is None
     assert data.pvs1_flowchart["decision_tree"][0]["note_text"] == "Resolved note text."
-    assert {warning.code for warning in warnings} == {
-        "invalid_external_link",
-        "final_strength_inferred",
-    }
+    assert data.pvs1_flowchart["final_strength_source"] == "inferred"
+    assert {warning.code for warning in warnings} == {"invalid_external_link"}
+
+
+def test_present_variant_emits_pvs1_not_applicable_warning() -> None:
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="1-1-A-T",
+            variant_type="Intergenic",
+            gene_symbol="XK",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="not_applicable",
+            final_strength="PVS1_Not_Applicable",
+            decision_tree=[],
+            notes={"note_1": "This variant type is incompatible with PVS1 criterion"},
+        ),
+        disease_mechanisms=[],
+    )
+    data, warnings = present_variant(parsed, source_url=None)
+    assert "pvs1_not_applicable" in {w.code for w in warnings}
+    assert data.pvs1_flowchart["final_strength"] == "PVS1_Not_Applicable"
+
+
+def test_present_variant_emits_pvs1_not_applicable_for_not_determined() -> None:
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="1-1-A-T",
+            variant_type="Unknown",
+            gene_symbol="XK",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="not_determined",
+            final_strength="PVS1_Not_Determined",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+    _, warnings = present_variant(parsed, source_url=None)
+    assert any(w.code == "pvs1_not_applicable" for w in warnings)
+
+
+def test_present_variant_no_warning_for_scorable_strength() -> None:
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-1-A-T",
+            variant_type="Nonsense",
+            gene_symbol="GENE",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF1",
+            final_strength="Strong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+    _, warnings = present_variant(parsed, source_url=None)
+    assert not any(w.code == "pvs1_not_applicable" for w in warnings)
 
 
 def test_present_cnv_shapes_cnv_payload() -> None:
@@ -91,13 +152,13 @@ def test_present_cnv_shapes_cnv_payload() -> None:
     assert data.genome_build == "hg19"
     assert data.cnv_info["gene_symbol"] == "MYO15A"
     assert data.cnv_info["cnv_type"] == "DEL"
-    assert data.cnv_info["size"] == "5000000"
+    assert data.cnv_info["size"] == 5000000
     assert data.pvs1_flowchart["final_strength"] == "VeryStrong"
     assert data.upstream_service == "AutoPVS1"
     assert warnings == []
 
 
-def test_present_variant_summary_omits_mechanisms_and_suppresses_inference_warning() -> None:
+def test_present_variant_summary_omits_mechanisms_and_emits_no_warnings() -> None:
     parsed = AutoPVS1Data(
         genome_build="hg38",
         variant_info=VariantInfo(
@@ -302,7 +363,6 @@ def test_present_cnv_full_preserves_rich_fields_and_unmet_by_default() -> None:
             cnv_type="Deletion",
             gene_symbol="MYO15A",
             coordinates="17-15000000-20000000-DEL",
-            size="5Mb",
         ),
         pvs1_flowchart=PVS1Flowchart(
             preliminary_decision_path="DEL",
@@ -340,7 +400,7 @@ def test_present_cnv_full_preserves_rich_fields_and_unmet_by_default() -> None:
 
     payload = data.model_dump(mode="json")
     assert payload["cnv_info"]["cnv_type"] == "DEL"
-    assert payload["cnv_info"]["size"] == "5000000"
+    assert payload["cnv_info"]["size"] == 5000000
     assert payload["pvs1_flowchart"]["notes"] == {"#1": "Resolved CNV note text."}
     assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"] == "Resolved CNV note text."
     assert [row["adjusted_strength"] for row in payload["disease_mechanisms"]] == [
@@ -350,3 +410,102 @@ def test_present_cnv_full_preserves_rich_fields_and_unmet_by_default() -> None:
     assert payload["disease_mechanisms"][0]["gene_url"] == "https://example.test/gene"
     assert payload["disease_mechanisms"][0]["disease_url"] == "https://example.test/disease/met"
     assert warnings == []
+
+
+def _canonical_parsed() -> AutoPVS1Data:
+    """The X-82763936-A-T POU3F4 case used as the size-diff anchor."""
+    return AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-82763936-A-T",
+            variant_type="Nonsense",
+            gene_symbol="POU3F4",
+            pli_score=3.29e-20,
+            chgvs="c.220A>T",
+            phgvs="p.Lys74*",
+            external_links={
+                "gnomAD": "https://gnomad.broadinstitute.org/variant/X-82763936-A-T",
+                "ClinVar": "https://www.ncbi.nlm.nih.gov/clinvar/variation/na",
+            },
+            invalid_external_links={
+                "dbSNP": "https://www.ncbi.nlm.nih.gov/snp/variation/na",
+            },
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF5",
+            final_strength="Strong",
+            final_strength_inferred=True,
+            decision_tree=[
+                FlowchartStep(code="NF1", note_id="#1"),
+                FlowchartStep(code="NF5", note_id="#2"),
+            ],
+            notes={"#1": "Note one.", "#2": "Note two."},
+        ),
+        disease_mechanisms=[
+            DiseaseMechanism(
+                gene="POU3F4",
+                disease="DFNX2",
+                inheritance="XL",
+                clinical_validity="Definitive",
+                consideration="No Decrease",
+                adjusted_strength="Strong",
+            ),
+        ],
+    )
+
+
+def test_present_variant_full_exposes_raw_fields_for_audit() -> None:
+    parsed = _canonical_parsed()
+    data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="full",
+    )
+    payload = data.model_dump(mode="json")
+
+    assert payload["variant_info"]["external_links_raw"] == {
+        "gnomAD": "https://gnomad.broadinstitute.org/variant/X-82763936-A-T",
+        "ClinVar": "https://www.ncbi.nlm.nih.gov/clinvar/variation/na",
+        "dbSNP": "https://www.ncbi.nlm.nih.gov/snp/variation/na",
+    }
+    raw_tree = payload["pvs1_flowchart"]["decision_tree_raw"]
+    assert raw_tree is not None
+    assert [step["code"] for step in raw_tree] == ["NF1", "NF5"]
+    # raw tree has NO injected note_text (audit before notes inlining)
+    assert all("note_text" not in step for step in raw_tree)
+
+
+def test_present_variant_standard_omits_raw_fields() -> None:
+    parsed = _canonical_parsed()
+    data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="standard",
+    )
+    payload = data.model_dump(mode="json", exclude_none=False)
+    assert payload["variant_info"].get("external_links_raw") is None
+    assert payload["pvs1_flowchart"].get("decision_tree_raw") is None
+
+
+def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:
+    parsed = _canonical_parsed()
+    full_data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="full",
+    )
+    std_data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="standard",
+    )
+    full_bytes = len(json.dumps(full_data.model_dump(mode="json"), separators=(",", ":")))
+    std_bytes = len(
+        json.dumps(
+            std_data.model_dump(mode="json", exclude_none=True),
+            separators=(",", ":"),
+        )
+    )
+    assert full_bytes > std_bytes, (
+        f"full payload ({full_bytes}B) must exceed standard ({std_bytes}B)"
+    )

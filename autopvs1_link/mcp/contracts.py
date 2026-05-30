@@ -7,10 +7,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from autopvs1_link.mcp.envelope import MCPEnvelope
+from autopvs1_link.mcp.envelope import MCPEnvelope, MCPError
 
 GenomeBuild = Literal["hg19", "hg38"]
-ExampleValue = str | int | None
+ExampleValue = Any
 
 
 class MCPContractModel(BaseModel):
@@ -60,6 +60,7 @@ class VariantInfoMCP(MCPContractModel):
     exon: str | None = None
     intron: str | None = None
     external_links: dict[str, str | None] = Field(default_factory=dict)
+    external_links_raw: dict[str, str | None] | None = None
 
 
 class CNVInfoMCP(MCPContractModel):
@@ -69,7 +70,7 @@ class CNVInfoMCP(MCPContractModel):
     cnv_type: str
     gene_symbol: str
     coordinates: str
-    size: str | None = None
+    size: int | None = None
 
 
 class FlowchartStepMCP(MCPContractModel):
@@ -89,6 +90,7 @@ class PVS1FlowchartMCP(MCPContractModel):
     final_strength_source: Literal["asserted", "inferred"] = "asserted"
     decision_tree: list[FlowchartStepMCP] = Field(default_factory=list)
     notes: dict[str, str] = Field(default_factory=dict)
+    decision_tree_raw: list[dict[str, Any]] | None = None
 
 
 class DiseaseMechanismMCP(MCPContractModel):
@@ -281,6 +283,93 @@ class VariantMCPEnvelope(MCPEnvelope[VariantMCPData]):
 
 class CNVMCPEnvelope(MCPEnvelope[CNVMCPData]):
     """Envelope schema for ``get_cnv_pvs1_data``."""
+
+
+class BulkVariantPVS1InputItem(BaseModel):
+    """One item in a bulk variant PVS1 request."""
+
+    genome_build: str = Field(
+        ...,
+        description="Genome build: hg19 or hg38. Invalid values yield a per-item error.",
+    )
+    variant_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="AutoPVS1 variant ID, for example X-82763936-A-T.",
+    )
+
+
+class BulkCNVPVS1InputItem(BaseModel):
+    """One item in a bulk CNV PVS1 request."""
+
+    genome_build: str = Field(
+        ...,
+        description="Genome build: hg19 or hg38. Invalid values yield a per-item error.",
+    )
+    cnv_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="AutoPVS1 CNV ID in {chrom}-{start}-{end}-{TYPE} form.",
+    )
+
+
+class BulkVariantPVS1ResultItem(BaseModel):
+    """Per-item result for a bulk variant PVS1 request."""
+
+    ok: bool
+    input: BulkVariantPVS1InputItem
+    data: VariantMCPData | None = None
+    error: MCPError | None = None
+
+
+class BulkCNVPVS1ResultItem(BaseModel):
+    """Per-item result for a bulk CNV PVS1 request."""
+
+    ok: bool
+    input: BulkCNVPVS1InputItem
+    data: CNVMCPData | None = None
+    error: MCPError | None = None
+
+
+class BulkVariantsMCPData(BaseModel):
+    """Aggregate payload for ``get_variants_pvs1_data_bulk``.
+
+    ``total`` is always the requested item count. ``attempted`` is the count
+    that ran (= ``len(items)``). ``skipped`` is the count that the server did
+    not attempt because ``continue_on_error=False`` broke the loop early.
+    Invariant: ``attempted == succeeded + failed`` and ``total == attempted + skipped``.
+    """
+
+    total: int
+    attempted: int
+    skipped: int
+    succeeded: int
+    failed: int
+    items: list[BulkVariantPVS1ResultItem] = Field(default_factory=list)
+
+
+class BulkCNVsMCPData(BaseModel):
+    """Aggregate payload for ``get_cnvs_pvs1_data_bulk``.
+
+    Same semantics as :class:`BulkVariantsMCPData`.
+    """
+
+    total: int
+    attempted: int
+    skipped: int
+    succeeded: int
+    failed: int
+    items: list[BulkCNVPVS1ResultItem] = Field(default_factory=list)
+
+
+class BulkVariantsMCPEnvelope(MCPEnvelope[BulkVariantsMCPData]):
+    """Envelope schema for ``get_variants_pvs1_data_bulk``."""
+
+
+class BulkCNVsMCPEnvelope(MCPEnvelope[BulkCNVsMCPData]):
+    """Envelope schema for ``get_cnvs_pvs1_data_bulk``."""
 
 
 class SearchMCPEnvelope(MCPEnvelope[SearchMCPData]):

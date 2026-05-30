@@ -57,37 +57,56 @@ def _present_flowchart(
     raw = _dump(flowchart)
     warnings: list[MCPWarning] = []
     notes = raw.get("notes") or {}
-    presented_steps: list[dict[str, Any]] = []
     final_strength_inferred = bool(raw.pop("final_strength_inferred", False))
     raw["final_strength_source"] = "inferred" if final_strength_inferred else "asserted"
 
-    for step in raw.get("decision_tree", []):
-        step_data = _dump(step) if isinstance(step, BaseModel) else dict(step)
+    final_strength = str(raw.get("final_strength") or "")
+    if final_strength in {"PVS1_Not_Applicable", "PVS1_Not_Determined"}:
+        warnings.append(
+            MCPWarning(
+                code="pvs1_not_applicable",
+                message=(
+                    "AutoPVS1 returned a sentinel strength "
+                    f"'{final_strength}' indicating PVS1 is not applicable "
+                    "to this variant. Treat as a non-PVS1-scorable result."
+                ),
+            )
+        )
+
+    raw_decision_tree = [
+        _dump(step) if isinstance(step, BaseModel) else dict(step)
+        for step in raw.get("decision_tree", [])
+    ]
+    presented_steps: list[dict[str, Any]] = []
+    for step in raw_decision_tree:
+        step_data = dict(step)
         note_id = step_data.get("note_id")
         if note_id and note_id in notes:
             step_data["note_text"] = notes[note_id]
         presented_steps.append(step_data)
 
     raw["decision_tree"] = presented_steps
-    if final_strength_inferred and response_mode != "summary":
-        warnings.append(
-            MCPWarning(
-                code="final_strength_inferred",
-                message="final_strength was inferred from the terminal decision_tree node.",
-            )
-        )
     if response_mode == "summary":
         raw = {
             "preliminary_decision_path": raw["preliminary_decision_path"],
             "final_strength": raw["final_strength"],
             "final_strength_source": raw["final_strength_source"],
         }
+    elif response_mode == "full":
+        raw["decision_tree_raw"] = raw_decision_tree
     return raw, warnings
 
 
 def _present_external_links(
     raw_info: dict[str, Any],
-) -> tuple[dict[str, str | None], list[MCPWarning]]:
+) -> tuple[dict[str, str | None], dict[str, str | None], list[MCPWarning]]:
+    """Return (links_for_display, raw_links_audit, warnings).
+
+    ``links_for_display`` nulls invalid URLs. ``raw_links_audit`` preserves
+    every label's URL as upstream returned it — including the invalid
+    sentinel URLs that get nulled in ``links_for_display``. The caller
+    decides whether to expose the audit dict (full mode only).
+    """
     warnings: list[MCPWarning] = []
     links: dict[str, str | None] = dict(raw_info.get("external_links") or {})
     invalid_links: dict[str, str] = dict(raw_info.get("invalid_external_links") or {})
@@ -96,7 +115,11 @@ def _present_external_links(
         if not url or url.rstrip("/").endswith("/variation/na"):
             invalid_links[label] = url or ""
 
+    raw_audit: dict[str, str | None] = {}
+    for label, url in links.items():
+        raw_audit[label] = url
     for label, url in invalid_links.items():
+        raw_audit[label] = url or None
         links[label] = None
         warnings.append(
             MCPWarning(
@@ -104,9 +127,8 @@ def _present_external_links(
                 message=f"{label} link from upstream AutoPVS1 was invalid and was nulled.",
             )
         )
-        raw_info.setdefault("_invalid_external_link_urls", {})[label] = url
 
-    return links, warnings
+    return links, raw_audit, warnings
 
 
 def _invalid_links_from_variant(parsed: AutoPVS1Data | dict[str, Any]) -> dict[str, str]:
@@ -126,7 +148,7 @@ def _enrich_cnv_info(cnv_info: dict[str, Any]) -> dict[str, Any]:
     start = int(match.group("start"))
     end = int(match.group("end"))
     cnv_info["cnv_type"] = match.group("type")
-    cnv_info["size"] = str(end - start)
+    cnv_info["size"] = end - start
     return cnv_info
 
 
@@ -147,11 +169,13 @@ def present_variant(
     if invalid_external_links:
         variant_info["invalid_external_links"] = invalid_external_links
     variant_info["pli_score_display"] = format_pli_score(variant_info.get("pli_score"))
-    external_links, link_warnings = _present_external_links(variant_info)
+    external_links, external_links_raw, link_warnings = _present_external_links(variant_info)
     variant_info["external_links"] = external_links
     variant_info.pop("invalid_external_links", None)
     variant_info.pop("_invalid_external_link_urls", None)
     warnings.extend(link_warnings)
+    if mode == "full":
+        variant_info["external_links_raw"] = external_links_raw
     if mode == "summary":
         variant_info = {
             key: variant_info[key]
