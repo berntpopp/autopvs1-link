@@ -110,6 +110,22 @@ def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> N
     assert detailed["payload_modes"]["ids_only"]["char_budget"] < 1500
 
 
+def test_search_behavior_documents_cursor_opacity_posture() -> None:
+    """The cursor is opaque-by-convention (base64url JSON), not signed.
+
+    For a research-use server this is fine, but callers must NOT rely
+    on cursor opacity for integrity — anyone can decode the offset.
+    The capabilities resource must say so explicitly so clients don't
+    treat the cursor as a secure handle.
+    """
+    detailed = detailed_capabilities_resource()
+    opacity = detailed["search_behavior"]["cursor_opacity"]
+    assert isinstance(opacity, str)
+    # Must mention that opacity is syntactic only, not cryptographic.
+    assert "syntactic" in opacity.lower()
+    assert "integrity" in opacity.lower() or "secur" in opacity.lower()
+
+
 def test_search_behavior_documents_pagination_block_fields() -> None:
     detailed = detailed_capabilities_resource()
     assert "pagination_block" in detailed["search_behavior"]

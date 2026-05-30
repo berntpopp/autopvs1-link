@@ -158,6 +158,14 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "Opaque pagination token returned as next_cursor; "
                 "callers must pass it back unchanged."
             ),
+            "cursor_opacity": (
+                "Syntactic only: cursors are base64url-encoded JSON "
+                '{"offset": N} so they round-trip transparently. They are '
+                "NOT signed; callers must not rely on opacity for "
+                "integrity or as a security boundary. AutoPVS1-Link is "
+                "research-use only and the cursor surface is sized "
+                "accordingly — use HTTPS for transport confidentiality."
+            ),
             "pagination_block": (
                 "Search results carry a pagination object with "
                 "previous_cursor, next_cursor, has_more, offset, and "
