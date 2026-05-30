@@ -499,13 +499,23 @@ def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:
         source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
         response_mode="standard",
     )
-    full_bytes = len(json.dumps(full_data.model_dump(mode="json"), separators=(",", ":")))
-    std_bytes = len(
-        json.dumps(
-            std_data.model_dump(mode="json", exclude_none=True),
-            separators=(",", ":"),
-        )
+    # Serialize both modes with the same exclude_none setting so the only
+    # delta is the new raw audit fields, not asymmetric Pydantic defaults.
+    full_json = json.dumps(
+        full_data.model_dump(mode="json", exclude_none=True),
+        separators=(",", ":"),
     )
-    assert full_bytes > std_bytes, (
-        f"full payload ({full_bytes}B) must exceed standard ({std_bytes}B)"
+    std_json = json.dumps(
+        std_data.model_dump(mode="json", exclude_none=True),
+        separators=(",", ":"),
+    )
+
+    # Direct regression guard: the raw fields are the difference.
+    assert "external_links_raw" in full_json
+    assert "decision_tree_raw" in full_json
+    assert "external_links_raw" not in std_json
+    assert "decision_tree_raw" not in std_json
+
+    assert len(full_json) > len(std_json), (
+        f"full payload ({len(full_json)}B) must exceed standard ({len(std_json)}B)"
     )
