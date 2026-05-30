@@ -25,6 +25,7 @@ def build_mcp_server() -> FastMCP:
 
     from autopvs1_link.mcp import prompts, resources
     from autopvs1_link.mcp.tools import (
+        bulk_tools,
         cache_tools,
         cnv_tool,
         health_tool,
@@ -36,6 +37,7 @@ def build_mcp_server() -> FastMCP:
     health_tool.register(mcp)
     variant_tool.register(mcp)
     cnv_tool.register(mcp)
+    bulk_tools.register(mcp)
     search_tool.register(mcp)
     cache_tools.register(mcp)
     prompts.register(mcp)
