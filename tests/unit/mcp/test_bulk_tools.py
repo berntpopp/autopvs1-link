@@ -487,6 +487,102 @@ async def test_bulk_aggregated_warning_carries_count_and_affected_indices(mocker
 
 
 @pytest.mark.asyncio
+async def test_bulk_per_item_multi_emission_stays_unaggregated(mocker) -> None:
+    """One item with TWO invalid external links emits invalid_external_link
+    twice — but only ONE item is affected, so the warning must NOT carry
+    count or affected_indices (avoids misleading aggregation signal)."""
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-1-A-T",
+            variant_type="Nonsense",
+            gene_symbol="GENE",
+            external_links={"gnomAD": "https://example.test/variant"},
+            invalid_external_links={
+                "ClinVar": "https://bad/clinvar",
+                "dbSNP": "https://bad/dbsnp",
+            },
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF",
+            final_strength="Strong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(side_effect=[parsed]),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variants_pvs1_data_bulk",
+        {"items": [{"genome_build": "hg19", "variant_id": "X-1-A-T"}]},
+    )
+    warnings = [
+        w
+        for w in result.structured_content["meta"]["warnings"]
+        if w["code"] == "invalid_external_link"
+    ]
+    assert len(warnings) == 1
+    single = warnings[0]
+    # Single affected item — no aggregate fields on the wire.
+    assert "count" not in single
+    assert "affected_indices" not in single
+
+
+@pytest.mark.asyncio
+async def test_bulk_cnvs_aggregated_warning_carries_count_and_affected_indices(mocker) -> None:
+    """3 CNV items each emit pvs1_not_applicable → 1 aggregated warning
+    with count=3 and affected_indices=[0,1,2]. Mirrors the variant test
+    so the CNV dedup path is regression-guarded. CNVInfo has no
+    external_links field, so the variant path's invalid_external_link
+    code is unreachable here; pvs1_not_applicable is the closest CNV
+    mirror that exercises _dedupe_warnings."""
+    parsed = AutoPVS1CNVData(
+        genome_build="hg19",
+        cnv_info=CNVInfo(
+            cnv_id="11-2797090-2869333-DEL",
+            cnv_type="Deletion",
+            gene_symbol="GENE",
+            coordinates="11-2797090-2869333-DEL",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="DEL",
+            final_strength="PVS1_Not_Applicable",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[],
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_cnv",
+        new=AsyncMock(side_effect=[parsed, parsed, parsed]),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_cnvs_pvs1_data_bulk",
+        {
+            "items": [
+                {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
+                {"genome_build": "hg19", "cnv_id": "12-1000000-2000000-DEL"},
+                {"genome_build": "hg19", "cnv_id": "13-3000000-4000000-DEL"},
+            ]
+        },
+    )
+    warnings = [
+        w
+        for w in result.structured_content["meta"]["warnings"]
+        if w["code"] == "pvs1_not_applicable"
+    ]
+    assert len(warnings) == 1
+    aggregated = warnings[0]
+    assert aggregated["count"] == 3
+    assert aggregated["affected_indices"] == [0, 1, 2]
+
+
+@pytest.mark.asyncio
 async def test_single_tool_warning_omits_aggregate_fields(mocker) -> None:
     parsed = AutoPVS1Data(
         genome_build="hg19",

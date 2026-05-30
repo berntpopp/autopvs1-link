@@ -37,11 +37,15 @@ def _dedupe_warnings(
     """Collapse per-item warnings by code.
 
     Input: ``[(item_index, warning), ...]`` in order of emission.
-    Output: one ``MCPWarning`` per unique code. When a code appears more
-    than once, the aggregated warning carries ``count`` and the sorted
-    de-duplicated ``affected_indices`` list. Single-occurrence codes keep
-    ``count``/``affected_indices`` as ``None`` so single-tool callers see
-    no change.
+    Output: one ``MCPWarning`` per unique code, in first-seen order.
+
+    Aggregation gate is per-item, not per-emission: when a code is emitted
+    by more than one distinct item, the returned warning carries ``count``
+    (the number of distinct affected items) and ``affected_indices`` (the
+    sorted, deduplicated item index list). When a code is emitted only by
+    a single item — even if that item emits the same code multiple times
+    — the original ``MCPWarning`` is returned unchanged so single-tool
+    callers see the wire shape they have always seen.
     """
     buckets: dict[str, dict[str, Any]] = {}
     order: list[str] = []
