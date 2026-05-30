@@ -44,7 +44,7 @@ def register_metadata(mcp: FastMCP) -> None:
     )
     async def get_server_capabilities() -> dict[str, Any]:
         """Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow."""
-        return ok_envelope(present_compact_capabilities())
+        return ok_envelope(present_compact_capabilities(), tool_name="get_server_capabilities")
 
     @mcp.resource(
         "autopvs1-link://capabilities",

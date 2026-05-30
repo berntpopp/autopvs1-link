@@ -12,6 +12,8 @@ from autopvs1_link.mcp.contracts import ClearCacheData, ClearCacheMCPEnvelope
 from autopvs1_link.mcp.envelope import ToolResponse, error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import DestructiveOperationDisabledError
 
+_TOOL_NAME = "clear_cache"
+
 
 def destructive_tools_enabled() -> bool:
     """Return whether destructive MCP tools should be registered."""
@@ -46,10 +48,12 @@ def register(mcp: FastMCP) -> None:
                     "Set AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true only in trusted "
                     "administrative environments."
                 ],
+                tool_name=_TOOL_NAME,
             )
         return ok_envelope(
             ClearCacheData(
                 cleared=True,
                 message="All service caches and cache statistics cleared.",
-            )
+            ),
+            tool_name=_TOOL_NAME,
         )

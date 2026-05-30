@@ -15,6 +15,7 @@ from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 from autopvs1_link.mcp.tools.cache_tools import destructive_tools_enabled
 
 _UPSTREAM_PROBE_TIMEOUT_SECONDS = 3.0
+_TOOL_NAME = "get_server_health"
 
 UpstreamStatus = Literal["not_checked", "reachable", "unreachable"]
 
@@ -106,4 +107,4 @@ def register(mcp: FastMCP) -> None:
             )
         else:
             data = HealthData(destructive_tools_enabled=destructive_tools_enabled())
-        return ok_envelope(data)
+        return ok_envelope(data, tool_name=_TOOL_NAME)

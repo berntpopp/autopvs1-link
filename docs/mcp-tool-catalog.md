@@ -8,11 +8,10 @@ Auto-generated from `autopvs1_link.mcp.facade.build_mcp_server`. Regenerate with
 
 Score one copy-number variant with the AutoPVS1 PVS1 rules.
 
-First-turn LLM callers: pass ``response_mode='summary'`` to receive
-the verdict (preliminary path + final strength) under ~1.5KB.
-Widen to ``response_mode='standard'`` only when the user asks for
-the decision tree. AutoPVS1 outputs are research-use only, not
-clinical decision support.
+First-turn LLM callers get the verdict under ~1.5KB by default
+(``response_mode='summary'``). Widen to ``response_mode='standard'``
+for the full decision tree. AutoPVS1 outputs are research-use only,
+not clinical decision support.
 
 #### Input Schema
 
@@ -48,8 +47,8 @@ clinical decision support.
       "type": "string"
     },
     "response_mode": {
-      "default": "standard",
-      "description": "Response detail level. LLM-first callers should pass 'summary' (verdict + path + final strength, ~1.5KB); widen to 'standard' (default, full decision tree with hoisted note_text and disease_mechanisms) when the user asks for the tree; use 'full' only for auditors who need the ``*_raw`` upstream fields; 'ids_only' is the batch-screen lookup tier.",
+      "default": "summary",
+      "description": "Response detail level. Default 'summary' returns the verdict (preliminary path + final strength) under ~1.5KB. Widen to 'standard' for the full decision tree with hoisted note_text and disease_mechanisms when the user asks for the tree; use 'full' only for auditors who need the ``*_raw`` upstream fields; 'ids_only' is the batch-screen lookup tier.",
       "enum": [
         "ids_only",
         "summary",
@@ -401,7 +400,7 @@ clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -414,6 +413,18 @@ clinical decision support.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cost_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tier"
         },
         "effective_chars": {
           "anyOf": [
@@ -438,6 +449,45 @@ clinical decision support.
           ],
           "default": null,
           "title": "Elapsed Ms"
+        },
+        "next_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Actions"
+        },
+        "next_call_earliest_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Call Earliest At"
+        },
+        "rate_limit_floor_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Floor Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -475,8 +525,20 @@ clinical decision support.
           "title": "Research Use Only",
           "type": "boolean"
         },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
         "server_version": {
-          "default": "1.0.0",
+          "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -622,8 +684,8 @@ not. Order is first-seen-code-first.
       "type": "string"
     },
     "response_mode": {
-      "default": "standard",
-      "description": "Response detail level applied to each item. Default to 'summary' for bulk batch screens \u2014 keeps the per-item payload small enough that 10 items still fit a turn. Widen to 'standard' only when an item needs the full decision tree.",
+      "default": "summary",
+      "description": "Response detail level applied to each item. Default 'summary' keeps the per-item payload small enough that 10 items still fit one turn budget. Widen to 'standard' only when an item needs the full decision tree.",
       "enum": [
         "ids_only",
         "summary",
@@ -1097,7 +1159,7 @@ not. Order is first-seen-code-first.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1110,6 +1172,18 @@ not. Order is first-seen-code-first.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cost_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tier"
         },
         "effective_chars": {
           "anyOf": [
@@ -1134,6 +1208,45 @@ not. Order is first-seen-code-first.
           ],
           "default": null,
           "title": "Elapsed Ms"
+        },
+        "next_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Actions"
+        },
+        "next_call_earliest_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Call Earliest At"
+        },
+        "rate_limit_floor_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Floor Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -1171,8 +1284,20 @@ not. Order is first-seen-code-first.
           "title": "Research Use Only",
           "type": "boolean"
         },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
         "server_version": {
-          "default": "1.0.0",
+          "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -1326,8 +1451,20 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
             },
             "tool_summaries": {
               "additionalProperties": {
-                "description": "Compact MCP tool summary for first-turn discovery.",
+                "description": "Compact MCP tool summary for first-turn discovery.\n\n``default_response_mode`` is the response_mode the tool emits when\nthe caller omits the parameter. Surfaced so LLM consumers can plan\nbandwidth without parsing the tool description; cheap tools that do\nnot accept response_mode leave it absent.",
                 "properties": {
+                  "default_response_mode": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Default Response Mode"
+                  },
                   "example": {
                     "additionalProperties": true,
                     "title": "Example",
@@ -1415,7 +1552,7 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1428,6 +1565,18 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cost_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tier"
         },
         "effective_chars": {
           "anyOf": [
@@ -1452,6 +1601,45 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           ],
           "default": null,
           "title": "Elapsed Ms"
+        },
+        "next_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Actions"
+        },
+        "next_call_earliest_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Call Earliest At"
+        },
+        "rate_limit_floor_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Floor Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -1489,8 +1677,20 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "title": "Research Use Only",
           "type": "boolean"
         },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
         "server_version": {
-          "default": "1.0.0",
+          "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -1637,7 +1837,7 @@ cold scoring call.
               "type": "string"
             },
             "version": {
-              "default": "1.0.0",
+              "default": "1.1.0",
               "title": "Version",
               "type": "string"
             }
@@ -1689,7 +1889,7 @@ cold scoring call.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1702,6 +1902,18 @@ cold scoring call.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cost_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tier"
         },
         "effective_chars": {
           "anyOf": [
@@ -1726,6 +1938,45 @@ cold scoring call.
           ],
           "default": null,
           "title": "Elapsed Ms"
+        },
+        "next_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Actions"
+        },
+        "next_call_earliest_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Call Earliest At"
+        },
+        "rate_limit_floor_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Floor Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -1763,8 +2014,20 @@ cold scoring call.
           "title": "Research Use Only",
           "type": "boolean"
         },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
         "server_version": {
-          "default": "1.0.0",
+          "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -1851,11 +2114,11 @@ return ``requires_disambiguation`` with allele-keyed candidates
 instead of
 silently picking one (mitigates multi-allelic mis-scoring).
 
-First-turn LLM callers: pass ``response_mode='summary'`` to receive
-the verdict (preliminary path + final strength) under ~1.5KB.
-Widen to ``response_mode='standard'`` only when the user asks for
-the decision tree. AutoPVS1 outputs are research-use only, not
-clinical decision support.
+First-turn LLM callers get the verdict under ~1.5KB by default
+(``response_mode='summary'``). Widen to ``response_mode='standard'``
+for the full decision tree, or ``'full'`` for the audit-trail
+``*_raw`` upstream fields. AutoPVS1 outputs are research-use only,
+not clinical decision support.
 
 #### Input Schema
 
@@ -1887,8 +2150,8 @@ clinical decision support.
       "type": "string"
     },
     "response_mode": {
-      "default": "standard",
-      "description": "Response detail level. LLM-first callers should pass 'summary' (verdict + path + final strength, ~1.5KB); widen to 'standard' (default, full decision tree with hoisted note_text and disease_mechanisms) when the user asks for the tree; use 'full' only for auditors who need the ``*_raw`` upstream fields; 'ids_only' is the batch-screen lookup tier.",
+      "default": "summary",
+      "description": "Response detail level. Default 'summary' returns the verdict (preliminary path + final strength) under ~1.5KB so first-turn LLM callers stay in budget. Widen to 'standard' for the full decision tree with hoisted note_text and disease_mechanisms when the user asks for the tree; use 'full' only for auditors who need the ``*_raw`` upstream fields; 'ids_only' is the batch-screen lookup tier.",
       "enum": [
         "ids_only",
         "summary",
@@ -2372,7 +2635,7 @@ clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -2385,6 +2648,18 @@ clinical decision support.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cost_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tier"
         },
         "effective_chars": {
           "anyOf": [
@@ -2409,6 +2684,45 @@ clinical decision support.
           ],
           "default": null,
           "title": "Elapsed Ms"
+        },
+        "next_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Actions"
+        },
+        "next_call_earliest_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Call Earliest At"
+        },
+        "rate_limit_floor_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Floor Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -2446,8 +2760,20 @@ clinical decision support.
           "title": "Research Use Only",
           "type": "boolean"
         },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
         "server_version": {
-          "default": "1.0.0",
+          "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -2601,8 +2927,8 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
       "type": "string"
     },
     "response_mode": {
-      "default": "standard",
-      "description": "Response detail level applied to each item. Default to 'summary' for bulk batch screens \u2014 keeps the per-item payload small enough that 10 items still fit a turn. Widen to 'standard' only when an item needs the full decision tree.",
+      "default": "summary",
+      "description": "Response detail level applied to each item. Default 'summary' keeps the per-item payload small enough that 10 items still fit one turn budget. Widen to 'standard' only when an item needs the full decision tree.",
       "enum": [
         "ids_only",
         "summary",
@@ -3204,7 +3530,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -3217,6 +3543,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cost_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tier"
         },
         "effective_chars": {
           "anyOf": [
@@ -3241,6 +3579,45 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           ],
           "default": null,
           "title": "Elapsed Ms"
+        },
+        "next_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Actions"
+        },
+        "next_call_earliest_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Call Earliest At"
+        },
+        "rate_limit_floor_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Floor Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -3278,8 +3655,20 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "title": "Research Use Only",
           "type": "boolean"
         },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
         "server_version": {
-          "default": "1.0.0",
+          "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -3433,8 +3822,8 @@ not clinical decision support.
       "type": "string"
     },
     "response_mode": {
-      "default": "standard",
-      "description": "Response detail level. Use 'ids_only' to discover the AutoPVS1 variant_id with minimum bytes; 'summary' drops the result rows (use only with pagination metadata); 'standard' (default) returns rich rows with gene + variant_type; 'full' is identical to 'standard' for search.",
+      "default": "ids_only",
+      "description": "Response detail level. Default 'ids_only' emits the AutoPVS1 variant_id and url per row \u2014 the leanest shape for hand-off to get_variant_pvs1_data. 'summary' drops the rows entirely (use only with pagination metadata); 'standard' returns rich rows with gene + variant_type; 'full' is identical to 'standard' for search.",
       "enum": [
         "ids_only",
         "summary",
@@ -3657,7 +4046,7 @@ not clinical decision support.
       ]
     },
     "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).\nPopulated by the cache wrapper via the telemetry ContextVar; both\ndrop from the wire when the tool made no upstream call (e.g.\n``get_server_health`` or ``get_server_capabilities``).",
+      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -3670,6 +4059,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Cache Status"
+        },
+        "cost_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tier"
         },
         "effective_chars": {
           "anyOf": [
@@ -3694,6 +4095,45 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Elapsed Ms"
+        },
+        "next_actions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Actions"
+        },
+        "next_call_earliest_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Call Earliest At"
+        },
+        "rate_limit_floor_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Floor Ms"
         },
         "recommended_citation": {
           "description": "Recommended citation for AutoPVS1 research-use outputs.",
@@ -3731,8 +4171,20 @@ not clinical decision support.
           "title": "Research Use Only",
           "type": "boolean"
         },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
         "server_version": {
-          "default": "1.0.0",
+          "default": "1.1.0",
           "title": "Server Version",
           "type": "string"
         },

@@ -216,6 +216,7 @@ async def test_bulk_variants_propagates_response_and_meta_modes(mocker) -> None:
 
 @pytest.mark.asyncio
 async def test_bulk_cnvs_happy_path_with_size_int(mocker) -> None:
+    """cnv_info.size is a standard-mode-only field; pin response_mode here."""
     mocker.patch(
         "autopvs1_link.mcp.service_adapters.get_cnv",
         new=AsyncMock(return_value=_cnv_fixture("11-2797090-2869333-DEL")),
@@ -226,7 +227,8 @@ async def test_bulk_cnvs_happy_path_with_size_int(mocker) -> None:
         {
             "items": [
                 {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
-            ]
+            ],
+            "response_mode": "standard",
         },
     )
     payload = result.structured_content
@@ -367,6 +369,10 @@ async def test_bulk_variants_propagates_include_unmet_false(mocker) -> None:
         {
             "items": [{"genome_build": "hg19", "variant_id": "X-1-A-T"}],
             "include_unmet": False,
+            # disease_mechanisms is dropped in summary mode (post-v1.1.0
+            # default); pin standard so the include_unmet filter has rows
+            # to act on.
+            "response_mode": "standard",
         },
     )
     rows = result.structured_content["data"]["items"][0]["data"]["disease_mechanisms"]
@@ -434,7 +440,11 @@ async def test_bulk_variants_dedupes_warnings_by_code(mocker) -> None:
                 {"genome_build": "hg19", "variant_id": "X-1-A-T"},
                 {"genome_build": "hg19", "variant_id": "X-2-G-A"},
                 {"genome_build": "hg19", "variant_id": "X-3-T-C"},
-            ]
+            ],
+            # invalid_external_link is suppressed in summary (the wire
+            # already strips external_links); pin standard so the dedup
+            # path has codes to dedupe.
+            "response_mode": "standard",
         },
     )
     codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
@@ -475,7 +485,10 @@ async def test_bulk_aggregated_warning_carries_count_and_affected_indices(mocker
                 {"genome_build": "hg19", "variant_id": "X-1-A-T"},
                 {"genome_build": "hg19", "variant_id": "X-2-G-A"},
                 {"genome_build": "hg19", "variant_id": "X-3-T-C"},
-            ]
+            ],
+            # Standard pins external_links presentation so the
+            # invalid_external_link warning is emitted by every item.
+            "response_mode": "standard",
         },
     )
     warnings = [
@@ -528,7 +541,10 @@ async def test_bulk_per_item_multi_emission_stays_unaggregated(mocker) -> None:
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "get_variants_pvs1_data_bulk",
-        {"items": [{"genome_build": "hg19", "variant_id": "X-1-A-T"}]},
+        {
+            "items": [{"genome_build": "hg19", "variant_id": "X-1-A-T"}],
+            "response_mode": "standard",
+        },
     )
     warnings = [
         w
@@ -601,7 +617,8 @@ async def test_bulk_mixed_code_aggregation_keeps_distinct_index_sets(mocker) -> 
                 {"genome_build": "hg19", "variant_id": "X-1-A-T"},
                 {"genome_build": "hg19", "variant_id": "X-2-G-A"},
                 {"genome_build": "hg19", "variant_id": "X-3-T-C"},
-            ]
+            ],
+            "response_mode": "standard",
         },
     )
     warnings = result.structured_content["meta"]["warnings"]
@@ -696,7 +713,11 @@ async def test_single_tool_warning_omits_aggregate_fields(mocker) -> None:
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "get_variant_pvs1_data",
-        {"genome_build": "hg19", "variant_id": "X-1-A-T"},
+        {
+            "genome_build": "hg19",
+            "variant_id": "X-1-A-T",
+            "response_mode": "standard",
+        },
     )
     warnings = result.structured_content["meta"]["warnings"]
     assert warnings, "expected at least one warning"

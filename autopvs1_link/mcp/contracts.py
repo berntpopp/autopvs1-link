@@ -138,10 +138,17 @@ class SearchResultMCP(MCPContractModel):
 
 
 class ToolSummaryMCP(BaseModel):
-    """Compact MCP tool summary for first-turn discovery."""
+    """Compact MCP tool summary for first-turn discovery.
+
+    ``default_response_mode`` is the response_mode the tool emits when
+    the caller omits the parameter. Surfaced so LLM consumers can plan
+    bandwidth without parsing the tool description; cheap tools that do
+    not accept response_mode leave it absent.
+    """
 
     purpose: str
     example: dict[str, ExampleValue] = Field(default_factory=dict)
+    default_response_mode: str | None = None
 
 
 class WorkflowStepMCP(BaseModel):

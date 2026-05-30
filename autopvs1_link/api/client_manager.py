@@ -39,9 +39,14 @@ class ClientManager:
         self._client_lock = asyncio.Lock()
         self._shutdown_event = asyncio.Event()
         self._last_request_time = 0.0
-        self._request_delay = 1.0  # 1 second between requests to be respectful
+        # Sourced from settings so AUTOPVS1_LINK_API_RATE_LIMIT_DELAY
+        # actually controls the applied floor (previously hard-coded to
+        # 1.0, which diverged silently when the env var was tuned). The
+        # MCP envelope reads the SAME settings value for meta.rate_limit_floor_ms
+        # so the wire hint and the applied behaviour stay in lockstep.
+        self._request_delay = settings.api.rate_limit_delay
 
-        logger.info("ClientManager initialized")
+        logger.info("ClientManager initialized", rate_limit_seconds=self._request_delay)
 
     async def get_client(self) -> AutoPVS1Client:
         """Get or create the singleton AutoPVS1Client instance."""

@@ -6,6 +6,91 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Breaking
+
+- **MCP default `response_mode` flipped to LLM-first sizing
+  (v1.1.0).** `get_variant_pvs1_data`, `get_cnv_pvs1_data`, and both
+  bulk variants now default to `"summary"` (verdict + final strength,
+  ~1.5 KB); `search_variants` defaults to `"ids_only"` (variant_id +
+  url per row). Anthropic's Tool Search docs and the Pydantic /
+  Codilime "ruthless brevity" engineering write-ups (research
+  2026-05-30) put consensus behind smaller-by-default for
+  LLM-consumed MCPs; the prior `"standard"` default shipped the full
+  decision tree on every first-turn call, wasting ~70% of the typical
+  token budget when the caller only needed the verdict. Pass
+  `response_mode="standard"` to opt back into the decision tree or
+  `"full"` for the audit-trail `*_raw` fields. `capabilities_version`
+  invalidates automatically (the `_TOOL_SUMMARIES` purpose strings
+  carry the new defaults and were edited) and `SERVER_VERSION` ticks
+  1.0.0 → 1.1.0 so cache-aware clients pick the change up.
+
+### Added
+
+- **`meta.cost_tier` + `meta.rate_limit_floor_ms` +
+  `meta.next_call_earliest_at` on every envelope.** Scrape-tier tools
+  advertise `"expensive_cold_cheap_warm"` and the configured upstream
+  floor in milliseconds (default 1000); cheap tools advertise
+  `"cheap"` and omit the floor. `next_call_earliest_at` is an
+  ISO-8601 UTC instant populated only when the call drove an upstream
+  request (`cache_status in {"miss", "coalesced"}`) so LLM clients
+  know exactly when the rate-limit clock will release. The new
+  `autopvs1_link/mcp/cost_tiers.py` registry is the single source of
+  truth shared by the wire and the detailed capabilities resource so
+  the two cannot drift; a unit test enforces lockstep.
+- **`meta.retry_after_ms` on transient errors.** Defaulted to the
+  rate-limit floor for `upstream_timeout`, `upstream_unavailable`,
+  and `external_resolver_unavailable` so an LLM retrying immediately
+  does not just block on the floor; callers can override (e.g. from
+  an upstream `Retry-After` header).
+- **`meta.next_actions[]` recovery hints on every error envelope.**
+  Sourced from a new `ERROR_NEXT_ACTIONS` registry alongside
+  `KNOWN_ERROR_CODES` in `autopvs1_link/mcp/registries.py`. Every
+  documented code carries a 1-2 item list of specific recovery
+  actions so a failing LLM dispatcher can pick the next move without
+  paying a ToolSearch round-trip to re-discover the surface. Pinned
+  tests assert every code has hints, every hint is non-empty, and no
+  orphaned hints exist for deleted codes.
+- **Rewritten server `instructions=` string.** Trimmed to ~1725 bytes
+  / ~431 tokens (under the 2 KB Claude Code truncation cliff) and
+  restructured into a five-block template (purpose → canonical
+  workflow arrows → deferred-tool fallback list → error-code legend
+  → safety language). Names all six core entry-point tools verbatim
+  (`get_variant_pvs1_data`, `get_cnv_pvs1_data`, `search_variants`,
+  `get_variants_pvs1_data_bulk`, `get_cnvs_pvs1_data_bulk`,
+  `get_server_capabilities`) so cold-start clients can skip the
+  deferred-tool ToolSearch round-trip — Anthropic Tool Search docs
+  cite 27-40% first-turn cost for that hop. Snapshot byte-length and
+  tool-coverage tests guard the string against future drift.
+- **`ToolSummaryMCP.default_response_mode`** on the compact
+  capabilities tool so cached discovery clients can plan bandwidth
+  without parsing the per-tool description.
+- **`error_envelope.meta_recovery_hints`** description on the
+  detailed capabilities resource explaining the new
+  `meta.next_actions[]` and `meta.retry_after_ms` shapes.
+
+### Fixed
+
+- **`ClientManager._request_delay` now reads from
+  `settings.api.rate_limit_delay`.** Previously hard-coded to `1.0`
+  while the env var `AUTOPVS1_LINK_API_RATE_LIMIT_DELAY` silently
+  diverged when tuned — latent bug flagged in the v9.7 codebase
+  audit. The MCP envelope now reads the SAME settings value for
+  `meta.rate_limit_floor_ms`, so the wire hint and the applied
+  behaviour stay in lockstep.
+- **Hard-coded cache TTL mirror in
+  `presenters/capabilities.py`** replaced with
+  `settings.cache.ttl_seconds`, so an env-tuned cache TTL
+  (`AUTOPVS1_LINK_CACHE_TTL_HOURS`) auto-propagates to the
+  capabilities resource without further edits.
+
+### Changed
+
+- **`SERVER_VERSION` ticked 1.0.0 → 1.1.0** (also
+  `autopvs1_link/__init__.py:__version__`, `pyproject.toml`, and the
+  `MCPConfig` / `Settings` defaults). MCP-spec-compliant clients
+  caching `serverInfo` see the bump; `capabilities_version`
+  invalidates via the hash.
+
 ### Added
 
 - **Real rsID / HGVS auto-resolution via Ensembl Variant Recoder REST**

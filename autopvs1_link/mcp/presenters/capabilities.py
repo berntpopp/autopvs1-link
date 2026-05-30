@@ -12,7 +12,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from autopvs1_link.config import settings
 from autopvs1_link.mcp.contracts import CompactCapabilitiesData, ToolSummaryMCP, WorkflowStepMCP
+from autopvs1_link.mcp.cost_tiers import (
+    CHEAP_TIER as _CHEAP_TIER,
+)
+from autopvs1_link.mcp.cost_tiers import (
+    SCRAPE_TIER as _SCRAPE_TIER,
+)
 from autopvs1_link.mcp.registries import (
     KNOWN_ERROR_CODES,
     KNOWN_WARNING_CODES,
@@ -21,81 +28,88 @@ from autopvs1_link.mcp.registries import (
 )
 from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 
-_SCRAPE_TIER = "expensive_cold_cheap_warm"
-_CHEAP_TIER = "cheap"
-_DEFAULT_CACHE_TTL_SECONDS = 86_400
+# Sourced from config so an env-tuned cache TTL
+# (AUTOPVS1_LINK_CACHE_TTL_HOURS) auto-propagates here without re-edits.
+# Was a hard-coded 86_400 mirror that drifted from settings under
+# overrides.
+_DEFAULT_CACHE_TTL_SECONDS = settings.cache.ttl_seconds
 
 
 _TOOL_SUMMARIES: dict[str, dict[str, Any]] = {
     "get_variant_pvs1_data": {
         "purpose": (
             "Research-use PVS1 analysis for one AutoPVS1 SNV/indel ID. "
-            "LLM-first: pass response_mode='summary' for the verdict."
+            "Default response_mode is 'summary' (verdict + final "
+            "strength); widen to 'standard' for the decision tree."
         ),
         "example": {
             "genome_build": "hg19",
             "variant_id": "X-82763936-A-T",
-            "response_mode": "summary",
         },
+        "default_response_mode": "summary",
     },
     "get_cnv_pvs1_data": {
         "purpose": (
             "Research-use PVS1 analysis for one AutoPVS1 CNV ID. "
-            "LLM-first: pass response_mode='summary' for the verdict."
+            "Default response_mode is 'summary' (verdict + final "
+            "strength); widen to 'standard' for the decision tree."
         ),
         "example": {
             "genome_build": "hg19",
             "cnv_id": "17-15000000-20000000-DEL",
-            "response_mode": "summary",
         },
+        "default_response_mode": "summary",
     },
     "search_variants": {
         "purpose": (
             "Search AutoPVS1 by gene symbol, partial variant ID, or "
-            "upstream-supported query. Use response_mode='ids_only' "
-            "to save ~40% per row (variant_id + url only). For rsID/HGVS, "
-            "call get_variant_pvs1_data directly — its built-in Ensembl "
-            "Variant Recoder resolver is more accurate than search."
+            "upstream-supported query. Default response_mode is "
+            "'ids_only' (variant_id + url per row, ~40% smaller) so "
+            "callers can hand the resolved id to get_variant_pvs1_data. "
+            "For rsID/HGVS, skip search and call get_variant_pvs1_data "
+            "directly — its built-in Ensembl Variant Recoder resolver "
+            "is authoritative."
         ),
         "example": {
             "query": "BRCA1",
             "genome_build": "hg38",
             "limit": 10,
-            "response_mode": "ids_only",
         },
+        "default_response_mode": "ids_only",
     },
     "get_server_health": {
         "purpose": (
             "Read local server health and enabled feature flags "
-            "without upstream calls (sub-millisecond, no cost)."
+            "without upstream calls (sub-millisecond, no cost). Pass "
+            "check_upstream=true for an opt-in HEAD probe."
         ),
         "example": {},
     },
     "get_variants_pvs1_data_bulk": {
         "purpose": (
             "Bulk PVS1 scoring for 1-10 SNV/indel variants in one "
-            "call. Default response_mode='summary' to keep 10 "
-            "verdicts inside one turn budget."
+            "call. Default response_mode is 'summary' so 10 verdicts "
+            "fit one turn budget."
         ),
         "example": {
             "items": [
                 {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
             ],
-            "response_mode": "summary",
         },
+        "default_response_mode": "summary",
     },
     "get_cnvs_pvs1_data_bulk": {
         "purpose": (
             "Bulk PVS1 scoring for 1-10 CNVs in one call. Default "
-            "response_mode='summary' to keep 10 verdicts inside one "
-            "turn budget."
+            "response_mode is 'summary' so 10 verdicts fit one turn "
+            "budget."
         ),
         "example": {
             "items": [
                 {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
             ],
-            "response_mode": "summary",
         },
+        "default_response_mode": "summary",
     },
 }
 
@@ -200,7 +214,11 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
         endpoint="/mcp/",
         research_use_only=True,
         tool_summaries={
-            name: ToolSummaryMCP(purpose=data["purpose"], example=data["example"])
+            name: ToolSummaryMCP(
+                purpose=data["purpose"],
+                example=data["example"],
+                default_response_mode=data.get("default_response_mode"),
+            )
             for name, data in _TOOL_SUMMARIES.items()
         },
         canonical_parameters=_CANONICAL_PARAMETERS,
@@ -276,6 +294,15 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "required_fields": ["ok", "data", "error", "meta"],
             "stable_error_codes": sorted(KNOWN_ERROR_CODES),
             "stable_warning_codes": sorted(KNOWN_WARNING_CODES),
+            "meta_recovery_hints": (
+                "Every error envelope's meta.next_actions[] is a per-code "
+                "list of recovery hints so a failing LLM dispatcher can "
+                "pick the next move without paying a ToolSearch round-trip "
+                "to re-discover the surface. Transient codes also carry "
+                "meta.retry_after_ms set to the rate-limit floor unless "
+                "the caller overrides it (e.g. from a 429 Retry-After "
+                "header)."
+            ),
         },
         "payload_modes": {
             mode: {"char_budget": spec["char_budget"], "note": spec["note"]}
@@ -372,7 +399,7 @@ _AUTO_RESOLUTION_BLOCK: dict[str, Any] = {
         },
         "endpoint": "/variant_recoder/human/{id}",
         "rate_limit": "Ensembl REST: ~15 req/s shared across all endpoints",
-        "result_cache_ttl_seconds": 86_400,
+        "result_cache_ttl_seconds": _DEFAULT_CACHE_TTL_SECONDS,
     },
     "accepted_forms": {
         "canonical": "CHROM-POS-REF-ALT (e.g. X-82763936-A-T) — no extra upstream call",

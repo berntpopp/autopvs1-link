@@ -490,7 +490,14 @@ async def test_search_no_result_hgvs_like_query_returns_guidance(mocker) -> None
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "search_variants",
-        {"query": " BRCA1 c.5266dupC ", "genome_build": "hg38"},
+        {
+            "query": " BRCA1 c.5266dupC ",
+            "genome_build": "hg38",
+            # ids_only (post-v1.1.0 default) drops data.suggestions; this
+            # test exercises the no-result guidance surface, so pin a
+            # mode that retains it.
+            "response_mode": "standard",
+        },
     )
 
     fake.assert_awaited_once_with("BRCA1 c.5266dupC", "hg38")
@@ -838,6 +845,9 @@ async def test_variant_standard_mode_drops_null_default_fields_from_wire(mocker)
     ``chgvs: null``, ``phgvs: null``, ``decision_tree_raw: null``, etc.
     The contract still declares the optional fields; the wire just omits
     null leaves so first-turn LLM calls do not waste budget.
+
+    Explicit ``response_mode='standard'`` keeps the test's intent stable
+    after the v1.1.0 default flipped to ``summary``.
     """
     mocker.patch(
         "autopvs1_link.mcp.service_adapters.get_variant",
@@ -846,7 +856,11 @@ async def test_variant_standard_mode_drops_null_default_fields_from_wire(mocker)
     mcp = build_mcp_server()
     result = await mcp.call_tool(
         "get_variant_pvs1_data",
-        {"genome_build": "hg38", "variant_id": "X-1-A-T"},
+        {
+            "genome_build": "hg38",
+            "variant_id": "X-1-A-T",
+            "response_mode": "standard",
+        },
     )
     data = result.structured_content["data"]
     variant_info = data["variant_info"]

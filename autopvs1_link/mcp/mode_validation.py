@@ -44,8 +44,10 @@ def normalize_response_mode(response_mode: Any) -> ResponseMode:
         value=response_mode,
         supported_values="ids_only, summary, standard, or full",
         suggestions=[
-            "Use response_mode='standard' unless a smaller (ids_only/summary) "
-            "or audit-trail (full) payload is needed."
+            "Omit response_mode to accept the LLM-first default "
+            "('summary' for scoring tools, 'ids_only' for search). "
+            "Pass 'standard' for the full decision tree or 'full' for "
+            "audit-trail *_raw fields."
         ],
     )
 

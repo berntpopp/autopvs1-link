@@ -35,6 +35,7 @@ from autopvs1_link.mcp.validation import (
 
 RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
 META_MODE_SCHEMA = {"type": "string", "enum": ["full", "compact", "minimal"]}
+_TOOL_NAME = "get_variant_pvs1_data"
 
 
 def _is_retryable_status(status_code: int) -> bool:
@@ -227,17 +228,18 @@ def register(mcp: FastMCP) -> None:
             Any,
             Field(
                 description=(
-                    "Response detail level. LLM-first callers should pass "
-                    "'summary' (verdict + path + final strength, ~1.5KB); "
-                    "widen to 'standard' (default, full decision tree with "
-                    "hoisted note_text and disease_mechanisms) when the user "
+                    "Response detail level. Default 'summary' returns the "
+                    "verdict (preliminary path + final strength) under "
+                    "~1.5KB so first-turn LLM callers stay in budget. "
+                    "Widen to 'standard' for the full decision tree with "
+                    "hoisted note_text and disease_mechanisms when the user "
                     "asks for the tree; use 'full' only for auditors who "
                     "need the ``*_raw`` upstream fields; 'ids_only' is the "
                     "batch-screen lookup tier."
                 ),
                 json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
-        ] = "standard",
+        ] = "summary",
         meta_mode: Annotated[
             Any,
             Field(
@@ -264,11 +266,11 @@ def register(mcp: FastMCP) -> None:
         instead of
         silently picking one (mitigates multi-allelic mis-scoring).
 
-        First-turn LLM callers: pass ``response_mode='summary'`` to receive
-        the verdict (preliminary path + final strength) under ~1.5KB.
-        Widen to ``response_mode='standard'`` only when the user asks for
-        the decision tree. AutoPVS1 outputs are research-use only, not
-        clinical decision support.
+        First-turn LLM callers get the verdict under ~1.5KB by default
+        (``response_mode='summary'``). Widen to ``response_mode='standard'``
+        for the full decision tree, or ``'full'`` for the audit-trail
+        ``*_raw`` upstream fields. AutoPVS1 outputs are research-use only,
+        not clinical decision support.
         """
         normalized_meta_mode: MetaMode = "full"
         try:
@@ -293,9 +295,10 @@ def register(mcp: FastMCP) -> None:
                 data,
                 warnings=resolution_warnings + warnings,
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except InvalidMCPModeError as exc:
-            return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)
+            return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode, tool_name=_TOOL_NAME)
         except MCPInputError as exc:
             return error_envelope(
                 code=exc.code,
@@ -304,6 +307,7 @@ def register(mcp: FastMCP) -> None:
                 suggestions=exc.suggestions,
                 details=exc.details or None,
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except httpx.TimeoutException:
             return error_envelope(
@@ -312,6 +316,7 @@ def register(mcp: FastMCP) -> None:
                 retryable=True,
                 suggestions=["Retry later or confirm the AutoPVS1 service is reachable."],
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except httpx.HTTPStatusError as exc:
             code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
@@ -321,6 +326,7 @@ def register(mcp: FastMCP) -> None:
                 retryable=_is_retryable_status(exc.response.status_code),
                 suggestions=["Confirm the genome_build and AutoPVS1 variant ID."],
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except httpx.RequestError:
             return error_envelope(
@@ -329,6 +335,7 @@ def register(mcp: FastMCP) -> None:
                 retryable=True,
                 suggestions=["Retry later or confirm the AutoPVS1 service is reachable."],
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except ValueError:
             return error_envelope(
@@ -337,4 +344,5 @@ def register(mcp: FastMCP) -> None:
                 retryable=False,
                 suggestions=["Retry after confirming the variant exists in AutoPVS1."],
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )

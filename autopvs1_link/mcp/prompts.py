@@ -7,9 +7,10 @@ from typing import Annotated
 from fastmcp import FastMCP
 
 _PAYLOAD_SIZING_GUIDANCE = (
-    "Payload sizing: pass response_mode='summary' first; widen to "
-    "'standard' only if the user asks for the decision tree, and use "
-    "'full' only when an auditor needs the *_raw upstream fields. Use "
+    "Payload sizing: scoring tools default response_mode='summary' "
+    "(search_variants defaults to 'ids_only'); widen to 'standard' "
+    "only if the user asks for the decision tree, and use 'full' only "
+    "when an auditor needs the *_raw upstream fields. Pass "
     "meta_mode='compact' unless citations need to be reproduced verbatim."
 )
 

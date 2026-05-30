@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "autopvs1-link"
-version = "1.0.0"
+version = "1.1.0"
 description = "A unified server providing REST API and MCP interfaces for autopvs1.bgi.com PVS1 variant data"
 readme = "README.md"
 authors = [

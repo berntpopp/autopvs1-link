@@ -29,28 +29,31 @@ def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
     assert payload["tool_summaries"]["get_variant_pvs1_data"] == {
         "purpose": (
             "Research-use PVS1 analysis for one AutoPVS1 SNV/indel ID. "
-            "LLM-first: pass response_mode='summary' for the verdict."
+            "Default response_mode is 'summary' (verdict + final "
+            "strength); widen to 'standard' for the decision tree."
         ),
         "example": {
             "genome_build": "hg19",
             "variant_id": "X-82763936-A-T",
-            "response_mode": "summary",
         },
+        "default_response_mode": "summary",
     }
     assert payload["tool_summaries"]["search_variants"] == {
         "purpose": (
             "Search AutoPVS1 by gene symbol, partial variant ID, or "
-            "upstream-supported query. Use response_mode='ids_only' "
-            "to save ~40% per row (variant_id + url only). For rsID/HGVS, "
-            "call get_variant_pvs1_data directly — its built-in Ensembl "
-            "Variant Recoder resolver is more accurate than search."
+            "upstream-supported query. Default response_mode is "
+            "'ids_only' (variant_id + url per row, ~40% smaller) so "
+            "callers can hand the resolved id to get_variant_pvs1_data. "
+            "For rsID/HGVS, skip search and call get_variant_pvs1_data "
+            "directly — its built-in Ensembl Variant Recoder resolver "
+            "is authoritative."
         ),
         "example": {
             "query": "BRCA1",
             "genome_build": "hg38",
             "limit": 10,
-            "response_mode": "ids_only",
         },
+        "default_response_mode": "ids_only",
     }
     assert payload["compact_workflow"] == [
         {
@@ -79,8 +82,11 @@ def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
     ]
     assert payload["tool_summaries"]["get_variants_pvs1_data_bulk"]["example"] == {
         "items": [{"genome_build": "hg19", "variant_id": "X-82763936-A-T"}],
-        "response_mode": "summary",
     }
+    assert (
+        payload["tool_summaries"]["get_variants_pvs1_data_bulk"]["default_response_mode"]
+        == "summary"
+    )
     assert "get_variants_pvs1_data_bulk" in compact.canonical_parameters
     assert "get_cnvs_pvs1_data_bulk" in compact.canonical_parameters
 

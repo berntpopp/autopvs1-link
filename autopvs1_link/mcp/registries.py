@@ -52,6 +52,77 @@ KNOWN_ERROR_CODES: dict[str, str] = {
     ),
 }
 
+ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
+    "invalid_variant_id": [
+        "Re-call with variant_id in CHROM-POS-REF-ALT form (X-82763936-A-T).",
+        "Call search_variants to discover an AutoPVS1 variant_id for a gene or HGVS string.",
+    ],
+    "invalid_cnv_id": [
+        "Re-call with cnv_id in CHROM-START-END-DEL|DUP form (17-15000000-20000000-DEL).",
+    ],
+    "invalid_genome_build": [
+        "Re-call with genome_build='hg19' or genome_build='hg38'.",
+    ],
+    "invalid_search_query": [
+        "Use a non-empty query; gene symbols (BRCA1) and partial variant IDs are supported.",
+    ],
+    "invalid_search_cursor": [
+        "Drop the cursor (cursor=None) to start from page 1.",
+        "Re-page using data.pagination.next_cursor from a prior call.",
+    ],
+    "invalid_bulk_input": [
+        "Pass items as a JSON list of 1-10 objects matching the per-item schema.",
+    ],
+    "invalid_response_mode": [
+        "Use one of: ids_only, summary, standard, full.",
+        "Omit response_mode to accept the LLM-first default for this tool.",
+    ],
+    "invalid_meta_mode": [
+        "Use one of: full, compact, minimal.",
+    ],
+    "not_found": [
+        "Confirm the identifier exists upstream; search_variants resolves gene or text queries.",
+        "Try the other genome_build if the source coordinate is ambiguous between hg19 and hg38.",
+    ],
+    "requires_disambiguation": [
+        "Pick one of error.details.candidates[*].id (carries spdi + allele_key + resource_uri) and re-call.",
+    ],
+    "external_resolver_unavailable": [
+        "Retry after meta.retry_after_ms; Ensembl Variant Recoder may be transiently unreachable.",
+        "Bypass the resolver by passing a canonical CHROM-POS-REF-ALT variant_id.",
+    ],
+    "upstream_timeout": [
+        "Retry after meta.retry_after_ms; AutoPVS1 cold calls can take ~3-4s.",
+        "Call get_server_health(check_upstream=true) to confirm AutoPVS1 is reachable.",
+    ],
+    "upstream_unavailable": [
+        "Retry after meta.retry_after_ms; AutoPVS1 may be temporarily down or rate-limiting.",
+        "Call get_server_health(check_upstream=true) to confirm AutoPVS1 is reachable.",
+    ],
+    "parse_error": [
+        "Confirm the identifier exists in AutoPVS1; the HTML schema may have changed for new edge cases.",
+        "Report the failing input so the parser can be adjusted.",
+    ],
+    "destructive_disabled": [
+        "Set AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true and restart the server (administrative environments only).",
+    ],
+    "internal_error": [
+        "Retry once with backoff; report a reproducer if the error persists.",
+    ],
+}
+
+
+def next_actions_for(code: str) -> list[str] | None:
+    """Return canonical recovery hints for ``code``, or None if absent.
+
+    Surfaced on ``meta.next_actions`` of every error envelope so a
+    failing LLM dispatcher does not need to re-discover the tool surface
+    via ToolSearch to recover. ``None`` keeps the meta field absent for
+    unregistered codes (forward-compatible).
+    """
+    return ERROR_NEXT_ACTIONS.get(code)
+
+
 KNOWN_WARNING_CODES: dict[str, str] = {
     "default_genome_build": "Search defaulted to genome_build='hg38'.",
     "deprecated_genome_version": "genome_version param is deprecated.",
@@ -132,6 +203,7 @@ def capabilities_version() -> str:
             KNOWN_ERROR_CODES,
             KNOWN_WARNING_CODES,
             PAYLOAD_MODES,
+            ERROR_NEXT_ACTIONS,
             _TOOL_SUMMARIES,
             _CANONICAL_PARAMETERS,
             _COMPACT_WORKFLOW,

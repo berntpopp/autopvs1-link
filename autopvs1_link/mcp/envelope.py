@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any, TypeVar
 from uuid import uuid4
 
@@ -13,7 +14,10 @@ from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
 
 from autopvs1_link import __version__
+from autopvs1_link.config import settings
+from autopvs1_link.mcp.cost_tiers import SCRAPE_TIER, cost_tier_for
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
+from autopvs1_link.mcp.registries import next_actions_for
 from autopvs1_link.mcp.telemetry import get_call_telemetry
 
 
@@ -105,10 +109,40 @@ class MCPMeta(BaseModel):
     per-mode ``char_budget`` after the first call instead of guessing.
 
     ``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's
-    wall-clock time and cache outcome (``hit`` | ``miss`` | ``bypass``).
-    Populated by the cache wrapper via the telemetry ContextVar; both
-    drop from the wire when the tool made no upstream call (e.g.
-    ``get_server_health`` or ``get_server_capabilities``).
+    wall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``
+    | ``bypass``). Populated by the cache wrapper via the telemetry
+    ContextVar; both drop from the wire when the tool made no upstream
+    call (e.g. ``get_server_health`` or ``get_server_capabilities``).
+
+    ``cost_tier`` is a coarse latency hint sourced from
+    :data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value
+    appears in the detailed capabilities resource so the wire and the
+    discovery doc stay in lockstep. LLM callers use it to plan call
+    sequencing without re-fetching capabilities every turn.
+
+    ``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap
+    (default 1000 ms; tunable via
+    ``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on
+    scrape-tier envelopes since it is meaningless for cheap tools.
+
+    ``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated
+    only when this call actually drove an upstream request
+    (``cache_status in {"miss", "coalesced"}``) — those reset the
+    rate-limit clock, so the next upstream call is gated until that
+    instant. ``hit`` / ``bypass`` cannot determine the next earliest
+    time (the clock may already have elapsed), so the field stays
+    absent.
+
+    ``retry_after_ms`` populates only on error envelopes for which the
+    caller can sensibly retry after a delay; on success envelopes it
+    drops from the wire.
+
+    ``next_actions`` is a per-error-code list of recovery hints
+    sourced from
+    :data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates
+    on every error envelope so a failing LLM dispatcher can pick the
+    next move without paying a ToolSearch round-trip to re-discover
+    the surface; absent on success envelopes.
     """
 
     request_id: str = Field(default_factory=lambda: correlation_id.get() or str(uuid4()))
@@ -119,6 +153,11 @@ class MCPMeta(BaseModel):
     effective_chars: int | None = None
     elapsed_ms: float | None = None
     cache_status: str | None = None
+    cost_tier: str | None = None
+    rate_limit_floor_ms: int | None = None
+    next_call_earliest_at: str | None = None
+    retry_after_ms: int | None = None
+    next_actions: list[str] | None = None
 
 
 class MCPEnvelope[DataT](BaseModel):
@@ -172,19 +211,55 @@ def _strip_none_error_details(node: Any) -> Any:
 
 
 def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
-    """Drop ``elapsed_ms``/``cache_status`` from meta when no upstream call ran.
+    """Drop telemetry / cost-hint meta keys whose value is None.
 
     Cheap tools (``get_server_health``, ``get_server_capabilities``) never
     touch the upstream; the telemetry ContextVar stays at its default
     ``None`` and the fields would otherwise ship as ``null`` and mislead
-    callers reading them as ``0ms``.
+    callers reading them as ``0ms`` or as advertised latency hints that
+    do not apply. ``retry_after_ms`` is also stripped on success
+    envelopes.
     """
     meta = payload.get("meta")
     if isinstance(meta, dict):
-        for key in ("elapsed_ms", "cache_status"):
+        for key in (
+            "elapsed_ms",
+            "cache_status",
+            "cost_tier",
+            "rate_limit_floor_ms",
+            "next_call_earliest_at",
+            "retry_after_ms",
+            "next_actions",
+        ):
             if meta.get(key) is None:
                 meta.pop(key, None)
     return payload
+
+
+def _rate_limit_floor_ms() -> int:
+    """Return the configured AutoPVS1 upstream rate-limit floor in ms."""
+    return int(settings.api.rate_limit_delay * 1000)
+
+
+def _cost_hints_for(
+    tool_name: str | None,
+    cache_status: str | None,
+) -> tuple[str | None, int | None, str | None]:
+    """Compute ``(cost_tier, rate_limit_floor_ms, next_call_earliest_at)``.
+
+    ``next_call_earliest_at`` populates only when the call drove a real
+    upstream request — ``cache_status`` of ``miss`` or ``coalesced``
+    means the rate-limit clock reset and the next upstream call is
+    gated until ``floor_ms`` past now.
+    """
+    tier = cost_tier_for(tool_name)
+    if tier != SCRAPE_TIER:
+        return tier, None, None
+    floor_ms = _rate_limit_floor_ms()
+    next_at: str | None = None
+    if cache_status in ("miss", "coalesced"):
+        next_at = (datetime.now(UTC) + timedelta(milliseconds=floor_ms)).isoformat()
+    return tier, floor_ms, next_at
 
 
 def _strip_none_warning_aggregate_fields(payload: dict[str, Any]) -> dict[str, Any]:
@@ -204,11 +279,17 @@ def _strip_none_warning_aggregate_fields(payload: dict[str, Any]) -> dict[str, A
     return payload
 
 
+_RETRYABLE_TRANSIENT_CODES = frozenset(
+    {"upstream_timeout", "upstream_unavailable", "external_resolver_unavailable"}
+)
+
+
 def ok_envelope(
     data: BaseModel | dict[str, Any],
     warnings: list[MCPWarning] | None = None,
     *,
     meta_mode: Any = "full",
+    tool_name: str | None = None,
 ) -> dict[str, Any]:
     """Return a successful MCP envelope as a JSON-ready dict.
 
@@ -217,6 +298,12 @@ def ok_envelope(
     Pydantic schema's optional-with-default-None scaffolding. The outer
     envelope ``ok``/``data``/``error``/``meta`` shape is preserved so the
     documented ``required_fields`` contract still holds.
+
+    ``tool_name`` enables cost-tier and rate-limit-floor hints in
+    ``meta``; pass the declared MCP tool name (e.g.
+    ``"get_variant_pvs1_data"``) so the envelope can look up the
+    tier registered in :mod:`autopvs1_link.mcp.cost_tiers` without each
+    caller hard-coding the value.
     """
     if isinstance(data, BaseModel):
         payload = data.model_dump(mode="json", exclude_none=True)
@@ -224,6 +311,7 @@ def ok_envelope(
         payload = data
     effective_chars = len(json.dumps(payload, separators=(",", ":")))
     elapsed_ms, cache_status = get_call_telemetry()
+    cost_tier, rate_limit_floor_ms, next_call_earliest_at = _cost_hints_for(tool_name, cache_status)
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=True,
         data=payload,
@@ -233,6 +321,9 @@ def ok_envelope(
             effective_chars=effective_chars,
             elapsed_ms=round(elapsed_ms, 2) if elapsed_ms is not None else None,
             cache_status=cache_status,
+            cost_tier=cost_tier,
+            rate_limit_floor_ms=rate_limit_floor_ms,
+            next_call_earliest_at=next_call_earliest_at,
         ),
     )
     out = _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
@@ -252,6 +343,8 @@ def error_envelope(
     details: dict[str, Any] | None = None,
     warnings: list[MCPWarning] | None = None,
     meta_mode: Any = "full",
+    tool_name: str | None = None,
+    retry_after_ms: int | None = None,
 ) -> ErrorToolResult:
     """Return a failed MCP result that flips ``CallToolResult.isError=true``.
 
@@ -259,7 +352,22 @@ def error_envelope(
     so dict-style callers (and existing tests) keep working. The wire-level
     ``isError`` flag is set so MCP-spec clients can distinguish failed calls
     from successful ones without parsing the envelope.
+
+    For transient upstream errors (``upstream_timeout``,
+    ``upstream_unavailable``, ``external_resolver_unavailable``) we
+    default ``retry_after_ms`` to the rate-limit floor when the caller
+    did not supply one, so an LLM client retrying immediately does not
+    just block on the floor.
     """
+    tier = cost_tier_for(tool_name)
+    rate_limit_floor_ms = _rate_limit_floor_ms() if tier == SCRAPE_TIER else None
+    if (
+        retry_after_ms is None
+        and retryable
+        and rate_limit_floor_ms is not None
+        and code in _RETRYABLE_TRANSIENT_CODES
+    ):
+        retry_after_ms = rate_limit_floor_ms
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=False,
         data=None,
@@ -270,13 +378,20 @@ def error_envelope(
             suggestions=suggestions or [],
             details=details,
         ),
-        meta=MCPMeta(warnings=warnings or []),
+        meta=MCPMeta(
+            warnings=warnings or [],
+            cost_tier=tier,
+            rate_limit_floor_ms=rate_limit_floor_ms,
+            retry_after_ms=retry_after_ms,
+            next_actions=next_actions_for(code),
+        ),
     )
     payload = envelope.model_dump(mode="json")
     if payload["error"]["details"] is None:
         payload["error"].pop("details")
     payload = _apply_meta_mode(payload, meta_mode)
     payload = _strip_none_warning_aggregate_fields(payload)
+    payload = _strip_none_telemetry_fields(payload)
     return ErrorToolResult(
         content=[TextContent(type="text", text=json.dumps(payload, separators=(",", ":")))],
         structured_content=payload,

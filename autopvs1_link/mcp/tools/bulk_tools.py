@@ -29,6 +29,8 @@ from autopvs1_link.mcp.tools._pvs1_runners import run_cnv_pvs1, run_variant_pvs1
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
 
 BULK_MAX_ITEMS = 10
+_VARIANTS_BULK_TOOL = "get_variants_pvs1_data_bulk"
+_CNVS_BULK_TOOL = "get_cnvs_pvs1_data_bulk"
 
 
 def _dedupe_warnings(
@@ -183,15 +185,15 @@ def register(mcp: FastMCP) -> None:
             Any,
             Field(
                 description=(
-                    "Response detail level applied to each item. Default to "
-                    "'summary' for bulk batch screens — keeps the per-item "
-                    "payload small enough that 10 items still fit a turn. "
-                    "Widen to 'standard' only when an item needs the full "
+                    "Response detail level applied to each item. Default "
+                    "'summary' keeps the per-item payload small enough "
+                    "that 10 items still fit one turn budget. Widen to "
+                    "'standard' only when an item needs the full "
                     "decision tree."
                 ),
                 json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
-        ] = "standard",
+        ] = "summary",
         meta_mode: Annotated[
             Any,
             Field(
@@ -247,7 +249,9 @@ def register(mcp: FastMCP) -> None:
             _validate_size(raw_items)
             parsed_items = _parse_variant_items(raw_items)
         except InvalidMCPModeError as exc:
-            return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)
+            return invalid_mode_envelope(
+                exc, meta_mode=normalized_meta_mode, tool_name=_VARIANTS_BULK_TOOL
+            )
         except _BulkInputError as exc:
             return error_envelope(
                 code="invalid_bulk_input",
@@ -258,6 +262,7 @@ def register(mcp: FastMCP) -> None:
                     "{genome_build, variant_id} objects."
                 ],
                 meta_mode=normalized_meta_mode,
+                tool_name=_VARIANTS_BULK_TOOL,
             )
 
         results: list[BulkVariantPVS1ResultItem] = []
@@ -299,6 +304,7 @@ def register(mcp: FastMCP) -> None:
             payload,
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
+            tool_name=_VARIANTS_BULK_TOOL,
         )
 
     @mcp.tool(
@@ -327,15 +333,15 @@ def register(mcp: FastMCP) -> None:
             Any,
             Field(
                 description=(
-                    "Response detail level applied to each item. Default to "
-                    "'summary' for bulk batch screens — keeps the per-item "
-                    "payload small enough that 10 items still fit a turn. "
-                    "Widen to 'standard' only when an item needs the full "
+                    "Response detail level applied to each item. Default "
+                    "'summary' keeps the per-item payload small enough "
+                    "that 10 items still fit one turn budget. Widen to "
+                    "'standard' only when an item needs the full "
                     "decision tree."
                 ),
                 json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
-        ] = "standard",
+        ] = "summary",
         meta_mode: Annotated[
             Any,
             Field(
@@ -383,7 +389,9 @@ def register(mcp: FastMCP) -> None:
             _validate_size(raw_items)
             parsed_items = _parse_cnv_items(raw_items)
         except InvalidMCPModeError as exc:
-            return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)
+            return invalid_mode_envelope(
+                exc, meta_mode=normalized_meta_mode, tool_name=_CNVS_BULK_TOOL
+            )
         except _BulkInputError as exc:
             return error_envelope(
                 code="invalid_bulk_input",
@@ -393,6 +401,7 @@ def register(mcp: FastMCP) -> None:
                     f"Pass items as a list of 1-{BULK_MAX_ITEMS} {{genome_build, cnv_id}} objects."
                 ],
                 meta_mode=normalized_meta_mode,
+                tool_name=_CNVS_BULK_TOOL,
             )
 
         results: list[BulkCNVPVS1ResultItem] = []
@@ -434,4 +443,5 @@ def register(mcp: FastMCP) -> None:
             payload,
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
+            tool_name=_CNVS_BULK_TOOL,
         )

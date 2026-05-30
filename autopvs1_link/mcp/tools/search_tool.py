@@ -42,6 +42,8 @@ NullableStringParam = SkipValidation[str | None]
 ResponseModeParam = SkipValidation[Literal["ids_only", "summary", "standard", "full"]]
 MetaModeParam = SkipValidation[Literal["full", "compact", "minimal"]]
 
+_TOOL_NAME = "search_variants"
+
 
 def register(mcp: FastMCP) -> None:
     """Register the search_variants tool."""
@@ -90,15 +92,16 @@ def register(mcp: FastMCP) -> None:
             ResponseModeParam,
             Field(
                 description=(
-                    "Response detail level. Use 'ids_only' to discover the "
-                    "AutoPVS1 variant_id with minimum bytes; 'summary' drops "
-                    "the result rows (use only with pagination metadata); "
-                    "'standard' (default) returns rich rows with gene + "
-                    "variant_type; 'full' is identical to 'standard' for "
-                    "search."
+                    "Response detail level. Default 'ids_only' emits the "
+                    "AutoPVS1 variant_id and url per row — the leanest "
+                    "shape for hand-off to get_variant_pvs1_data. "
+                    "'summary' drops the rows entirely (use only with "
+                    "pagination metadata); 'standard' returns rich rows "
+                    "with gene + variant_type; 'full' is identical to "
+                    "'standard' for search."
                 ),
             ),
-        ] = "standard",
+        ] = "ids_only",
         meta_mode: Annotated[
             MetaModeParam,
             Field(
@@ -139,9 +142,10 @@ def register(mcp: FastMCP) -> None:
                 data,
                 warnings=warnings,
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except InvalidMCPModeError as exc:
-            return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)
+            return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode, tool_name=_TOOL_NAME)
         except MCPInputError as exc:
             return error_envelope(
                 code=exc.code,
@@ -150,6 +154,7 @@ def register(mcp: FastMCP) -> None:
                 suggestions=exc.suggestions,
                 details=exc.details or None,
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except httpx.TimeoutException:
             return error_envelope(
@@ -158,6 +163,7 @@ def register(mcp: FastMCP) -> None:
                 retryable=True,
                 suggestions=["Retry later or search by gene symbol only."],
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except httpx.HTTPStatusError as exc:
             return error_envelope(
@@ -166,6 +172,7 @@ def register(mcp: FastMCP) -> None:
                 retryable=exc.response.status_code in {408, 429} or exc.response.status_code >= 500,
                 suggestions=["Retry later or simplify the search query."],
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
         except httpx.RequestError:
             return error_envelope(
@@ -174,4 +181,5 @@ def register(mcp: FastMCP) -> None:
                 retryable=True,
                 suggestions=["Retry later or search by gene symbol only."],
                 meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
             )
