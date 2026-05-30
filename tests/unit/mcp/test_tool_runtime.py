@@ -727,6 +727,91 @@ async def test_search_ids_only_wire_payload_strips_descriptive_fields(mocker) ->
 
 
 @pytest.mark.asyncio
+async def test_every_tool_wire_payload_validates_against_published_schema(mocker) -> None:
+    """Meta-test: compacted structured_content must satisfy the tool's output_schema.
+
+    The MCP client validates ``structuredContent`` against the schema the
+    server publishes via ``tools/list``. Stripping null fields from the
+    wire (``exclude_none=True``) is safe only when the schema marks those
+    fields non-required. This test catches the seam where a Pydantic
+    field declared ``str | None`` (no default → required → schema marks
+    required) is stripped on the wire and the client rejects.
+
+    Regression for ``search_variants`` page 1 throwing
+    ``Output validation error: 'previous_cursor' is a required property``.
+    """
+    import jsonschema
+
+    from autopvs1_link.mcp.contracts import (
+        CNVMCPEnvelope,
+        CompactCapabilitiesMCPEnvelope,
+        SearchMCPEnvelope,
+        VariantMCPEnvelope,
+    )
+
+    # Mock all upstream service adapters so the test is fast + deterministic.
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(return_value=_variant_result()),
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_cnv",
+        new=AsyncMock(return_value=_cnv_result()),
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.search_variants",
+        new=AsyncMock(
+            return_value=AutoPVS1SearchResults(
+                query="MYH9",
+                genome_version="hg38",
+                results=[
+                    SearchResult(
+                        variant_id=f"22-{i}-A-T",
+                        gene="MYH9",
+                        variant_type="Nonsense",
+                        genome_build="hg38",
+                        url=f"https://autopvs1.bgi.com/variant/hg38/22-{i}-A-T",
+                    )
+                    for i in range(3)
+                ],
+            )
+        ),
+    )
+
+    mcp = build_mcp_server()
+    cases = [
+        (
+            "get_variant_pvs1_data",
+            {"genome_build": "hg19", "variant_id": "X-1-A-T"},
+            VariantMCPEnvelope,
+        ),
+        (
+            "get_cnv_pvs1_data",
+            {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
+            CNVMCPEnvelope,
+        ),
+        # search page 1: previous_cursor is null here — this is the regression.
+        (
+            "search_variants",
+            {"query": "MYH9", "genome_build": "hg38"},
+            SearchMCPEnvelope,
+        ),
+        ("get_server_capabilities", {}, CompactCapabilitiesMCPEnvelope),
+    ]
+    for tool_name, args, envelope_cls in cases:
+        result = await mcp.call_tool(tool_name, args)
+        structured = result.structured_content
+        schema = envelope_cls.model_json_schema()
+        try:
+            jsonschema.validate(instance=structured, schema=schema)
+        except jsonschema.ValidationError as exc:
+            raise AssertionError(
+                f"tool {tool_name!r} produced wire payload that fails its own "
+                f"output_schema: {exc.message} at path {list(exc.absolute_path)}"
+            ) from exc
+
+
+@pytest.mark.asyncio
 async def test_variant_standard_mode_drops_null_default_fields_from_wire(mocker) -> None:
     """Standard-mode wire payload must drop null-default fields for tokens.
 

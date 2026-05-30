@@ -235,10 +235,17 @@ class SearchPaginationMCP(BaseModel):
     only what the upstream returned for this query (no guarantee of
     exhaustiveness); ``upstream_total`` means the upstream guarantees the
     full result set was returned.
+
+    ``previous_cursor`` and ``next_cursor`` carry ``= None`` defaults so
+    the published JSON schema marks them non-required. The wire payload
+    strips null fields (``exclude_none=True``) and the MCP client
+    validates structured content against that schema — without the
+    defaults, page 1 (no previous) and the last page (no next) would
+    fail validation.
     """
 
-    previous_cursor: str | None
-    next_cursor: str | None
+    previous_cursor: str | None = None
+    next_cursor: str | None = None
     has_more: bool
     offset: int
     total_count_kind: Literal["upstream_total", "upstream_page"] = "upstream_page"
