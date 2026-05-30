@@ -11,7 +11,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import TypedDict
+
+
+class PayloadModeSpec(TypedDict):
+    """Per-response-mode metadata exposed on capabilities."""
+
+    char_budget: int
+    note: str
+
 
 KNOWN_ERROR_CODES: dict[str, str] = {
     "invalid_variant_id": "Variant ID malformed; expect CHROM-POS-REF-ALT.",
@@ -40,7 +48,7 @@ KNOWN_WARNING_CODES: dict[str, str] = {
     "unsupported_hgvs_like_search": "HGVS-like text returned zero results.",
 }
 
-PAYLOAD_MODES: dict[str, dict[str, Any]] = {
+PAYLOAD_MODES: dict[str, PayloadModeSpec] = {
     "summary": {
         "char_budget": 1500,
         "note": "IDs + final strength only.",
@@ -59,8 +67,10 @@ PAYLOAD_MODES: dict[str, dict[str, Any]] = {
 def capabilities_version() -> str:
     """Return a stable 16-char sha256 prefix over the registries.
 
-    Used by ``CompactCapabilitiesData.capabilities_version`` so clients can
-    cache discovery output and invalidate when codes or modes change.
+    Task 3 wires this into ``CompactCapabilitiesData.capabilities_version``
+    so clients can cache discovery output and invalidate when codes or
+    modes change. The hash is deterministic across processes because the
+    JSON serialization uses ``sort_keys=True``.
     """
     blob = json.dumps(
         [KNOWN_ERROR_CODES, KNOWN_WARNING_CODES, PAYLOAD_MODES],

@@ -15,20 +15,27 @@ _MCP_ROOT = Path(__file__).resolve().parents[3] / "autopvs1_link" / "mcp"
 
 
 def test_known_error_codes_cover_every_mcp_input_error_raise_site() -> None:
-    """Every MCPInputError(code='X', ...) site in autopvs1_link/mcp/ must
-    declare X in KNOWN_ERROR_CODES, otherwise capabilities lies to callers."""
-    pattern = re.compile(r"MCPInputError\(\s*\n?\s*code=\"([a-z_]+)\"")
+    """Every site under autopvs1_link/mcp/ that emits an error code must
+    declare that code in KNOWN_ERROR_CODES. Otherwise capabilities lies
+    to callers and clients see an undocumented code on the wire.
+
+    The scanner covers three emission paths:
+    1. ``MCPInputError(code="...", ...)`` — direct user-input validation.
+    2. ``error_envelope(code="...", ...)`` — tool-level error wrapping.
+    3. ``InvalidMCPModeError(code="...", ...)`` — response/meta mode validation.
+    """
+    patterns = [
+        re.compile(r"MCPInputError\(\s*\n?\s*[^)]*?code=\"([a-z_]+)\""),
+        re.compile(r"error_envelope\(\s*\n?\s*[^)]*?code=\"([a-z_]+)\""),
+        re.compile(r"InvalidMCPModeError\(\s*\n?\s*[^)]*?code=\"([a-z_]+)\""),
+    ]
     found: set[str] = set()
     for path in _MCP_ROOT.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
-        found.update(pattern.findall(text))
-    # mode_validation also raises through InvalidMCPModeError with stable codes
-    mode_pattern = re.compile(r"code=\"(invalid_response_mode|invalid_meta_mode)\"")
-    for path in _MCP_ROOT.rglob("*.py"):
-        text = path.read_text(encoding="utf-8")
-        found.update(mode_pattern.findall(text))
+        for pattern in patterns:
+            found.update(pattern.findall(text))
     missing = found - set(KNOWN_ERROR_CODES)
-    assert not missing, f"error codes raised but not registered: {sorted(missing)}"
+    assert not missing, f"error codes emitted but not registered: {sorted(missing)}"
 
 
 def test_known_warning_codes_cover_every_mcp_warning_construction() -> None:
