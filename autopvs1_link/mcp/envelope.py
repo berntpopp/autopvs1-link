@@ -45,7 +45,7 @@ class ErrorToolResult(ToolResult):
             content=self.content,
             structuredContent=self.structured_content,
             isError=True,
-            _meta=self.meta,  # type: ignore[call-arg]
+            _meta=self.meta,
         )
 
 
