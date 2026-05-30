@@ -122,3 +122,24 @@ def test_detailed_capabilities_mirrors_capabilities_version() -> None:
     detailed = detailed_capabilities_resource()
     compact = present_compact_capabilities().model_dump(mode="json")
     assert detailed["capabilities_version"] == compact["capabilities_version"]
+
+
+def test_detailed_capabilities_documents_bulk_behavior_contract() -> None:
+    detailed = detailed_capabilities_resource()
+    bulk = detailed["bulk_behavior"]
+    assert bulk["max_items"] == 10
+    assert bulk["execution"] == "sequential"
+    assert bulk["respects_upstream_rate_limit"] is True
+    assert bulk["upstream_rate_limit_seconds"] == 1.0
+    assert bulk["worst_case_latency_seconds"] == 10
+    assert bulk["continue_on_error_default"] is True
+    assert bulk["ordering"] == "preserves input order"
+    assert bulk["per_item_envelope"] == {
+        "ok": "bool",
+        "input": "object",
+        "data": "object|null",
+        "error": "object|null",
+    }
+    assert bulk["applies_response_mode_per_item"] is True
+    assert bulk["applies_meta_mode_top_level_only"] is True
+    assert bulk["accounting_invariant"] == "total == attempted + skipped"

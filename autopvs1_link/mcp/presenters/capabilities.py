@@ -166,6 +166,24 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             mode: {"char_budget": spec["char_budget"], "note": spec["note"]}
             for mode, spec in PAYLOAD_MODES.items()
         },
+        "bulk_behavior": {
+            "max_items": 10,
+            "execution": "sequential",
+            "respects_upstream_rate_limit": True,
+            "upstream_rate_limit_seconds": 1.0,
+            "worst_case_latency_seconds": 10,
+            "continue_on_error_default": True,
+            "ordering": "preserves input order",
+            "per_item_envelope": {
+                "ok": "bool",
+                "input": "object",
+                "data": "object|null",
+                "error": "object|null",
+            },
+            "applies_response_mode_per_item": True,
+            "applies_meta_mode_top_level_only": True,
+            "accounting_invariant": "total == attempted + skipped",
+        },
         "cache_statistics": {
             "resource": "autopvs1-link://cache/statistics",
             "semantics": ("Method-keyed counters with stable keys and cache key shapes."),
