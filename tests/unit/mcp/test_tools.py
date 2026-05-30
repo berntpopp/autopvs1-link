@@ -401,3 +401,20 @@ async def test_pvs1_workflow_help_search_first_describes_resolution_chain() -> N
     body = rendered.messages[0].content.text
     assert "search_variants" in body
     assert "next_cursor" in body
+
+
+@pytest.mark.asyncio
+async def test_pvs1_workflow_help_unknown_task_returns_valid_choices() -> None:
+    """Graceful fallback: when task is not one of the known keys, the
+    prompt should list the valid choices so the caller can recover."""
+    mcp: FastMCP = build_mcp_server()
+    rendered = await mcp.render_prompt(
+        "pvs1_workflow_help",
+        {"task": "totally_not_a_task"},
+    )
+    body = rendered.messages[0].content.text
+    assert "Unknown task" in body
+    # All three valid task keys must be advertised so the caller can correct.
+    assert "clinical_review" in body
+    assert "batch_screen" in body
+    assert "search_first" in body

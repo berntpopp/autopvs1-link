@@ -86,7 +86,7 @@ _WORKFLOW_HELP_BODIES: dict[str, str] = {
     ),
     "batch_screen": (
         "Use AutoPVS1-Link for research-use PVS1 batch screening only.\n\n"
-        "Chain for 2-10 variants in one call:\n"
+        "Chain for 1-10 variants in one call:\n"
         "1. Confirm all variants share a genome build; otherwise split "
         "into per-build batches.\n"
         "2. get_variants_pvs1_data_bulk(items=[...], "
@@ -162,5 +162,6 @@ def register(mcp: FastMCP) -> None:
         """Return tool-chain guidance keyed by task."""
         body = _WORKFLOW_HELP_BODIES.get(task)
         if body is None:
-            return "Unknown task. Choose one of: clinical_review, batch_screen, search_first."
+            valid = ", ".join(_WORKFLOW_HELP_BODIES)
+            return f"Unknown task. Choose one of: {valid}."
         return body
