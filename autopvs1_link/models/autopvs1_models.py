@@ -72,7 +72,7 @@ class CNVInfo(BaseModel):
     cnv_type: str
     gene_symbol: str
     coordinates: str
-    size: str | None = None
+    size: int | None = None
 
 
 class AutoPVS1Data(BaseModel):
