@@ -7,9 +7,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from autopvs1_link.mcp.contracts import SearchMCPData
+from autopvs1_link.mcp.contracts import SearchMCPData, SearchPaginationMCP
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.mode_validation import ResponseMode, normalize_response_mode
+from autopvs1_link.mcp.validation import _encode_cursor
 
 HGVS_LIKE_RE = re.compile(
     r"((?:^|\s)[A-Z][A-Z0-9-]*(?:\s+|\s*:\s*)c\.)"
@@ -67,11 +68,13 @@ def present_search(
     total_count = len(all_results)
     page = all_results[offset : offset + limit]
     next_offset = offset + limit
-    next_cursor = str(next_offset) if next_offset < total_count else None
+    has_more = next_offset < total_count
+    next_cursor = _encode_cursor(next_offset) if has_more else None
+    previous_cursor = _encode_cursor(max(0, offset - limit)) if offset > 0 else None
     warnings = list(inherited_warnings)
     suggestions: list[str] = []
 
-    if next_cursor is not None:
+    if has_more:
         warnings.append(
             MCPWarning(
                 code="search_results_truncated",
@@ -88,13 +91,20 @@ def present_search(
             )
         )
 
+    pagination = SearchPaginationMCP(
+        previous_cursor=previous_cursor,
+        next_cursor=next_cursor,
+        has_more=has_more,
+        offset=offset,
+        total_count_kind="upstream_page",
+    )
     return (
         SearchMCPData(
             query=query,
             genome_build=genome_build,
             total_count=total_count,
             returned_count=len(page),
-            next_cursor=next_cursor,
+            pagination=pagination,
             results=[] if mode == "summary" else page,
             suggestions=suggestions,
         ),

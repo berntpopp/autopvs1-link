@@ -154,7 +154,15 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "limit_default": 10,
             "limit_min": 1,
             "limit_max": 50,
-            "cursor": "Opaque integer-offset string returned as next_cursor.",
+            "cursor": (
+                "Opaque pagination token returned as next_cursor; "
+                "callers must pass it back unchanged."
+            ),
+            "pagination_block": (
+                "Search results carry a pagination object with "
+                "previous_cursor, next_cursor, has_more, offset, and "
+                "total_count_kind."
+            ),
             "deprecated_alias": ("genome_version is accepted for one release; use genome_build."),
         },
         "error_envelope": {

@@ -194,6 +194,25 @@ class CNVMCPData(BaseModel):
         super().__init__(**payload)
 
 
+class SearchPaginationMCP(BaseModel):
+    """Opaque pagination block for ``search_variants``.
+
+    Cursors are opaque base64url-encoded tokens; callers must not parse
+    or construct them. ``offset`` is echoed for operator visibility only.
+    ``total_count_kind`` documents how to interpret ``total_count`` on the
+    surrounding ``SearchMCPData``: ``upstream_page`` means the count is
+    only what the upstream returned for this query (no guarantee of
+    exhaustiveness); ``upstream_total`` means the upstream guarantees the
+    full result set was returned.
+    """
+
+    previous_cursor: str | None
+    next_cursor: str | None
+    has_more: bool
+    offset: int
+    total_count_kind: Literal["upstream_total", "upstream_page"] = "upstream_page"
+
+
 class SearchMCPData(BaseModel):
     """MCP-presented search page."""
 
@@ -201,7 +220,7 @@ class SearchMCPData(BaseModel):
     genome_build: str
     total_count: int
     returned_count: int
-    next_cursor: str | None
+    pagination: SearchPaginationMCP
     ordering: Literal["upstream"] = "upstream"
     results: list[SearchResultMCP] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
@@ -213,7 +232,7 @@ class SearchMCPData(BaseModel):
         genome_build: str,
         total_count: int,
         returned_count: int,
-        next_cursor: str | None,
+        pagination: SearchPaginationMCP | dict[str, Any],
         ordering: Literal["upstream"] = "upstream",
         results: Sequence[SearchResultMCP | dict[str, Any]] | None = None,
         suggestions: list[str] | None = None,
@@ -223,7 +242,7 @@ class SearchMCPData(BaseModel):
             "genome_build": genome_build,
             "total_count": total_count,
             "returned_count": returned_count,
-            "next_cursor": next_cursor,
+            "pagination": pagination,
             "ordering": ordering,
         }
         if results is not None:

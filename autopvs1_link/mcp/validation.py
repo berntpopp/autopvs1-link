@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import re
 
 from autopvs1_link.mcp.envelope import MCPWarning
@@ -154,6 +156,51 @@ def _invalid_search_pagination(message: str) -> MCPInputError:
     )
 
 
+def _invalid_search_cursor(message: str) -> MCPInputError:
+    return MCPInputError(
+        code="invalid_search_cursor",
+        message=message,
+        suggestions=[
+            "Use the opaque next_cursor value returned by the previous search_variants call; "
+            "omit cursor to reset to the first page.",
+        ],
+    )
+
+
+def _encode_cursor(offset: int) -> str:
+    """Encode an integer offset as a base64url JSON payload (no padding)."""
+    payload = json.dumps({"offset": int(offset)}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(payload).decode().rstrip("=")
+
+
+def _decode_cursor(cursor: str) -> int:
+    """Decode an opaque cursor to its integer offset, raising on malformed input."""
+    if not isinstance(cursor, str) or not cursor:
+        raise _invalid_search_cursor("Search cursor must be a non-empty opaque string.")
+    if cursor.isdigit():
+        # Reject the legacy integer-offset form so callers cannot construct cursors.
+        raise _invalid_search_cursor(
+            "Search cursor must be the opaque next_cursor returned by search_variants."
+        )
+    padded = cursor + "=" * (-len(cursor) % 4)
+    try:
+        decoded_bytes = base64.urlsafe_b64decode(padded.encode())
+    except (ValueError, TypeError) as exc:
+        raise _invalid_search_cursor("Search cursor is not valid base64url.") from exc
+    try:
+        payload = json.loads(decoded_bytes.decode())
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise _invalid_search_cursor("Search cursor payload is not valid JSON.") from exc
+    if not isinstance(payload, dict) or "offset" not in payload:
+        raise _invalid_search_cursor("Search cursor payload must contain an integer offset.")
+    raw_offset = payload["offset"]
+    if not isinstance(raw_offset, int) or isinstance(raw_offset, bool):
+        raise _invalid_search_cursor("Search cursor offset must be an integer.")
+    if raw_offset < 0:
+        raise _invalid_search_cursor("Search cursor offset must be zero or greater.")
+    return raw_offset
+
+
 def _normalize_limit(limit: object) -> int:
     if isinstance(limit, int) and not isinstance(limit, bool):
         return limit
@@ -167,34 +214,19 @@ def _normalize_limit(limit: object) -> int:
     raise _invalid_search_pagination("Search limit must be an integer.")
 
 
-def normalize_limit_cursor(limit: object, cursor: object | None) -> tuple[int, int]:
-    bounded_limit = max(1, min(_normalize_limit(limit), 50))
+def normalize_limit_cursor(limit: object, cursor: object | None) -> tuple[int, int, int]:
+    """Return ``(bounded_limit, offset, requested_limit)``.
+
+    ``requested_limit`` is the caller's pre-clamp value so callers can emit a
+    ``limit_clamped`` warning when ``bounded_limit != requested_limit``.
+    ``cursor`` is now an opaque base64url-encoded token; callers must pass
+    through the ``next_cursor`` returned by a previous search call.
+    """
+    requested_limit = _normalize_limit(limit)
+    bounded_limit = max(1, min(requested_limit, 50))
     if cursor is None:
-        return bounded_limit, 0
+        return bounded_limit, 0, requested_limit
     if not isinstance(cursor, str):
-        raise MCPInputError(
-            code="invalid_search_query",
-            message="Search cursor must be an integer-offset string.",
-            suggestions=[
-                "Use the next_cursor value returned by the previous search_variants call."
-            ],
-        )
-    try:
-        offset = int(cursor)
-    except ValueError as exc:
-        raise MCPInputError(
-            code="invalid_search_query",
-            message="Search cursor must be an integer-offset string.",
-            suggestions=[
-                "Use the next_cursor value returned by the previous search_variants call."
-            ],
-        ) from exc
-    if offset < 0:
-        raise MCPInputError(
-            code="invalid_search_query",
-            message="Search cursor must be zero or greater.",
-            suggestions=[
-                "Use the next_cursor value returned by the previous search_variants call."
-            ],
-        )
-    return bounded_limit, offset
+        raise _invalid_search_cursor("Search cursor must be a non-empty opaque string.")
+    offset = _decode_cursor(cursor)
+    return bounded_limit, offset, requested_limit

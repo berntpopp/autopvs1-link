@@ -2948,7 +2948,7 @@ Use this to search AutoPVS1 by gene symbol or variant text.
         }
       ],
       "default": null,
-      "description": "Opaque integer-offset cursor returned as next_cursor."
+      "description": "Opaque pagination token returned as next_cursor; do not construct."
     },
     "genome_build": {
       "anyOf": [
@@ -3034,22 +3034,63 @@ Use this to search AutoPVS1 by gene symbol or variant text.
               "title": "Genome Build",
               "type": "string"
             },
-            "next_cursor": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Next Cursor"
-            },
             "ordering": {
               "const": "upstream",
               "default": "upstream",
               "title": "Ordering",
               "type": "string"
+            },
+            "pagination": {
+              "description": "Opaque pagination block for ``search_variants``.\n\nCursors are opaque base64url-encoded tokens; callers must not parse\nor construct them. ``offset`` is echoed for operator visibility only.\n``total_count_kind`` documents how to interpret ``total_count`` on the\nsurrounding ``SearchMCPData``: ``upstream_page`` means the count is\nonly what the upstream returned for this query (no guarantee of\nexhaustiveness); ``upstream_total`` means the upstream guarantees the\nfull result set was returned.",
+              "properties": {
+                "has_more": {
+                  "title": "Has More",
+                  "type": "boolean"
+                },
+                "next_cursor": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Next Cursor"
+                },
+                "offset": {
+                  "title": "Offset",
+                  "type": "integer"
+                },
+                "previous_cursor": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Previous Cursor"
+                },
+                "total_count_kind": {
+                  "default": "upstream_page",
+                  "enum": [
+                    "upstream_total",
+                    "upstream_page"
+                  ],
+                  "title": "Total Count Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "previous_cursor",
+                "next_cursor",
+                "has_more",
+                "offset"
+              ],
+              "title": "SearchPaginationMCP",
+              "type": "object"
             },
             "query": {
               "title": "Query",
@@ -3114,7 +3155,7 @@ Use this to search AutoPVS1 by gene symbol or variant text.
             "genome_build",
             "total_count",
             "returned_count",
-            "next_cursor"
+            "pagination"
           ],
           "title": "SearchMCPData",
           "type": "object"

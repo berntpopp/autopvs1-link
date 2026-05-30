@@ -1,5 +1,8 @@
 """Tests for search MCP pagination and guidance."""
 
+import base64
+import json
+
 from autopvs1_link.mcp.presenters.search import present_search
 from autopvs1_link.models.autopvs1_models import AutoPVS1SearchResults, SearchResult
 
@@ -34,7 +37,8 @@ def test_present_search_paginates_in_upstream_order() -> None:
     assert data.genome_build == "hg38"
     assert data.total_count == 12
     assert data.returned_count == 10
-    assert data.next_cursor == "10"
+    assert data.pagination.next_cursor is not None
+    assert data.pagination.has_more is True
     assert data.ordering == "upstream"
     assert data.results[0]["variant_id"] == "17-0-A-T"
     assert warnings[0].code == "search_results_truncated"
@@ -57,7 +61,8 @@ def test_present_search_uses_cursor_offset() -> None:
     )
 
     assert data.returned_count == 2
-    assert data.next_cursor is None
+    assert data.pagination.next_cursor is None
+    assert data.pagination.has_more is False
     assert [row["variant_id"] for row in data.results] == ["17-10-A-T", "17-11-A-T"]
     assert warnings == []
 
@@ -220,7 +225,8 @@ def test_present_search_summary_keeps_counts_and_omits_result_rows() -> None:
     assert payload["genome_build"] == "hg38"
     assert payload["total_count"] == 3
     assert payload["returned_count"] == 2
-    assert payload["next_cursor"] == "2"
+    assert payload["pagination"]["next_cursor"] is not None
+    assert payload["pagination"]["has_more"] is True
     assert payload["ordering"] == "upstream"
     assert payload["results"] == []
     assert warnings[0].code == "search_results_truncated"
@@ -245,3 +251,79 @@ def test_present_search_full_preserves_result_rows() -> None:
 
     assert [row["variant_id"] for row in data.results] == ["17-0-A-T", "17-1-A-T"]
     assert warnings[0].code == "search_results_truncated"
+
+
+def _make_results(n: int) -> dict[str, object]:
+    return {
+        "query": "POU3F4",
+        "genome_version": "hg38",
+        "results": [
+            {
+                "variant_id": f"X-{i}-A-T",
+                "gene": "POU3F4",
+                "variant_type": "Nonsense",
+                "genome_build": "hg38",
+                "url": f"https://autopvs1.bgi.com/variant/hg38/X-{i}-A-T",
+            }
+            for i in range(n)
+        ],
+    }
+
+
+def test_search_pagination_block_carries_opaque_cursors_and_offset_echo() -> None:
+    parsed = _make_results(25)
+    data, _ = present_search(
+        parsed,
+        query="POU3F4",
+        genome_build="hg38",
+        limit=10,
+        offset=0,
+        inherited_warnings=[],
+    )
+    payload = data.model_dump(mode="json")
+    pagination = payload["pagination"]
+    assert pagination["offset"] == 0
+    assert pagination["has_more"] is True
+    assert pagination["total_count_kind"] == "upstream_page"
+    next_cursor = pagination["next_cursor"]
+    assert next_cursor is not None
+    # opaque: not a bare integer string
+    assert not next_cursor.isdigit()
+    decoded = json.loads(
+        base64.urlsafe_b64decode(next_cursor + "=" * (-len(next_cursor) % 4)).decode()
+    )
+    assert decoded == {"offset": 10}
+
+
+def test_search_pagination_has_previous_cursor_on_subsequent_pages() -> None:
+    parsed = _make_results(25)
+    data, _ = present_search(
+        parsed,
+        query="POU3F4",
+        genome_build="hg38",
+        limit=10,
+        offset=10,
+        inherited_warnings=[],
+    )
+    pagination = data.model_dump(mode="json")["pagination"]
+    assert pagination["offset"] == 10
+    previous = pagination["previous_cursor"]
+    assert previous is not None
+    decoded = json.loads(base64.urlsafe_b64decode(previous + "=" * (-len(previous) % 4)).decode())
+    assert decoded == {"offset": 0}
+
+
+def test_search_pagination_has_no_next_cursor_on_last_page() -> None:
+    parsed = _make_results(5)
+    data, _ = present_search(
+        parsed,
+        query="POU3F4",
+        genome_build="hg38",
+        limit=10,
+        offset=0,
+        inherited_warnings=[],
+    )
+    pagination = data.model_dump(mode="json")["pagination"]
+    assert pagination["next_cursor"] is None
+    assert pagination["has_more"] is False
+    assert pagination["previous_cursor"] is None

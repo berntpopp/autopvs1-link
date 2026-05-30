@@ -8,6 +8,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** `search_variants` cursor is now an opaque base64url-encoded
+  token instead of an integer-offset string; callers persisting offsets
+  must round-trip through the returned `data.pagination.next_cursor`.
+  `SearchMCPData` replaces its top-level `next_cursor` field with a
+  `pagination` block exposing `previous_cursor`, `next_cursor`, `has_more`,
+  `offset`, and `total_count_kind` ("upstream_page" by default). Stale
+  integer-offset cursors are rejected with `error.code=invalid_search_cursor`.
 - Python floor raised to 3.12.
 - Build backend migrated from setuptools to hatchling; project managed with
   uv; `uv.lock` is committed.

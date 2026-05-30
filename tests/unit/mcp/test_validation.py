@@ -1,9 +1,14 @@
 """Tests for MCP-only input validation and normalization."""
 
+import base64
+import json
+
 import pytest
 
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.validation import (
+    _decode_cursor,
+    _encode_cursor,
     normalize_cnv_id,
     normalize_genome_builds,
     normalize_limit_cursor,
@@ -95,22 +100,69 @@ def test_normalize_search_query_trims_and_rejects_whitespace() -> None:
 
 
 def test_normalize_limit_cursor_bounds_values() -> None:
-    assert normalize_limit_cursor(10, None) == (10, 0)
-    assert normalize_limit_cursor(99, "5") == (50, 5)
-    assert normalize_limit_cursor(0, None) == (1, 0)
+    assert normalize_limit_cursor(10, None) == (10, 0, 10)
+    assert normalize_limit_cursor(99, _encode_cursor(5)) == (50, 5, 99)
+    assert normalize_limit_cursor(0, None) == (1, 0, 0)
+
+
+def test_normalize_limit_cursor_returns_requested_limit_for_clamp_warning() -> None:
+    # Caller relies on requested != bounded to emit limit_clamped.
+    bounded, offset, requested = normalize_limit_cursor(200, None)
+    assert (bounded, offset, requested) == (50, 0, 200)
 
 
 def test_normalize_limit_cursor_rejects_non_integer_cursor() -> None:
     with pytest.raises(MCPInputError) as exc_info:
         normalize_limit_cursor(10, "abc")
 
-    assert exc_info.value.code == "invalid_search_query"
+    assert exc_info.value.code == "invalid_search_cursor"
     assert "cursor" in str(exc_info.value)
 
 
 def test_normalize_limit_cursor_rejects_negative_cursor() -> None:
+    bad = base64.urlsafe_b64encode(json.dumps({"offset": -1}).encode()).decode().rstrip("=")
     with pytest.raises(MCPInputError) as exc_info:
-        normalize_limit_cursor(10, "-1")
+        normalize_limit_cursor(10, bad)
 
-    assert exc_info.value.code == "invalid_search_query"
+    assert exc_info.value.code == "invalid_search_cursor"
     assert "zero or greater" in str(exc_info.value)
+
+
+def test_cursor_round_trip_through_encode_decode() -> None:
+    encoded = _encode_cursor(42)
+    assert isinstance(encoded, str)
+    # base64url with no padding
+    assert "=" not in encoded
+    assert _decode_cursor(encoded) == 42
+
+
+def test_decode_cursor_rejects_raw_integer_offset_string() -> None:
+    """Integer-offset cursors are no longer accepted; they are not opaque."""
+    with pytest.raises(MCPInputError) as exc:
+        _decode_cursor("10")
+    assert exc.value.code == "invalid_search_cursor"
+
+
+def test_decode_cursor_rejects_malformed_base64() -> None:
+    with pytest.raises(MCPInputError) as exc:
+        _decode_cursor("not-base64!")
+    assert exc.value.code == "invalid_search_cursor"
+
+
+def test_decode_cursor_rejects_base64_without_offset_key() -> None:
+    bad = base64.urlsafe_b64encode(json.dumps({"page": 1}).encode()).decode().rstrip("=")
+    with pytest.raises(MCPInputError) as exc:
+        _decode_cursor(bad)
+    assert exc.value.code == "invalid_search_cursor"
+
+
+def test_decode_cursor_rejects_negative_offset() -> None:
+    bad = base64.urlsafe_b64encode(json.dumps({"offset": -1}).encode()).decode().rstrip("=")
+    with pytest.raises(MCPInputError) as exc:
+        _decode_cursor(bad)
+    assert exc.value.code == "invalid_search_cursor"
+
+
+def test_normalize_limit_cursor_accepts_opaque_cursor() -> None:
+    bounded, offset, requested = normalize_limit_cursor(10, _encode_cursor(20))
+    assert (bounded, offset, requested) == (10, 20, 10)

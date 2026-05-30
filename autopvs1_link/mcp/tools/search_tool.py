@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import httpx
 from fastmcp import FastMCP
@@ -11,7 +11,7 @@ from pydantic import Field, SkipValidation
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from autopvs1_link.mcp.contracts import SearchMCPEnvelope
-from autopvs1_link.mcp.envelope import error_envelope, ok_envelope
+from autopvs1_link.mcp.envelope import MCPWarning, ToolResponse, error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import (
     InvalidMCPModeError,
@@ -26,6 +26,14 @@ from autopvs1_link.mcp.validation import (
     normalize_limit_cursor,
     normalize_search_query,
 )
+
+
+def _make_limit_clamped_warning(requested: int, bounded: int) -> MCPWarning:
+    return MCPWarning(
+        code="limit_clamped",
+        message=(f"Requested limit={requested} was clamped to {bounded} (allowed range 1-50)."),
+    )
+
 
 GenomeBuildParam = SkipValidation[Literal["hg19", "hg38"] | None]
 IntParam = SkipValidation[int]
@@ -69,7 +77,7 @@ def register(mcp: FastMCP) -> None:
         cursor: Annotated[
             NullableStringParam,
             Field(
-                description="Opaque integer-offset cursor returned as next_cursor.",
+                description="Opaque pagination token returned as next_cursor; do not construct.",
             ),
         ] = None,
         genome_version: Annotated[
@@ -90,7 +98,7 @@ def register(mcp: FastMCP) -> None:
                 description="Metadata detail level: full, compact, or minimal.",
             ),
         ] = "full",
-    ) -> dict[str, Any]:
+    ) -> ToolResponse:
         """Use this to search AutoPVS1 by gene symbol or variant text."""
         normalized_meta_mode: MetaMode = "full"
         try:
@@ -98,7 +106,11 @@ def register(mcp: FastMCP) -> None:
             normalized_response_mode = normalize_response_mode(response_mode)
             normalized_query = normalize_search_query(query)
             normalized_build, build_warnings = normalize_genome_builds(genome_build, genome_version)
-            normalized_limit, offset = normalize_limit_cursor(limit, cursor)
+            normalized_limit, offset, requested_limit = normalize_limit_cursor(limit, cursor)
+            if requested_limit != normalized_limit:
+                build_warnings.append(
+                    _make_limit_clamped_warning(requested_limit, normalized_limit)
+                )
             result = await service_adapters.search_variants(normalized_query, normalized_build)
             data, warnings = present_search(
                 result,
@@ -109,7 +121,12 @@ def register(mcp: FastMCP) -> None:
                 inherited_warnings=build_warnings,
                 response_mode=normalized_response_mode,
             )
-            return ok_envelope(data, warnings=warnings, meta_mode=normalized_meta_mode)
+            return ok_envelope(
+                data,
+                warnings=warnings,
+                meta_mode=normalized_meta_mode,
+                compact_data=normalized_response_mode == "summary",
+            )
         except InvalidMCPModeError as exc:
             return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode)
         except MCPInputError as exc:

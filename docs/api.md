@@ -61,10 +61,12 @@ structured correction when possible. For example,
 `error.details.corrected_id: "11-2797090-2869333-DEL"`.
 
 Search pagination uses `limit` and `cursor`. The first call may omit `cursor`;
-when `data.next_cursor` is present, pass that value as the next call's
-`cursor`. `limit` defaults to 10 and is bounded to the server-supported range.
-If `genome_build` is omitted, MCP search defaults to `hg38` and emits a
-`default_genome_build_used` warning.
+when `data.pagination.next_cursor` is present, pass that opaque token back as
+the next call's `cursor`. Cursors are base64url-encoded; callers must not
+parse or construct them. `data.pagination` also carries `previous_cursor`,
+`has_more`, `offset`, and `total_count_kind`. `limit` defaults to 10 and is
+bounded to the server-supported range. If `genome_build` is omitted, MCP
+search defaults to `hg38` and emits a `default_genome_build_used` warning.
 
 ### Available Prompts
 
