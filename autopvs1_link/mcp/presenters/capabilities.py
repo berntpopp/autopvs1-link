@@ -25,49 +25,71 @@ def present_compact_capabilities() -> CompactCapabilitiesData:
         research_use_only=True,
         tool_summaries={
             "get_variant_pvs1_data": ToolSummaryMCP(
-                purpose="research-use PVS1 analysis for one AutoPVS1 SNV/indel ID.",
+                purpose=(
+                    "Research-use PVS1 analysis for one AutoPVS1 SNV/indel ID. "
+                    "LLM-first: pass response_mode='summary' for the verdict."
+                ),
                 example={
                     "genome_build": "hg19",
                     "variant_id": "X-82763936-A-T",
+                    "response_mode": "summary",
                 },
             ),
             "get_cnv_pvs1_data": ToolSummaryMCP(
-                purpose="research-use PVS1 analysis for one AutoPVS1 CNV ID.",
+                purpose=(
+                    "Research-use PVS1 analysis for one AutoPVS1 CNV ID. "
+                    "LLM-first: pass response_mode='summary' for the verdict."
+                ),
                 example={
                     "genome_build": "hg19",
                     "cnv_id": "17-15000000-20000000-DEL",
+                    "response_mode": "summary",
                 },
             ),
             "search_variants": ToolSummaryMCP(
                 purpose=(
                     "Search AutoPVS1 by gene symbol, partial variant ID, or "
-                    "upstream-supported query."
+                    "upstream-supported query. Use response_mode='ids_only' "
+                    "to resolve to a variant_id with minimum bytes."
                 ),
                 example={
                     "query": "BRCA1",
                     "genome_build": "hg38",
                     "limit": 10,
-                    "cursor": None,
+                    "response_mode": "ids_only",
                 },
             ),
             "get_server_health": ToolSummaryMCP(
-                purpose="Read local server health and enabled feature flags without upstream calls.",
+                purpose=(
+                    "Read local server health and enabled feature flags "
+                    "without upstream calls (sub-millisecond, no cost)."
+                ),
                 example={},
             ),
             "get_variants_pvs1_data_bulk": ToolSummaryMCP(
-                purpose="Bulk PVS1 scoring for 1-10 SNV/indel variants in one call.",
+                purpose=(
+                    "Bulk PVS1 scoring for 1-10 SNV/indel variants in one "
+                    "call. Default response_mode='summary' to keep 10 "
+                    "verdicts inside one turn budget."
+                ),
                 example={
                     "items": [
                         {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
                     ],
+                    "response_mode": "summary",
                 },
             ),
             "get_cnvs_pvs1_data_bulk": ToolSummaryMCP(
-                purpose="Bulk PVS1 scoring for 1-10 CNVs in one call.",
+                purpose=(
+                    "Bulk PVS1 scoring for 1-10 CNVs in one call. Default "
+                    "response_mode='summary' to keep 10 verdicts inside one "
+                    "turn budget."
+                ),
                 example={
                     "items": [
                         {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
                     ],
+                    "response_mode": "summary",
                 },
             ),
         },

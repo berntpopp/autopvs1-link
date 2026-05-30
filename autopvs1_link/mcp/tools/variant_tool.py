@@ -57,7 +57,15 @@ def register(mcp: FastMCP) -> None:
         response_mode: Annotated[
             Any,
             Field(
-                description="Response detail level: ids_only, summary, standard, or full.",
+                description=(
+                    "Response detail level. LLM-first callers should pass "
+                    "'summary' (verdict + path + final strength, ~1.5KB); "
+                    "widen to 'standard' (default, full decision tree with "
+                    "hoisted note_text and disease_mechanisms) when the user "
+                    "asks for the tree; use 'full' only for auditors who "
+                    "need the ``*_raw`` upstream fields; 'ids_only' is the "
+                    "batch-screen lookup tier."
+                ),
                 json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
         ] = "standard",
@@ -76,7 +84,14 @@ def register(mcp: FastMCP) -> None:
             ),
         ] = True,
     ) -> ToolResponse:
-        """Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules."""
+        """Score one SNV/indel variant with the AutoPVS1 PVS1 rules.
+
+        First-turn LLM callers: pass ``response_mode='summary'`` to receive
+        the verdict (preliminary path + final strength) under ~1.5KB.
+        Widen to ``response_mode='standard'`` only when the user asks for
+        the decision tree. AutoPVS1 outputs are research-use only, not
+        clinical decision support.
+        """
         normalized_meta_mode: MetaMode = "full"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)

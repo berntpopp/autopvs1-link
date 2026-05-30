@@ -182,7 +182,13 @@ def register(mcp: FastMCP) -> None:
         response_mode: Annotated[
             Any,
             Field(
-                description="Response detail level applied to each item.",
+                description=(
+                    "Response detail level applied to each item. Default to "
+                    "'summary' for bulk batch screens — keeps the per-item "
+                    "payload small enough that 10 items still fit a turn. "
+                    "Widen to 'standard' only when an item needs the full "
+                    "decision tree."
+                ),
                 json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
         ] = "standard",
@@ -211,9 +217,13 @@ def register(mcp: FastMCP) -> None:
         """Score 1-10 SNV/indel variants in one call.
 
         Prefer this over ``get_variant_pvs1_data`` when you have 2+ variant
-        IDs of the same kind. Items run sequentially server-side and respect
-        the upstream rate limit (default ~1 req/s) plus the existing cache,
-        so a fully uncached 10-item batch can take ~10s wall time.
+        IDs of the same kind. For LLM batch screens, default to
+        ``response_mode='summary'`` so 10 verdicts share one turn budget;
+        widen per-item only when reasoning needs the full decision tree.
+        Items run sequentially server-side and respect the upstream rate
+        limit (default ~1 req/s) plus the existing cache, so a fully
+        uncached 10-item batch can take ~10s wall time and a fully cached
+        one returns in milliseconds.
 
         Per-item envelope: each result has ``{ok, input, data, error}``.
         Output items preserve input order. ``response_mode`` and
@@ -316,7 +326,13 @@ def register(mcp: FastMCP) -> None:
         response_mode: Annotated[
             Any,
             Field(
-                description="Response detail level applied to each item.",
+                description=(
+                    "Response detail level applied to each item. Default to "
+                    "'summary' for bulk batch screens — keeps the per-item "
+                    "payload small enough that 10 items still fit a turn. "
+                    "Widen to 'standard' only when an item needs the full "
+                    "decision tree."
+                ),
                 json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
         ] = "standard",
@@ -345,12 +361,14 @@ def register(mcp: FastMCP) -> None:
         """Score 1-10 CNVs in one call.
 
         Prefer this over ``get_cnv_pvs1_data`` when you have 2+ CNV IDs.
-        Same semantics as ``get_variants_pvs1_data_bulk``: sequential
-        server-side, respects upstream rate limit + cache; per-item
-        ``{ok, input, data, error}``; output items preserve input order;
-        ``response_mode`` and ``include_unmet`` apply per item; ``meta_mode``
-        applies to the outer envelope only. Per-item failures do not stop
-        the batch unless ``continue_on_error=false``.
+        For LLM batch screens, default to ``response_mode='summary'`` so
+        10 verdicts share one turn budget. Same semantics as
+        ``get_variants_pvs1_data_bulk``: sequential server-side, respects
+        upstream rate limit + cache; per-item ``{ok, input, data,
+        error}``; output items preserve input order; ``response_mode``
+        and ``include_unmet`` apply per item; ``meta_mode`` applies to
+        the outer envelope only. Per-item failures do not stop the batch
+        unless ``continue_on_error=false``.
 
         Warning aggregation: per-item warnings collapse into
         ``meta.warnings``; codes emitted by more than one distinct item

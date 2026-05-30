@@ -89,7 +89,14 @@ def register(mcp: FastMCP) -> None:
         response_mode: Annotated[
             ResponseModeParam,
             Field(
-                description="Response detail level: ids_only, summary, standard, or full.",
+                description=(
+                    "Response detail level. Use 'ids_only' to discover the "
+                    "AutoPVS1 variant_id with minimum bytes; 'summary' drops "
+                    "the result rows (use only with pagination metadata); "
+                    "'standard' (default) returns rich rows with gene + "
+                    "variant_type; 'full' is identical to 'standard' for "
+                    "search."
+                ),
             ),
         ] = "standard",
         meta_mode: Annotated[
@@ -99,7 +106,14 @@ def register(mcp: FastMCP) -> None:
             ),
         ] = "full",
     ) -> ToolResponse:
-        """Use this to search AutoPVS1 by gene symbol or variant text."""
+        """Search AutoPVS1 by gene symbol or variant text.
+
+        Use ``response_mode='ids_only'`` (lowest-bandwidth lookup) to
+        resolve a query to an AutoPVS1 ``variant_id`` you can hand to
+        ``get_variant_pvs1_data``. ``next_cursor`` is opaque base64url;
+        pass it back unchanged. AutoPVS1 outputs are research-use only,
+        not clinical decision support.
+        """
         normalized_meta_mode: MetaMode = "full"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)

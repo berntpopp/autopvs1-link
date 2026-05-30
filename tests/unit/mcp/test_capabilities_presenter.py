@@ -27,19 +27,27 @@ def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
     assert "clear_cache" not in compact.tool_summaries
     assert "clear_cache" not in compact.canonical_parameters
     assert payload["tool_summaries"]["get_variant_pvs1_data"] == {
-        "purpose": "research-use PVS1 analysis for one AutoPVS1 SNV/indel ID.",
+        "purpose": (
+            "Research-use PVS1 analysis for one AutoPVS1 SNV/indel ID. "
+            "LLM-first: pass response_mode='summary' for the verdict."
+        ),
         "example": {
             "genome_build": "hg19",
             "variant_id": "X-82763936-A-T",
+            "response_mode": "summary",
         },
     }
     assert payload["tool_summaries"]["search_variants"] == {
-        "purpose": "Search AutoPVS1 by gene symbol, partial variant ID, or upstream-supported query.",
+        "purpose": (
+            "Search AutoPVS1 by gene symbol, partial variant ID, or "
+            "upstream-supported query. Use response_mode='ids_only' "
+            "to resolve to a variant_id with minimum bytes."
+        ),
         "example": {
             "query": "BRCA1",
             "genome_build": "hg38",
             "limit": 10,
-            "cursor": None,
+            "response_mode": "ids_only",
         },
     }
     assert payload["compact_workflow"] == [
@@ -69,6 +77,7 @@ def test_compact_capabilities_are_first_turn_tool_selection_data() -> None:
     ]
     assert payload["tool_summaries"]["get_variants_pvs1_data_bulk"]["example"] == {
         "items": [{"genome_build": "hg19", "variant_id": "X-82763936-A-T"}],
+        "response_mode": "summary",
     }
     assert "get_variants_pvs1_data_bulk" in compact.canonical_parameters
     assert "get_cnvs_pvs1_data_bulk" in compact.canonical_parameters
