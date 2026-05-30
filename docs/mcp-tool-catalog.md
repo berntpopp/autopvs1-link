@@ -512,6 +512,11 @@ server-side, respects upstream rate limit + cache; per-item
 applies to the outer envelope only. Per-item failures do not stop
 the batch unless ``continue_on_error=false``.
 
+Warning aggregation: per-item warnings collapse into
+``meta.warnings``; codes emitted by more than one distinct item
+carry ``count`` and ``affected_indices``; single-item codes do
+not. Order is first-seen-code-first.
+
 #### Input Schema
 
 ```json
@@ -2284,6 +2289,13 @@ Output items preserve input order. ``response_mode`` and
 envelope only. Per-item input or upstream failures do not stop the
 batch unless ``continue_on_error=false``. Bulk dispatch errors
 (malformed ``items``) use error code ``invalid_bulk_input``.
+
+Warning aggregation: per-item warnings are NOT echoed; they are
+collapsed into ``meta.warnings`` at the top level. A warning code
+is aggregated only when more than one distinct item emitted it;
+single-item codes appear without ``count`` or ``affected_indices``.
+Aggregated codes carry ``count`` (distinct items) and the sorted
+``affected_indices`` list. Order is first-seen-code-first.
 
 #### Input Schema
 

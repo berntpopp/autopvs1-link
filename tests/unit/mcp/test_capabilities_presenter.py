@@ -214,3 +214,17 @@ def test_detailed_capabilities_documents_bulk_behavior_contract() -> None:
     assert bulk["applies_response_mode_per_item"] is True
     assert bulk["applies_meta_mode_top_level_only"] is True
     assert bulk["accounting_invariant"] == "total == attempted + skipped"
+
+
+def test_detailed_capabilities_documents_warning_aggregation_policy() -> None:
+    """Item 4: callers consuming meta.warnings from a bulk call need to know
+    exactly when count and affected_indices are populated so they can
+    correctly interpret 'one warning' vs 'many items emitted this code'."""
+    detailed = detailed_capabilities_resource()
+    aggregation = detailed["bulk_behavior"]["warning_aggregation"]
+    assert aggregation["scope"] == "top-level meta.warnings only; per-item warnings are not echoed"
+    assert aggregation["gate"] == "code aggregated only when emitted by more than one distinct item"
+    assert (
+        aggregation["fields"] == "count and affected_indices populated; absent on single-item codes"
+    )
+    assert aggregation["ordering"] == "first-seen-code-first"

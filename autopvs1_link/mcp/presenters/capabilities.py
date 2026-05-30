@@ -199,6 +199,12 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "applies_response_mode_per_item": True,
             "applies_meta_mode_top_level_only": True,
             "accounting_invariant": "total == attempted + skipped",
+            "warning_aggregation": {
+                "scope": ("top-level meta.warnings only; per-item warnings are not echoed"),
+                "gate": ("code aggregated only when emitted by more than one distinct item"),
+                "fields": ("count and affected_indices populated; absent on single-item codes"),
+                "ordering": "first-seen-code-first",
+            },
         },
         "cache_statistics": {
             "resource": "autopvs1-link://cache/statistics",
