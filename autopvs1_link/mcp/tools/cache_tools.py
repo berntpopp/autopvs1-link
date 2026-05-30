@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 
 from fastmcp import FastMCP
 
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import DESTRUCTIVE_CLOSED_WORLD
 from autopvs1_link.mcp.contracts import ClearCacheData, ClearCacheMCPEnvelope
-from autopvs1_link.mcp.envelope import error_envelope, ok_envelope
+from autopvs1_link.mcp.envelope import ToolResponse, error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import DestructiveOperationDisabledError
 
 
@@ -30,7 +29,7 @@ def register(mcp: FastMCP) -> None:
         output_schema=ClearCacheMCPEnvelope.model_json_schema(),
         annotations=DESTRUCTIVE_CLOSED_WORLD,
     )
-    async def clear_cache() -> dict[str, Any]:
+    async def clear_cache() -> ToolResponse:
         """Clear all service caches.
 
         Disabled by default. Enable with

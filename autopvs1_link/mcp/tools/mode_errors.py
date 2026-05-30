@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from autopvs1_link.mcp.envelope import error_envelope
+from autopvs1_link.mcp.envelope import ErrorToolResult, error_envelope
 from autopvs1_link.mcp.mode_validation import InvalidMCPModeError, MetaMode
 
 
 def invalid_mode_envelope(
     exc: InvalidMCPModeError, *, meta_mode: MetaMode = "full"
-) -> dict[str, Any]:
+) -> ErrorToolResult:
     """Return an input-error envelope for unsupported response/meta modes."""
     return error_envelope(
         code=exc.code,

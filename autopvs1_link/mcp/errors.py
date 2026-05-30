@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from autopvs1_link.mcp.envelope import error_envelope
+from autopvs1_link.mcp.envelope import ErrorToolResult, error_envelope
 
 
 class MCPToolError(Exception):
@@ -56,7 +56,7 @@ class MCPInputError(MCPToolError):
         self.suggestions = suggestions or []
         self.retryable = False
 
-    def to_envelope(self) -> dict[str, Any]:
+    def to_envelope(self) -> ErrorToolResult:
         return error_envelope(
             code=self.code,
             message=str(self),

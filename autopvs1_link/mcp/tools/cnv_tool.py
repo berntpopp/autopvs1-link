@@ -13,7 +13,7 @@ from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from autopvs1_link.mcp.contracts import CNVMCPEnvelope
-from autopvs1_link.mcp.envelope import error_envelope, ok_envelope
+from autopvs1_link.mcp.envelope import ToolResponse, error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import (
     InvalidMCPModeError,
@@ -80,7 +80,7 @@ def register(mcp: FastMCP) -> None:
                 json_schema_extra={"type": "boolean"},
             ),
         ] = True,
-    ) -> dict[str, Any]:
+    ) -> ToolResponse:
         """Use this to score one copy-number variant with AutoPVS1 PVS1 rules."""
         normalized_meta_mode: MetaMode = "full"
         try:
