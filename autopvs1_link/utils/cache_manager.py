@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from async_lru import AlruCacheLoopResetWarning, alru_cache
@@ -171,6 +171,18 @@ class AdvancedCacheManager:
             cached_func = alru_cache(maxsize=maxsize, ttl=ttl)(func)
             method_name = func.__name__
 
+            # Per-method coalesce tracker. ``async_lru`` shares an in-flight
+            # future across concurrent same-key callers but exposes that fact
+            # only through ``cache_info().hits`` deltas — and the deltas don't
+            # distinguish "true hit (cache already populated)" from "we waited
+            # on someone else's miss". This set lets us tell them apart. A
+            # caller that finds the key already in the set must be a waiter
+            # (the populator hasn't cleaned up yet), so even though async_lru
+            # eventually reports it as a hit, we label the wire as
+            # ``coalesced`` so meta.cache_status + meta.elapsed_ms tell a
+            # consistent story to the LLM consumer.
+            inflight_keys: set[str] = set()
+
             @wraps(func)
             async def wrapper(*args, **kwargs) -> Any:
                 if not self._enabled:
@@ -194,8 +206,16 @@ class AdvancedCacheManager:
                 start_time = time.time()
                 perf_start = time.perf_counter()
 
+                # ``in inflight_keys`` is the membership snapshot AT ENTRY:
+                # if the populator hasn't reached the cleanup branch yet, the
+                # key is present and this caller is the latecomer that will
+                # share the populator's coroutine. The check happens before
+                # any await, so set membership is atomic w.r.t. other tasks.
+                was_inflight_on_entry = cache_key in inflight_keys
+                if not was_inflight_on_entry:
+                    inflight_keys.add(cache_key)
+
                 try:
-                    # Check if result is in cache
                     cache_info_before = cached_func.cache_info()
                     with warnings.catch_warnings():
                         warnings.filterwarnings(
@@ -204,28 +224,57 @@ class AdvancedCacheManager:
                         )
                         result = await cached_func(*args, **kwargs)
                     cache_info_after = cached_func.cache_info()
-
-                    execution_time = time.time() - start_time
-                    elapsed_ms = (time.perf_counter() - perf_start) * 1000.0
-
-                    # Determine if this was a hit or miss
-                    if cache_info_after.hits > cache_info_before.hits:
-                        self._record_hit(method_name, cache_key, execution_time)
-                        record_upstream_call(elapsed_ms, "hit")
-                    else:
-                        self._record_miss(method_name, cache_key, execution_time)
-                        record_upstream_call(elapsed_ms, "miss")
-
-                    # Check for evictions
-                    if cache_info_after.misses > cache_info_before.misses + 1:
-                        self._record_eviction(method_name)
-
-                    return result
-
                 except Exception as e:
                     execution_time = time.time() - start_time
                     self._record_error(method_name, cache_key, str(e))
                     raise
+                finally:
+                    # Always clear our marker so a follow-up call (post-failure
+                    # retry, or simply the next request) is not mis-classified
+                    # as ``coalesced``. Coalescers do not own the marker and
+                    # must not remove it (the populator's finally clause does).
+                    if not was_inflight_on_entry:
+                        inflight_keys.discard(cache_key)
+
+                execution_time = time.time() - start_time
+                elapsed_ms = (time.perf_counter() - perf_start) * 1000.0
+
+                # Classify the outcome. Order matters — coalesced first, then
+                # the miss/hit discriminator. ``async_lru`` counts each call's
+                # eventual receipt of a cached value (whether the cache was
+                # pre-populated or just populated by a sibling coalesced call)
+                # as a hit, so ``cache_info_after.hits > cache_info_before.hits``
+                # is true for the populator AND every waiter alike. Relying
+                # on it alone would mislabel the populator as ``hit``. The
+                # miss-delta on ``cache_info_after.misses`` is the honest
+                # signal: only the underlying-coroutine driver bumps misses.
+                #
+                #   coalesced -> we entered while someone else's miss was in
+                #                flight (was_inflight_on_entry). We pay the
+                #                wall-clock but did not drive the coroutine.
+                #   miss      -> we incremented misses; we drove the coroutine.
+                #   hit       -> cache was already populated; instant return.
+                missed = cache_info_after.misses > cache_info_before.misses
+                if was_inflight_on_entry:
+                    status: Literal["hit", "miss", "coalesced"] = "coalesced"
+                    # Coalesced calls did not do upstream work; bookkeep as a
+                    # hit so in-process hit_rate still reflects "no upstream
+                    # work charged to this call". The wire-side status is
+                    # honest via cache_status="coalesced".
+                    self._record_hit(method_name, cache_key, execution_time)
+                elif missed:
+                    status = "miss"
+                    self._record_miss(method_name, cache_key, execution_time)
+                else:
+                    status = "hit"
+                    self._record_hit(method_name, cache_key, execution_time)
+                record_upstream_call(elapsed_ms, status)
+
+                # Check for evictions
+                if cache_info_after.misses > cache_info_before.misses + 1:
+                    self._record_eviction(method_name)
+
+                return result
 
             # Add cache management methods to the wrapper
             wrapper.cache_info = cached_func.cache_info

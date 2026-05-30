@@ -1,7 +1,12 @@
 """Per-call telemetry context for upstream latency and cache observability.
 
 The cache wrapper records ``elapsed_ms`` and ``cache_status`` (``hit`` |
-``miss`` | ``bypass``) into a ``ContextVar`` for each upstream call. The
+``miss`` | ``coalesced`` | ``bypass``) into a ``ContextVar`` for each
+upstream call. ``coalesced`` is the honest label for a caller that
+arrived while another caller's miss was already in flight: ``async_lru``
+shares the in-flight future, the waiter's ``cache_info().hits`` counter
+nominally increments, but the waiter still paid the upstream wall-clock
+time. Reporting it as ``hit`` would mislead LLM consumers about cost. The
 MCP envelope helper reads it back when assembling ``meta``, so every
 tool response can echo the observed wall-clock cost without each tool
 handler having to wire timing through return values.
@@ -28,7 +33,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from typing import Literal
 
-CacheStatus = Literal["hit", "miss", "bypass"]
+CacheStatus = Literal["hit", "miss", "coalesced", "bypass"]
 
 _elapsed_ms: ContextVar[float | None] = ContextVar("autopvs1_upstream_elapsed_ms", default=None)
 _cache_status: ContextVar[CacheStatus | None] = ContextVar("autopvs1_cache_status", default=None)
