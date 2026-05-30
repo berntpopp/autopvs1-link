@@ -488,9 +488,16 @@ async def test_bulk_aggregated_warning_carries_count_and_affected_indices(mocker
 
 @pytest.mark.asyncio
 async def test_bulk_per_item_multi_emission_stays_unaggregated(mocker) -> None:
-    """One item with TWO invalid external links emits invalid_external_link
-    twice — but only ONE item is affected, so the warning must NOT carry
-    count or affected_indices (avoids misleading aggregation signal)."""
+    """Aggregation gate is per DISTINCT ITEM, not per emission.
+
+    A single item with N invalid links emits invalid_external_link N
+    times (the presenter raises one warning per nulled link), but the
+    distinct-item count is 1, so the aggregation gate stays closed and
+    NO ``count`` / ``affected_indices`` fields are populated on the
+    deduplicated wire warning. This is the contract documented as
+    ``warning_aggregation.gate = 'code aggregated only when emitted by
+    more than one distinct item'`` on the capabilities resource.
+    """
     parsed = AutoPVS1Data(
         genome_build="hg19",
         variant_info=VariantInfo(
@@ -527,9 +534,18 @@ async def test_bulk_per_item_multi_emission_stays_unaggregated(mocker) -> None:
     ]
     assert len(warnings) == 1
     single = warnings[0]
-    # Single affected item — no aggregate fields on the wire.
-    assert "count" not in single
-    assert "affected_indices" not in single
+    # Distinct-item count is 1 — gate stays closed, no aggregate fields.
+    # If these assertions ever pass with count/affected_indices PRESENT,
+    # the gate has regressed to per-emission counting.
+    assert "count" not in single, (
+        "Aggregation gate must be per distinct item, not per emission: "
+        f"single item emitted twice but warning carries count={single.get('count')!r}"
+    )
+    assert "affected_indices" not in single, (
+        "Aggregation gate must be per distinct item, not per emission: "
+        f"single item emitted twice but warning carries "
+        f"affected_indices={single.get('affected_indices')!r}"
+    )
 
 
 @pytest.mark.asyncio
