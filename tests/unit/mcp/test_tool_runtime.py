@@ -657,6 +657,76 @@ async def test_variant_ids_only_wire_payload_strips_null_fields(mocker) -> None:
 
 
 @pytest.mark.asyncio
+async def test_cnv_ids_only_wire_payload_strips_null_fields(mocker) -> None:
+    """End-to-end mirror of the variant ids_only test for the CNV detail
+    tool. Surfaced by the 9.65 review as a coverage gap: the CNV
+    presenter ids_only branch was tested directly but no test confirmed
+    the wire payload through call_tool actually compacts via
+    compact_data=True on the cnv_tool envelope path.
+    """
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_cnv",
+        new=AsyncMock(return_value=_cnv_result()),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_cnv_pvs1_data",
+        {
+            "genome_build": "hg19",
+            "cnv_id": "1-1-2-DEL",
+            "response_mode": "ids_only",
+        },
+    )
+    data = result.structured_content["data"]
+    cnv_info = data["cnv_info"]
+    # cnv_info on the wire is strictly the identifier — null leaks fail.
+    assert set(cnv_info) == {"cnv_id"}, cnv_info
+    assert cnv_info["cnv_id"] == "1-1-2-DEL"
+    # pvs1_flowchart absent on the wire (not present-with-null).
+    assert "pvs1_flowchart" not in data, data
+
+
+@pytest.mark.asyncio
+async def test_search_ids_only_wire_payload_strips_descriptive_fields(mocker) -> None:
+    """End-to-end mirror for search: ids_only must reach the wire as rows
+    of strictly {variant_id, url} with suggestions omitted. Closes the
+    9.65 review coverage gap that the search presenter ids_only branch
+    was tested at presenter level but not at call_tool level.
+    """
+    fake = AsyncMock(
+        return_value=AutoPVS1SearchResults(
+            query="BRCA1",
+            genome_version="hg38",
+            results=[
+                SearchResult(
+                    variant_id=f"17-{i}-A-T",
+                    gene="BRCA1",
+                    variant_type="Nonsense",
+                    genome_build="hg38",
+                    url=f"https://autopvs1.bgi.com/variant/hg38/17-{i}-A-T",
+                )
+                for i in range(3)
+            ],
+        )
+    )
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "search_variants",
+        {"query": "BRCA1", "genome_build": "hg38", "response_mode": "ids_only"},
+    )
+    data = result.structured_content["data"]
+    assert data["returned_count"] == 3
+    for row in data["results"]:
+        assert set(row) == {"variant_id", "url"}, row
+        assert row["variant_id"].startswith("17-")
+        assert row["url"].startswith("https://autopvs1.bgi.com/variant/")
+    # suggestions empty (drops to default-factory []) — must not echo
+    # HGVS-like guidance at the ids_only tier.
+    assert data.get("suggestions", []) == []
+
+
+@pytest.mark.asyncio
 async def test_variant_standard_mode_preserves_null_default_fields(mocker) -> None:
     mocker.patch(
         "autopvs1_link.mcp.service_adapters.get_variant",
