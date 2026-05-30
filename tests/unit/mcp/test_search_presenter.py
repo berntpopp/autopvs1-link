@@ -313,6 +313,52 @@ def test_search_pagination_has_previous_cursor_on_subsequent_pages() -> None:
     assert decoded == {"offset": 0}
 
 
+def test_present_search_ids_only_returns_only_variant_id_and_url_per_row() -> None:
+    """ids_only is the lookup tier — callers want IDs to feed
+    get_variant_pvs1_data; gene, variant_type, and the build echo on each
+    row are noise at this tier."""
+    parsed = AutoPVS1SearchResults(
+        query="BRCA1",
+        genome_version="hg38",
+        results=[_result(index) for index in range(3)],
+    )
+    data, _ = present_search(
+        parsed,
+        query="BRCA1",
+        genome_build="hg38",
+        limit=10,
+        offset=0,
+        inherited_warnings=[],
+        response_mode="ids_only",
+    )
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["returned_count"] == 3
+    for row in payload["results"]:
+        assert set(row) == {"variant_id", "url"}
+        assert row["variant_id"].startswith("17-")
+        assert row["url"].startswith("https://autopvs1.bgi.com/variant/")
+
+
+def test_present_search_ids_only_omits_suggestions_block() -> None:
+    """No HGVS-like guidance noise at the ids_only tier."""
+    parsed = AutoPVS1SearchResults(
+        query="BRCA1 c.123A>T",
+        genome_version="hg38",
+        results=[],
+    )
+    data, _ = present_search(
+        parsed,
+        query="BRCA1 c.123A>T",
+        genome_build="hg38",
+        limit=10,
+        offset=0,
+        inherited_warnings=[],
+        response_mode="ids_only",
+    )
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload.get("suggestions", []) == []
+
+
 def test_search_pagination_has_no_next_cursor_on_last_page() -> None:
     parsed = _make_results(5)
     data, _ = present_search(

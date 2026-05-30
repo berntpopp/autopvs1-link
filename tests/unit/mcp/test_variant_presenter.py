@@ -198,7 +198,10 @@ def test_present_variant_summary_omits_mechanisms_and_emits_no_warnings() -> Non
     assert payload["genome_build"] == "hg38"
     assert payload["variant_info"]["variant_id"] == "X-1-A-T"
     assert payload["variant_info"]["gene_symbol"] == "GENE"
-    assert payload["variant_info"]["external_links"] == {}
+    # Summary trims variant_info to {variant_id, variant_type, gene_symbol}
+    # so external_links drops to its widened None default; standard mode
+    # still surfaces the dict explicitly.
+    assert payload["variant_info"]["external_links"] is None
     assert payload["variant_info"]["chgvs"] is None
     assert payload["pvs1_flowchart"]["final_strength"] == "Strong"
     assert payload["pvs1_flowchart"]["final_strength_source"] == "inferred"
@@ -519,3 +522,93 @@ def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:
     assert len(full_json) > len(std_json), (
         f"full payload ({len(full_json)}B) must exceed standard ({len(std_json)}B)"
     )
+
+
+def test_present_variant_ids_only_keeps_only_identifier_genome_build_and_source_url() -> None:
+    """ids_only is the lowest-bandwidth lookup tier.
+
+    The payload must carry the upstream identifier plus enough context to
+    re-fetch it (genome_build + source_url). Everything else — pvs1_flowchart,
+    disease_mechanisms, external_links, variant_type, gene_symbol, etc — is
+    stripped. ``exclude_none=True`` is required because the contract widens
+    pvs1_flowchart to optional rather than removing it from the model.
+    """
+    parsed = _canonical_parsed()
+    data, warnings = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="ids_only",
+    )
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["genome_build"] == "hg19"
+    assert payload["source_url"] == "https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T"
+    assert payload["variant_info"] == {"variant_id": "X-82763936-A-T"}
+    # Everything else must not appear in the compact-mode payload.
+    assert "pvs1_flowchart" not in payload
+    assert payload.get("disease_mechanisms", []) == []
+    # No warnings should leak from skipped flowchart/links work.
+    assert warnings == []
+
+
+def test_present_variant_ids_only_bytes_strictly_smaller_than_summary() -> None:
+    """ids_only must be strictly more compact than summary on the canonical case."""
+    parsed = _canonical_parsed()
+    ids_only_data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="ids_only",
+    )
+    summary_data, _ = present_variant(
+        parsed,
+        source_url="https://autopvs1.bgi.com/variant/hg19/X-82763936-A-T",
+        response_mode="summary",
+    )
+    ids_only_bytes = len(
+        json.dumps(ids_only_data.model_dump(mode="json", exclude_none=True), separators=(",", ":"))
+    )
+    summary_bytes = len(
+        json.dumps(summary_data.model_dump(mode="json", exclude_none=True), separators=(",", ":"))
+    )
+    assert ids_only_bytes < summary_bytes, (
+        f"ids_only ({ids_only_bytes}B) must be smaller than summary ({summary_bytes}B)"
+    )
+
+
+def test_present_cnv_ids_only_keeps_only_cnv_id_genome_build_and_source_url() -> None:
+    parsed = AutoPVS1CNVData(
+        genome_build="hg19",
+        cnv_info=CNVInfo(
+            cnv_id="17-15000000-20000000-DEL",
+            cnv_type="Deletion",
+            gene_symbol="MYO15A",
+            coordinates="17-15000000-20000000-DEL",
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="DEL",
+            final_strength="VeryStrong",
+            decision_tree=[],
+            notes={},
+        ),
+        disease_mechanisms=[
+            DiseaseMechanism(
+                gene="MYO15A",
+                disease="Deafness",
+                inheritance="AR",
+                clinical_validity="Definitive",
+                consideration="No Decrease",
+                adjusted_strength="VeryStrong",
+            ),
+        ],
+    )
+    data, warnings = present_cnv(
+        parsed,
+        source_url="https://autopvs1.bgi.com/cnv/hg19/17-15000000-20000000-DEL",
+        response_mode="ids_only",
+    )
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["genome_build"] == "hg19"
+    assert payload["source_url"] == "https://autopvs1.bgi.com/cnv/hg19/17-15000000-20000000-DEL"
+    assert payload["cnv_info"] == {"cnv_id": "17-15000000-20000000-DEL"}
+    assert "pvs1_flowchart" not in payload
+    assert payload.get("disease_mechanisms", []) == []
+    assert warnings == []

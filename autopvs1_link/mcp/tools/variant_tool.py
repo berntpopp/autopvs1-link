@@ -25,7 +25,7 @@ from autopvs1_link.mcp.presenters.variant import present_variant
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
 from autopvs1_link.mcp.validation import normalize_genome_build, normalize_variant_id
 
-RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["summary", "standard", "full"]}
+RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
 META_MODE_SCHEMA = {"type": "string", "enum": ["full", "compact", "minimal"]}
 
 
@@ -57,7 +57,7 @@ def register(mcp: FastMCP) -> None:
         response_mode: Annotated[
             Any,
             Field(
-                description="Response detail level: summary, standard, or full.",
+                description="Response detail level: ids_only, summary, standard, or full.",
                 json_schema_extra=RESPONSE_MODE_SCHEMA,
             ),
         ] = "standard",

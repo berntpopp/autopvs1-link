@@ -39,7 +39,7 @@ GenomeBuildParam = SkipValidation[Literal["hg19", "hg38"] | None]
 IntParam = SkipValidation[int]
 SearchTextParam = SkipValidation[str]
 NullableStringParam = SkipValidation[str | None]
-ResponseModeParam = SkipValidation[Literal["summary", "standard", "full"]]
+ResponseModeParam = SkipValidation[Literal["ids_only", "summary", "standard", "full"]]
 MetaModeParam = SkipValidation[Literal["full", "compact", "minimal"]]
 
 
@@ -89,7 +89,7 @@ def register(mcp: FastMCP) -> None:
         response_mode: Annotated[
             ResponseModeParam,
             Field(
-                description="Response detail level: summary, standard, or full.",
+                description="Response detail level: ids_only, summary, standard, or full.",
             ),
         ] = "standard",
         meta_mode: Annotated[

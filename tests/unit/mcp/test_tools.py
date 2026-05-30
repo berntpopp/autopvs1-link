@@ -43,7 +43,8 @@ def _data_schema(output_schema: JsonSchema) -> JsonSchema:
 
 
 def _property_schema(root: JsonSchema, schema: JsonSchema, property_name: str) -> JsonSchema:
-    return _resolve_ref(root, schema["properties"][property_name])
+    raw = _non_null_schema(schema["properties"][property_name])
+    return _resolve_ref(root, raw)
 
 
 def _assert_typed_object_schema(
@@ -127,6 +128,7 @@ async def test_data_tools_use_direct_arguments_for_llm_discovery() -> None:
     }
     assert variant_schema["required"] == ["genome_build", "variant_id"]
     assert _enum_values(variant_schema["properties"]["response_mode"]) == {
+        "ids_only",
         "summary",
         "standard",
         "full",
@@ -153,6 +155,7 @@ async def test_data_tools_use_direct_arguments_for_llm_discovery() -> None:
     _assert_optional_genome_build_schema(search_schema["properties"]["genome_version"])
     assert _schema_allows_null(search_schema["properties"]["cursor"])
     assert _enum_values(search_schema["properties"]["response_mode"]) == {
+        "ids_only",
         "summary",
         "standard",
         "full",

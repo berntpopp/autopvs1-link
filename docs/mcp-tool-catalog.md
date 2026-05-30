@@ -43,8 +43,9 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level: summary, standard, or full.",
+      "description": "Response detail level: ids_only, summary, standard, or full.",
       "enum": [
+        "ids_only",
         "summary",
         "standard",
         "full"
@@ -69,26 +70,50 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
     "data": {
       "anyOf": [
         {
-          "description": "MCP-presented CNV data.",
+          "description": "MCP-presented CNV data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
           "properties": {
             "cnv_info": {
-              "description": "Typed copy-number variant information exposed through MCP.",
+              "description": "Typed copy-number variant information exposed through MCP.\n\nOnly ``cnv_id`` is required at the contract level; the other fields\nare dropped when ``response_mode='ids_only'``.",
               "properties": {
                 "cnv_id": {
                   "title": "Cnv Id",
                   "type": "string"
                 },
                 "cnv_type": {
-                  "title": "Cnv Type",
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Cnv Type"
                 },
                 "coordinates": {
-                  "title": "Coordinates",
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Coordinates"
                 },
                 "gene_symbol": {
-                  "title": "Gene Symbol",
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Gene Symbol"
                 },
                 "size": {
                   "anyOf": [
@@ -104,10 +129,7 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
                 }
               },
               "required": [
-                "cnv_id",
-                "cnv_type",
-                "gene_symbol",
-                "coordinates"
+                "cnv_id"
               ],
               "title": "CNVInfoMCP",
               "type": "object"
@@ -184,109 +206,117 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
               "type": "string"
             },
             "pvs1_flowchart": {
-              "description": "Typed PVS1 flowchart decision path and outcome.",
-              "properties": {
-                "decision_tree": {
-                  "items": {
-                    "description": "One typed step in the PVS1 decision flowchart.",
-                    "properties": {
-                      "code": {
-                        "title": "Code",
-                        "type": "string"
-                      },
-                      "description": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "default": null,
-                        "title": "Description"
-                      },
-                      "note_id": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "default": null,
-                        "title": "Note Id"
-                      },
-                      "note_text": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "default": null,
-                        "title": "Note Text"
-                      }
-                    },
-                    "required": [
-                      "code"
-                    ],
-                    "title": "FlowchartStepMCP",
-                    "type": "object"
-                  },
-                  "title": "Decision Tree",
-                  "type": "array"
-                },
-                "decision_tree_raw": {
-                  "anyOf": [
-                    {
+              "anyOf": [
+                {
+                  "description": "Typed PVS1 flowchart decision path and outcome.",
+                  "properties": {
+                    "decision_tree": {
                       "items": {
-                        "additionalProperties": true,
+                        "description": "One typed step in the PVS1 decision flowchart.",
+                        "properties": {
+                          "code": {
+                            "title": "Code",
+                            "type": "string"
+                          },
+                          "description": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Description"
+                          },
+                          "note_id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Note Id"
+                          },
+                          "note_text": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Note Text"
+                          }
+                        },
+                        "required": [
+                          "code"
+                        ],
+                        "title": "FlowchartStepMCP",
                         "type": "object"
                       },
+                      "title": "Decision Tree",
                       "type": "array"
                     },
-                    {
-                      "type": "null"
+                    "decision_tree_raw": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Decision Tree Raw"
+                    },
+                    "final_strength": {
+                      "title": "Final Strength",
+                      "type": "string"
+                    },
+                    "final_strength_source": {
+                      "default": "asserted",
+                      "enum": [
+                        "asserted",
+                        "inferred"
+                      ],
+                      "title": "Final Strength Source",
+                      "type": "string"
+                    },
+                    "notes": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "title": "Notes",
+                      "type": "object"
+                    },
+                    "preliminary_decision_path": {
+                      "title": "Preliminary Decision Path",
+                      "type": "string"
                     }
-                  ],
-                  "default": null,
-                  "title": "Decision Tree Raw"
-                },
-                "final_strength": {
-                  "title": "Final Strength",
-                  "type": "string"
-                },
-                "final_strength_source": {
-                  "default": "asserted",
-                  "enum": [
-                    "asserted",
-                    "inferred"
-                  ],
-                  "title": "Final Strength Source",
-                  "type": "string"
-                },
-                "notes": {
-                  "additionalProperties": {
-                    "type": "string"
                   },
-                  "title": "Notes",
+                  "required": [
+                    "preliminary_decision_path",
+                    "final_strength"
+                  ],
+                  "title": "PVS1FlowchartMCP",
                   "type": "object"
                 },
-                "preliminary_decision_path": {
-                  "title": "Preliminary Decision Path",
-                  "type": "string"
+                {
+                  "type": "null"
                 }
-              },
-              "required": [
-                "preliminary_decision_path",
-                "final_strength"
               ],
-              "title": "PVS1FlowchartMCP",
-              "type": "object"
+              "default": null
             },
             "source_url": {
               "anyOf": [
@@ -308,8 +338,7 @@ Use this to score one copy-number variant with AutoPVS1 PVS1 rules.
           },
           "required": [
             "genome_build",
-            "cnv_info",
-            "pvs1_flowchart"
+            "cnv_info"
           ],
           "title": "CNVMCPData",
           "type": "object"
@@ -539,6 +568,7 @@ the batch unless ``continue_on_error=false``.
       "default": "standard",
       "description": "Response detail level applied to each item.",
       "enum": [
+        "ids_only",
         "summary",
         "standard",
         "full"
@@ -579,26 +609,50 @@ the batch unless ``continue_on_error=false``.
                   "data": {
                     "anyOf": [
                       {
-                        "description": "MCP-presented CNV data.",
+                        "description": "MCP-presented CNV data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
                         "properties": {
                           "cnv_info": {
-                            "description": "Typed copy-number variant information exposed through MCP.",
+                            "description": "Typed copy-number variant information exposed through MCP.\n\nOnly ``cnv_id`` is required at the contract level; the other fields\nare dropped when ``response_mode='ids_only'``.",
                             "properties": {
                               "cnv_id": {
                                 "title": "Cnv Id",
                                 "type": "string"
                               },
                               "cnv_type": {
-                                "title": "Cnv Type",
-                                "type": "string"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "default": null,
+                                "title": "Cnv Type"
                               },
                               "coordinates": {
-                                "title": "Coordinates",
-                                "type": "string"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "default": null,
+                                "title": "Coordinates"
                               },
                               "gene_symbol": {
-                                "title": "Gene Symbol",
-                                "type": "string"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "default": null,
+                                "title": "Gene Symbol"
                               },
                               "size": {
                                 "anyOf": [
@@ -614,10 +668,7 @@ the batch unless ``continue_on_error=false``.
                               }
                             },
                             "required": [
-                              "cnv_id",
-                              "cnv_type",
-                              "gene_symbol",
-                              "coordinates"
+                              "cnv_id"
                             ],
                             "title": "CNVInfoMCP",
                             "type": "object"
@@ -694,109 +745,117 @@ the batch unless ``continue_on_error=false``.
                             "type": "string"
                           },
                           "pvs1_flowchart": {
-                            "description": "Typed PVS1 flowchart decision path and outcome.",
-                            "properties": {
-                              "decision_tree": {
-                                "items": {
-                                  "description": "One typed step in the PVS1 decision flowchart.",
-                                  "properties": {
-                                    "code": {
-                                      "title": "Code",
-                                      "type": "string"
-                                    },
-                                    "description": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ],
-                                      "default": null,
-                                      "title": "Description"
-                                    },
-                                    "note_id": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ],
-                                      "default": null,
-                                      "title": "Note Id"
-                                    },
-                                    "note_text": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ],
-                                      "default": null,
-                                      "title": "Note Text"
-                                    }
-                                  },
-                                  "required": [
-                                    "code"
-                                  ],
-                                  "title": "FlowchartStepMCP",
-                                  "type": "object"
-                                },
-                                "title": "Decision Tree",
-                                "type": "array"
-                              },
-                              "decision_tree_raw": {
-                                "anyOf": [
-                                  {
+                            "anyOf": [
+                              {
+                                "description": "Typed PVS1 flowchart decision path and outcome.",
+                                "properties": {
+                                  "decision_tree": {
                                     "items": {
-                                      "additionalProperties": true,
+                                      "description": "One typed step in the PVS1 decision flowchart.",
+                                      "properties": {
+                                        "code": {
+                                          "title": "Code",
+                                          "type": "string"
+                                        },
+                                        "description": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ],
+                                          "default": null,
+                                          "title": "Description"
+                                        },
+                                        "note_id": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ],
+                                          "default": null,
+                                          "title": "Note Id"
+                                        },
+                                        "note_text": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ],
+                                          "default": null,
+                                          "title": "Note Text"
+                                        }
+                                      },
+                                      "required": [
+                                        "code"
+                                      ],
+                                      "title": "FlowchartStepMCP",
                                       "type": "object"
                                     },
+                                    "title": "Decision Tree",
                                     "type": "array"
                                   },
-                                  {
-                                    "type": "null"
+                                  "decision_tree_raw": {
+                                    "anyOf": [
+                                      {
+                                        "items": {
+                                          "additionalProperties": true,
+                                          "type": "object"
+                                        },
+                                        "type": "array"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Decision Tree Raw"
+                                  },
+                                  "final_strength": {
+                                    "title": "Final Strength",
+                                    "type": "string"
+                                  },
+                                  "final_strength_source": {
+                                    "default": "asserted",
+                                    "enum": [
+                                      "asserted",
+                                      "inferred"
+                                    ],
+                                    "title": "Final Strength Source",
+                                    "type": "string"
+                                  },
+                                  "notes": {
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "title": "Notes",
+                                    "type": "object"
+                                  },
+                                  "preliminary_decision_path": {
+                                    "title": "Preliminary Decision Path",
+                                    "type": "string"
                                   }
-                                ],
-                                "default": null,
-                                "title": "Decision Tree Raw"
-                              },
-                              "final_strength": {
-                                "title": "Final Strength",
-                                "type": "string"
-                              },
-                              "final_strength_source": {
-                                "default": "asserted",
-                                "enum": [
-                                  "asserted",
-                                  "inferred"
-                                ],
-                                "title": "Final Strength Source",
-                                "type": "string"
-                              },
-                              "notes": {
-                                "additionalProperties": {
-                                  "type": "string"
                                 },
-                                "title": "Notes",
+                                "required": [
+                                  "preliminary_decision_path",
+                                  "final_strength"
+                                ],
+                                "title": "PVS1FlowchartMCP",
                                 "type": "object"
                               },
-                              "preliminary_decision_path": {
-                                "title": "Preliminary Decision Path",
-                                "type": "string"
+                              {
+                                "type": "null"
                               }
-                            },
-                            "required": [
-                              "preliminary_decision_path",
-                              "final_strength"
                             ],
-                            "title": "PVS1FlowchartMCP",
-                            "type": "object"
+                            "default": null
                           },
                           "source_url": {
                             "anyOf": [
@@ -818,8 +877,7 @@ the batch unless ``continue_on_error=false``.
                         },
                         "required": [
                           "genome_build",
-                          "cnv_info",
-                          "pvs1_flowchart"
+                          "cnv_info"
                         ],
                         "title": "CNVMCPData",
                         "type": "object"
@@ -1622,8 +1680,9 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level: summary, standard, or full.",
+      "description": "Response detail level: ids_only, summary, standard, or full.",
       "enum": [
+        "ids_only",
         "summary",
         "standard",
         "full"
@@ -1652,7 +1711,7 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
     "data": {
       "anyOf": [
         {
-          "description": "MCP-presented variant data.",
+          "description": "MCP-presented variant data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
           "properties": {
             "disease_mechanisms": {
               "items": {
@@ -1726,109 +1785,117 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
               "type": "string"
             },
             "pvs1_flowchart": {
-              "description": "Typed PVS1 flowchart decision path and outcome.",
-              "properties": {
-                "decision_tree": {
-                  "items": {
-                    "description": "One typed step in the PVS1 decision flowchart.",
-                    "properties": {
-                      "code": {
-                        "title": "Code",
-                        "type": "string"
-                      },
-                      "description": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "default": null,
-                        "title": "Description"
-                      },
-                      "note_id": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "default": null,
-                        "title": "Note Id"
-                      },
-                      "note_text": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "default": null,
-                        "title": "Note Text"
-                      }
-                    },
-                    "required": [
-                      "code"
-                    ],
-                    "title": "FlowchartStepMCP",
-                    "type": "object"
-                  },
-                  "title": "Decision Tree",
-                  "type": "array"
-                },
-                "decision_tree_raw": {
-                  "anyOf": [
-                    {
+              "anyOf": [
+                {
+                  "description": "Typed PVS1 flowchart decision path and outcome.",
+                  "properties": {
+                    "decision_tree": {
                       "items": {
-                        "additionalProperties": true,
+                        "description": "One typed step in the PVS1 decision flowchart.",
+                        "properties": {
+                          "code": {
+                            "title": "Code",
+                            "type": "string"
+                          },
+                          "description": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Description"
+                          },
+                          "note_id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Note Id"
+                          },
+                          "note_text": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Note Text"
+                          }
+                        },
+                        "required": [
+                          "code"
+                        ],
+                        "title": "FlowchartStepMCP",
                         "type": "object"
                       },
+                      "title": "Decision Tree",
                       "type": "array"
                     },
-                    {
-                      "type": "null"
+                    "decision_tree_raw": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Decision Tree Raw"
+                    },
+                    "final_strength": {
+                      "title": "Final Strength",
+                      "type": "string"
+                    },
+                    "final_strength_source": {
+                      "default": "asserted",
+                      "enum": [
+                        "asserted",
+                        "inferred"
+                      ],
+                      "title": "Final Strength Source",
+                      "type": "string"
+                    },
+                    "notes": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "title": "Notes",
+                      "type": "object"
+                    },
+                    "preliminary_decision_path": {
+                      "title": "Preliminary Decision Path",
+                      "type": "string"
                     }
-                  ],
-                  "default": null,
-                  "title": "Decision Tree Raw"
-                },
-                "final_strength": {
-                  "title": "Final Strength",
-                  "type": "string"
-                },
-                "final_strength_source": {
-                  "default": "asserted",
-                  "enum": [
-                    "asserted",
-                    "inferred"
-                  ],
-                  "title": "Final Strength Source",
-                  "type": "string"
-                },
-                "notes": {
-                  "additionalProperties": {
-                    "type": "string"
                   },
-                  "title": "Notes",
+                  "required": [
+                    "preliminary_decision_path",
+                    "final_strength"
+                  ],
+                  "title": "PVS1FlowchartMCP",
                   "type": "object"
                 },
-                "preliminary_decision_path": {
-                  "title": "Preliminary Decision Path",
-                  "type": "string"
+                {
+                  "type": "null"
                 }
-              },
-              "required": [
-                "preliminary_decision_path",
-                "final_strength"
               ],
-              "title": "PVS1FlowchartMCP",
-              "type": "object"
+              "default": null
             },
             "source_url": {
               "anyOf": [
@@ -1848,7 +1915,7 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
               "type": "string"
             },
             "variant_info": {
-              "description": "Typed variant information exposed through MCP.",
+              "description": "Typed variant information exposed through MCP.\n\nOnly ``variant_id`` is required at the contract level. ``variant_type``\nand ``gene_symbol`` are populated for summary/standard/full but absent\nwhen ``response_mode='ids_only'`` returns just the upstream identifier.",
               "properties": {
                 "chgvs": {
                   "anyOf": [
@@ -1875,18 +1942,26 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
                   "title": "Exon"
                 },
                 "external_links": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
+                  "anyOf": [
+                    {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "title": "External Links",
-                  "type": "object"
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "External Links"
                 },
                 "external_links_raw": {
                   "anyOf": [
@@ -1911,8 +1986,16 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
                   "title": "External Links Raw"
                 },
                 "gene_symbol": {
-                  "title": "Gene Symbol",
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Gene Symbol"
                 },
                 "gene_url": {
                   "anyOf": [
@@ -2003,14 +2086,20 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
                   "type": "string"
                 },
                 "variant_type": {
-                  "title": "Variant Type",
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Variant Type"
                 }
               },
               "required": [
-                "variant_id",
-                "variant_type",
-                "gene_symbol"
+                "variant_id"
               ],
               "title": "VariantInfoMCP",
               "type": "object"
@@ -2018,8 +2107,7 @@ Use this to score one SNV/indel variant with AutoPVS1 PVS1 rules.
           },
           "required": [
             "genome_build",
-            "variant_info",
-            "pvs1_flowchart"
+            "variant_info"
           ],
           "title": "VariantMCPData",
           "type": "object"
@@ -2253,6 +2341,7 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
       "default": "standard",
       "description": "Response detail level applied to each item.",
       "enum": [
+        "ids_only",
         "summary",
         "standard",
         "full"
@@ -2293,7 +2382,7 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
                   "data": {
                     "anyOf": [
                       {
-                        "description": "MCP-presented variant data.",
+                        "description": "MCP-presented variant data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
                         "properties": {
                           "disease_mechanisms": {
                             "items": {
@@ -2367,109 +2456,117 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
                             "type": "string"
                           },
                           "pvs1_flowchart": {
-                            "description": "Typed PVS1 flowchart decision path and outcome.",
-                            "properties": {
-                              "decision_tree": {
-                                "items": {
-                                  "description": "One typed step in the PVS1 decision flowchart.",
-                                  "properties": {
-                                    "code": {
-                                      "title": "Code",
-                                      "type": "string"
-                                    },
-                                    "description": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ],
-                                      "default": null,
-                                      "title": "Description"
-                                    },
-                                    "note_id": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ],
-                                      "default": null,
-                                      "title": "Note Id"
-                                    },
-                                    "note_text": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ],
-                                      "default": null,
-                                      "title": "Note Text"
-                                    }
-                                  },
-                                  "required": [
-                                    "code"
-                                  ],
-                                  "title": "FlowchartStepMCP",
-                                  "type": "object"
-                                },
-                                "title": "Decision Tree",
-                                "type": "array"
-                              },
-                              "decision_tree_raw": {
-                                "anyOf": [
-                                  {
+                            "anyOf": [
+                              {
+                                "description": "Typed PVS1 flowchart decision path and outcome.",
+                                "properties": {
+                                  "decision_tree": {
                                     "items": {
-                                      "additionalProperties": true,
+                                      "description": "One typed step in the PVS1 decision flowchart.",
+                                      "properties": {
+                                        "code": {
+                                          "title": "Code",
+                                          "type": "string"
+                                        },
+                                        "description": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ],
+                                          "default": null,
+                                          "title": "Description"
+                                        },
+                                        "note_id": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ],
+                                          "default": null,
+                                          "title": "Note Id"
+                                        },
+                                        "note_text": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ],
+                                          "default": null,
+                                          "title": "Note Text"
+                                        }
+                                      },
+                                      "required": [
+                                        "code"
+                                      ],
+                                      "title": "FlowchartStepMCP",
                                       "type": "object"
                                     },
+                                    "title": "Decision Tree",
                                     "type": "array"
                                   },
-                                  {
-                                    "type": "null"
+                                  "decision_tree_raw": {
+                                    "anyOf": [
+                                      {
+                                        "items": {
+                                          "additionalProperties": true,
+                                          "type": "object"
+                                        },
+                                        "type": "array"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Decision Tree Raw"
+                                  },
+                                  "final_strength": {
+                                    "title": "Final Strength",
+                                    "type": "string"
+                                  },
+                                  "final_strength_source": {
+                                    "default": "asserted",
+                                    "enum": [
+                                      "asserted",
+                                      "inferred"
+                                    ],
+                                    "title": "Final Strength Source",
+                                    "type": "string"
+                                  },
+                                  "notes": {
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "title": "Notes",
+                                    "type": "object"
+                                  },
+                                  "preliminary_decision_path": {
+                                    "title": "Preliminary Decision Path",
+                                    "type": "string"
                                   }
-                                ],
-                                "default": null,
-                                "title": "Decision Tree Raw"
-                              },
-                              "final_strength": {
-                                "title": "Final Strength",
-                                "type": "string"
-                              },
-                              "final_strength_source": {
-                                "default": "asserted",
-                                "enum": [
-                                  "asserted",
-                                  "inferred"
-                                ],
-                                "title": "Final Strength Source",
-                                "type": "string"
-                              },
-                              "notes": {
-                                "additionalProperties": {
-                                  "type": "string"
                                 },
-                                "title": "Notes",
+                                "required": [
+                                  "preliminary_decision_path",
+                                  "final_strength"
+                                ],
+                                "title": "PVS1FlowchartMCP",
                                 "type": "object"
                               },
-                              "preliminary_decision_path": {
-                                "title": "Preliminary Decision Path",
-                                "type": "string"
+                              {
+                                "type": "null"
                               }
-                            },
-                            "required": [
-                              "preliminary_decision_path",
-                              "final_strength"
                             ],
-                            "title": "PVS1FlowchartMCP",
-                            "type": "object"
+                            "default": null
                           },
                           "source_url": {
                             "anyOf": [
@@ -2489,7 +2586,7 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
                             "type": "string"
                           },
                           "variant_info": {
-                            "description": "Typed variant information exposed through MCP.",
+                            "description": "Typed variant information exposed through MCP.\n\nOnly ``variant_id`` is required at the contract level. ``variant_type``\nand ``gene_symbol`` are populated for summary/standard/full but absent\nwhen ``response_mode='ids_only'`` returns just the upstream identifier.",
                             "properties": {
                               "chgvs": {
                                 "anyOf": [
@@ -2516,18 +2613,26 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
                                 "title": "Exon"
                               },
                               "external_links": {
-                                "additionalProperties": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
+                                "anyOf": [
+                                  {
+                                    "additionalProperties": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "title": "External Links",
-                                "type": "object"
+                                    "type": "object"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "default": null,
+                                "title": "External Links"
                               },
                               "external_links_raw": {
                                 "anyOf": [
@@ -2552,8 +2657,16 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
                                 "title": "External Links Raw"
                               },
                               "gene_symbol": {
-                                "title": "Gene Symbol",
-                                "type": "string"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "default": null,
+                                "title": "Gene Symbol"
                               },
                               "gene_url": {
                                 "anyOf": [
@@ -2644,14 +2757,20 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
                                 "type": "string"
                               },
                               "variant_type": {
-                                "title": "Variant Type",
-                                "type": "string"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "default": null,
+                                "title": "Variant Type"
                               }
                             },
                             "required": [
-                              "variant_id",
-                              "variant_type",
-                              "gene_symbol"
+                              "variant_id"
                             ],
                             "title": "VariantInfoMCP",
                             "type": "object"
@@ -2659,8 +2778,7 @@ batch unless ``continue_on_error=false``. Bulk dispatch errors
                         },
                         "required": [
                           "genome_build",
-                          "variant_info",
-                          "pvs1_flowchart"
+                          "variant_info"
                         ],
                         "title": "VariantMCPData",
                         "type": "object"
@@ -3003,8 +3121,9 @@ Use this to search AutoPVS1 by gene symbol or variant text.
     },
     "response_mode": {
       "default": "standard",
-      "description": "Response detail level: summary, standard, or full.",
+      "description": "Response detail level: ids_only, summary, standard, or full.",
       "enum": [
+        "ids_only",
         "summary",
         "standard",
         "full"
@@ -3098,15 +3217,31 @@ Use this to search AutoPVS1 by gene symbol or variant text.
             },
             "results": {
               "items": {
-                "description": "Typed AutoPVS1 search result row.",
+                "description": "Typed AutoPVS1 search result row.\n\nOnly ``variant_id`` and ``url`` are guaranteed to be present.\n``response_mode='ids_only'`` drops the descriptive fields so callers\nthat only need the identifier and a re-fetch URL pay no extra bytes.",
                 "properties": {
                   "gene": {
-                    "title": "Gene",
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Gene"
                   },
                   "genome_build": {
-                    "title": "Genome Build",
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Genome Build"
                   },
                   "url": {
                     "title": "Url",
@@ -3117,15 +3252,20 @@ Use this to search AutoPVS1 by gene symbol or variant text.
                     "type": "string"
                   },
                   "variant_type": {
-                    "title": "Variant Type",
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Variant Type"
                   }
                 },
                 "required": [
                   "variant_id",
-                  "gene",
-                  "variant_type",
-                  "genome_build",
                   "url"
                 ],
                 "title": "SearchResultMCP",

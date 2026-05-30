@@ -137,7 +137,7 @@ async def test_get_variant_invalid_response_mode_returns_envelope_without_callin
         result.structured_content,
         code="invalid_response_mode",
         parameter="response_mode",
-        supported_values="summary, standard, or full",
+        supported_values="ids_only, summary, standard, or full",
     )
     _assert_no_raw_error_leak(result.content[0].text)
 
@@ -208,7 +208,7 @@ async def test_search_invalid_response_mode_returns_envelope_without_calling_ups
         result.structured_content,
         code="invalid_response_mode",
         parameter="response_mode",
-        supported_values="summary, standard, or full",
+        supported_values="ids_only, summary, standard, or full",
     )
     _assert_no_raw_error_leak(result.content[0].text)
 

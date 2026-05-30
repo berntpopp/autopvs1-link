@@ -6,6 +6,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `response_mode='ids_only'` tier on every detail tool (`get_variant_pvs1_data`,
+  `get_cnv_pvs1_data`, `search_variants`, plus the two bulk variants) for
+  lowest-bandwidth lookup. Emits only the upstream identifier, `genome_build`,
+  and `source_url` (search keeps `variant_id` + `url` per row). Documented on
+  the capabilities resource via the `payload_modes.ids_only` block; clients
+  can size requests off the published `char_budget`. Contract widenings
+  (`VariantInfoMCP.variant_type`, `VariantInfoMCP.gene_symbol`,
+  `CNVInfoMCP.cnv_type`, `CNVInfoMCP.gene_symbol`, `CNVInfoMCP.coordinates`,
+  `VariantMCPData.pvs1_flowchart`, `CNVMCPData.pvs1_flowchart`, and the
+  descriptive fields on `SearchResultMCP`) are purely additive — existing
+  summary/standard/full payloads are unchanged.
+
 ### Changed
 
 - **Breaking:** `search_variants` cursor is now an opaque base64url-encoded

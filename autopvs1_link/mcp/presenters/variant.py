@@ -162,6 +162,19 @@ def present_variant(
     """Shape parsed variant data for MCP callers."""
     raw = _dump(parsed)
     mode = _normalize_response_mode(response_mode)
+
+    if mode == "ids_only":
+        return (
+            VariantMCPData(
+                genome_build=raw["genome_build"],
+                variant_info={"variant_id": raw["variant_info"]["variant_id"]},
+                pvs1_flowchart=None,
+                disease_mechanisms=[],
+                source_url=source_url,
+            ),
+            [],
+        )
+
     warnings: list[MCPWarning] = []
 
     variant_info = dict(raw["variant_info"])
@@ -215,6 +228,19 @@ def present_cnv(
     """Shape parsed CNV data for MCP callers."""
     raw = _dump(parsed)
     mode = _normalize_response_mode(response_mode)
+
+    if mode == "ids_only":
+        return (
+            CNVMCPData(
+                genome_build=raw["genome_build"],
+                cnv_info={"cnv_id": raw["cnv_info"]["cnv_id"]},
+                pvs1_flowchart=None,
+                disease_mechanisms=[],
+                source_url=source_url,
+            ),
+            [],
+        )
+
     flowchart, warnings = _present_flowchart(raw["pvs1_flowchart"], response_mode=mode)
     disease_mechanisms = list(raw.get("disease_mechanisms") or [])
     if mode == "summary":

@@ -49,6 +49,15 @@ KNOWN_WARNING_CODES: dict[str, str] = {
 }
 
 PAYLOAD_MODES: dict[str, PayloadModeSpec] = {
+    "ids_only": {
+        "char_budget": 500,
+        "note": (
+            "Lowest-bandwidth lookup tier: emits only the upstream "
+            "identifier, genome_build, and source_url so callers can "
+            "round-trip IDs through batch screens without paying for the "
+            "decision tree or disease-mechanism rows."
+        ),
+    },
     "summary": {
         "char_budget": 1500,
         "note": "IDs + final strength only.",

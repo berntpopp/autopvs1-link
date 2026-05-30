@@ -79,7 +79,7 @@ def _dedupe_warnings(
     return deduped
 
 
-RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["summary", "standard", "full"]}
+RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
 META_MODE_SCHEMA = {"type": "string", "enum": ["full", "compact", "minimal"]}
 VARIANT_ITEM_SCHEMA = {
     "type": "object",

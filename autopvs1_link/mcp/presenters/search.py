@@ -98,6 +98,17 @@ def present_search(
         offset=offset,
         total_count_kind="upstream_page",
     )
+
+    if mode == "summary":
+        emitted_results: list[dict[str, Any]] = []
+        emitted_suggestions = suggestions
+    elif mode == "ids_only":
+        emitted_results = [{"variant_id": row["variant_id"], "url": row["url"]} for row in page]
+        emitted_suggestions = []
+    else:
+        emitted_results = page
+        emitted_suggestions = suggestions
+
     return (
         SearchMCPData(
             query=query,
@@ -105,8 +116,8 @@ def present_search(
             total_count=total_count,
             returned_count=len(page),
             pagination=pagination,
-            results=[] if mode == "summary" else page,
-            suggestions=suggestions,
+            results=emitted_results,
+            suggestions=emitted_suggestions,
         ),
         warnings,
     )

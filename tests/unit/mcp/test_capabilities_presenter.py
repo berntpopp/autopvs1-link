@@ -102,6 +102,12 @@ def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> N
     }
     assert detailed["payload_modes"]["summary"]["char_budget"] == 1500
     assert detailed["payload_modes"]["full"]["char_budget"] == 12000
+    # Task 9.7 Item 1: ids_only is the lowest-bandwidth lookup tier and
+    # must be discoverable on the same payload_modes table that documents
+    # summary/standard/full so clients pick the right enum value without
+    # reading source.
+    assert "ids_only" in detailed["payload_modes"]
+    assert detailed["payload_modes"]["ids_only"]["char_budget"] < 1500
 
 
 def test_search_behavior_documents_pagination_block_fields() -> None:

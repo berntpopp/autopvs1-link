@@ -51,10 +51,18 @@ def test_known_warning_codes_cover_every_mcp_warning_construction() -> None:
 
 
 def test_payload_modes_documents_every_response_mode() -> None:
-    assert set(PAYLOAD_MODES) == {"summary", "standard", "full"}
+    assert set(PAYLOAD_MODES) == {"ids_only", "summary", "standard", "full"}
     for _mode, meta in PAYLOAD_MODES.items():
         assert isinstance(meta["char_budget"], int)
         assert isinstance(meta["note"], str) and meta["note"]
+
+
+def test_payload_modes_budgets_grow_monotonically_with_detail() -> None:
+    """ids_only < summary < standard < full — the budget ordering encodes
+    the bandwidth ladder clients pick from."""
+    budgets = [PAYLOAD_MODES[m]["char_budget"] for m in ("ids_only", "summary", "standard", "full")]
+    assert budgets == sorted(budgets), budgets
+    assert len(set(budgets)) == len(budgets), "budgets must be distinct"
 
 
 def test_known_error_codes_messages_are_one_line_strings() -> None:

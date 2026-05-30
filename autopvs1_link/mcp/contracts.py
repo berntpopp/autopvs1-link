@@ -45,11 +45,16 @@ class ClearCacheInput(BaseModel):
 
 
 class VariantInfoMCP(MCPContractModel):
-    """Typed variant information exposed through MCP."""
+    """Typed variant information exposed through MCP.
+
+    Only ``variant_id`` is required at the contract level. ``variant_type``
+    and ``gene_symbol`` are populated for summary/standard/full but absent
+    when ``response_mode='ids_only'`` returns just the upstream identifier.
+    """
 
     variant_id: str
-    variant_type: str
-    gene_symbol: str
+    variant_type: str | None = None
+    gene_symbol: str | None = None
     gene_url: str | None = None
     pli_score: float | None = None
     pli_score_display: str | None = None
@@ -59,17 +64,21 @@ class VariantInfoMCP(MCPContractModel):
     phgvs: str | None = None
     exon: str | None = None
     intron: str | None = None
-    external_links: dict[str, str | None] = Field(default_factory=dict)
+    external_links: dict[str, str | None] | None = None
     external_links_raw: dict[str, str | None] | None = None
 
 
 class CNVInfoMCP(MCPContractModel):
-    """Typed copy-number variant information exposed through MCP."""
+    """Typed copy-number variant information exposed through MCP.
+
+    Only ``cnv_id`` is required at the contract level; the other fields
+    are dropped when ``response_mode='ids_only'``.
+    """
 
     cnv_id: str
-    cnv_type: str
-    gene_symbol: str
-    coordinates: str
+    cnv_type: str | None = None
+    gene_symbol: str | None = None
+    coordinates: str | None = None
     size: int | None = None
 
 
@@ -107,13 +116,18 @@ class DiseaseMechanismMCP(MCPContractModel):
 
 
 class SearchResultMCP(MCPContractModel):
-    """Typed AutoPVS1 search result row."""
+    """Typed AutoPVS1 search result row.
+
+    Only ``variant_id`` and ``url`` are guaranteed to be present.
+    ``response_mode='ids_only'`` drops the descriptive fields so callers
+    that only need the identifier and a re-fetch URL pay no extra bytes.
+    """
 
     variant_id: str
-    gene: str
-    variant_type: str
-    genome_build: str
     url: str
+    gene: str | None = None
+    variant_type: str | None = None
+    genome_build: str | None = None
 
 
 class ToolSummaryMCP(BaseModel):
@@ -131,11 +145,16 @@ class WorkflowStepMCP(BaseModel):
 
 
 class VariantMCPData(BaseModel):
-    """MCP-presented variant data."""
+    """MCP-presented variant data.
+
+    ``pvs1_flowchart`` is required in summary/standard/full modes but
+    omitted entirely when ``response_mode='ids_only'`` returns just the
+    upstream identifier.
+    """
 
     genome_build: str
     variant_info: VariantInfoMCP
-    pvs1_flowchart: PVS1FlowchartMCP
+    pvs1_flowchart: PVS1FlowchartMCP | None = None
     disease_mechanisms: list[DiseaseMechanismMCP] = Field(default_factory=list)
     source_url: str | None = None
     upstream_service: str = "AutoPVS1"
@@ -145,7 +164,7 @@ class VariantMCPData(BaseModel):
         *,
         genome_build: str,
         variant_info: VariantInfoMCP | dict[str, Any],
-        pvs1_flowchart: PVS1FlowchartMCP | dict[str, Any],
+        pvs1_flowchart: PVS1FlowchartMCP | dict[str, Any] | None = None,
         disease_mechanisms: Sequence[DiseaseMechanismMCP | dict[str, Any]] | None = None,
         source_url: str | None = None,
         upstream_service: str = "AutoPVS1",
@@ -163,11 +182,16 @@ class VariantMCPData(BaseModel):
 
 
 class CNVMCPData(BaseModel):
-    """MCP-presented CNV data."""
+    """MCP-presented CNV data.
+
+    ``pvs1_flowchart`` is required in summary/standard/full modes but
+    omitted entirely when ``response_mode='ids_only'`` returns just the
+    upstream identifier.
+    """
 
     genome_build: str
     cnv_info: CNVInfoMCP
-    pvs1_flowchart: PVS1FlowchartMCP
+    pvs1_flowchart: PVS1FlowchartMCP | None = None
     disease_mechanisms: list[DiseaseMechanismMCP] = Field(default_factory=list)
     source_url: str | None = None
     upstream_service: str = "AutoPVS1"
@@ -177,7 +201,7 @@ class CNVMCPData(BaseModel):
         *,
         genome_build: str,
         cnv_info: CNVInfoMCP | dict[str, Any],
-        pvs1_flowchart: PVS1FlowchartMCP | dict[str, Any],
+        pvs1_flowchart: PVS1FlowchartMCP | dict[str, Any] | None = None,
         disease_mechanisms: Sequence[DiseaseMechanismMCP | dict[str, Any]] | None = None,
         source_url: str | None = None,
         upstream_service: str = "AutoPVS1",

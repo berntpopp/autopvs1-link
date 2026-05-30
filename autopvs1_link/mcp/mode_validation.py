@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Literal, cast
 
-ResponseMode = Literal["summary", "standard", "full"]
+ResponseMode = Literal["ids_only", "summary", "standard", "full"]
 MetaMode = Literal["full", "compact", "minimal"]
 
-_RESPONSE_MODES = {"summary", "standard", "full"}
+_RESPONSE_MODES = {"ids_only", "summary", "standard", "full"}
 _META_MODES = {"full", "compact", "minimal"}
 
 
@@ -42,8 +42,11 @@ def normalize_response_mode(response_mode: Any) -> ResponseMode:
         code="invalid_response_mode",
         parameter="response_mode",
         value=response_mode,
-        supported_values="summary, standard, or full",
-        suggestions=["Use response_mode='standard' unless a summary or full response is needed."],
+        supported_values="ids_only, summary, standard, or full",
+        suggestions=[
+            "Use response_mode='standard' unless a smaller (ids_only/summary) "
+            "or audit-trail (full) payload is needed."
+        ],
     )
 
 
