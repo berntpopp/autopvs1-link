@@ -48,9 +48,10 @@ Read tools accept optional response-shaping controls:
 - `response_mode`: `summary`, `standard`, or `full`. Use `summary` for quick
   verdict-oriented answers, `standard` for the default balanced payload, and
   `full` when all presenter fields are needed.
-- `meta_mode`: `full`, `compact`, or `minimal`. `compact` keeps DOI/PMID
-  citation identifiers without full citation text; `minimal` keeps request ID,
-  server version, research-use flag, and warnings.
+- `meta_mode`: `compact` (default), `full`, or `minimal`. The default
+  `compact` keeps DOI/PMID citation identifiers without the full citation
+  text; request `full` on demand for the verbatim citation text and URL;
+  `minimal` keeps request ID, server version, research-use flag, and warnings.
 - `include_unmet`: variant and CNV tools default to `true`; set `false` to
   omit disease-mechanism rows whose adjusted strength is `Unmet`.
 

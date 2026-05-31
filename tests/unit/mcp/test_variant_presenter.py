@@ -891,3 +891,52 @@ def test_present_variant_summary_terminal_note_falls_back_to_notes_legend() -> N
 
     payload = data.model_dump(mode="json", exclude_none=True)
     assert payload["pvs1_flowchart"]["terminal_note"].startswith("PVS1 does not apply")
+
+
+# ---------------------------------------------------------------------------
+# Deterministic path_gloss on every PVS1 verdict (v1.2 polish)
+# ---------------------------------------------------------------------------
+
+
+def _variant_with_path(strength: str, steps: list[FlowchartStep]) -> AutoPVS1Data:
+    return AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-82763936-A-T", variant_type="SNV", gene_symbol="POU3F4"
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF5",
+            final_strength=strength,
+            decision_tree=steps,
+        ),
+    )
+
+
+def test_path_gloss_present_in_summary_for_strong_verdict() -> None:
+    parsed = _variant_with_path(
+        "Strong",
+        [
+            FlowchartStep(code="Nonsense or Frameshift"),
+            FlowchartStep(code="Not predicted to undergo NMD"),
+            FlowchartStep(code="Strong"),
+        ],
+    )
+    data, _ = present_variant(parsed, source_url=None, response_mode="summary")
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["pvs1_flowchart"]["path_gloss"] == (
+        "Nonsense or Frameshift -> Not predicted to undergo NMD -> Strong"
+    )
+
+
+def test_path_gloss_present_in_standard_mode() -> None:
+    parsed = _variant_with_path("Unmet", [FlowchartStep(code="Nonsense or Frameshift")])
+    data, _ = present_variant(parsed, source_url=None, response_mode="standard")
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload["pvs1_flowchart"]["path_gloss"] == "Nonsense or Frameshift -> Unmet"
+
+
+def test_path_gloss_absent_in_ids_only_mode() -> None:
+    parsed = _variant_with_path("Strong", [FlowchartStep(code="Nonsense or Frameshift")])
+    data, _ = present_variant(parsed, source_url=None, response_mode="ids_only")
+    payload = data.model_dump(mode="json", exclude_none=True)
+    assert payload.get("pvs1_flowchart") is None

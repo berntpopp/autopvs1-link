@@ -14,7 +14,7 @@ def test_ok_envelope_contains_required_metadata() -> None:
     assert envelope["ok"] is True
     assert envelope["data"] == {"cleared": True, "message": "cleared"}
     assert envelope["error"] is None
-    assert envelope["meta"]["server_version"] == "1.1.0"
+    assert envelope["meta"]["server_version"] == "1.2.0"
     assert envelope["meta"]["research_use_only"] is True
     assert envelope["meta"]["recommended_citation"]["doi"] == "10.1002/humu.24051"
     UUID(envelope["meta"]["request_id"])
@@ -429,3 +429,70 @@ def test_ok_envelope_bulk_mixed_aggregate_overrides_telemetry() -> None:
         assert envelope["meta"]["uncached_count"] == 1
     finally:
         reset_call_telemetry()
+
+
+# ---------------------------------------------------------------------------
+# next_commands threading (groundedness polish)
+# ---------------------------------------------------------------------------
+
+
+def test_ok_envelope_carries_next_commands_when_supplied() -> None:
+    out = ok_envelope(
+        {"x": 1},
+        meta_mode="full",
+        tool_name="get_variant_pvs1_data",
+        next_commands=[{"tool": "get_variant_pvs1_data", "arguments": {"y": 2}, "reason": "r"}],
+    )
+    assert out["meta"]["next_commands"] == [
+        {"tool": "get_variant_pvs1_data", "arguments": {"y": 2}, "reason": "r"}
+    ]
+
+
+def test_ok_envelope_drops_next_commands_when_absent() -> None:
+    out = ok_envelope({"x": 1}, meta_mode="full", tool_name="get_variant_pvs1_data")
+    assert "next_commands" not in out["meta"]
+
+
+def test_error_envelope_derives_disambiguation_next_commands() -> None:
+    result = error_envelope(
+        code="requires_disambiguation",
+        message="pick one",
+        retryable=False,
+        details={"candidates": [{"id": "17-1-A-G", "genome_build": "hg38"}]},
+        tool_name="get_variant_pvs1_data",
+    )
+    meta = result.structured_content["meta"]
+    assert meta["next_commands"] == [
+        {
+            "tool": "get_variant_pvs1_data",
+            "arguments": {"variant_id": "17-1-A-G", "genome_build": "hg38"},
+            "reason": "Re-score with this disambiguated candidate id.",
+        }
+    ]
+
+
+def test_error_envelope_without_candidates_drops_next_commands() -> None:
+    result = error_envelope(
+        code="invalid_variant_id",
+        message="bad",
+        retryable=False,
+        tool_name="get_variant_pvs1_data",
+    )
+    assert "next_commands" not in result.structured_content["meta"]
+
+
+def test_ok_envelope_emits_cold_latency_only_on_cold_call() -> None:
+    cold = ok_envelope(
+        {"x": 1},
+        meta_mode="full",
+        tool_name="search_variants",
+        cache_status_override="miss",
+    )
+    assert cold["meta"]["expected_cold_latency_ms"] == 3000
+    warm = ok_envelope(
+        {"x": 1},
+        meta_mode="full",
+        tool_name="search_variants",
+        cache_status_override="hit",
+    )
+    assert "expected_cold_latency_ms" not in warm["meta"]

@@ -16,7 +16,7 @@ workflow arrows -> deferred-tool fallback list -> error-code legend
 from __future__ import annotations
 
 SERVER_NAME = "AutoPVS1 Link"
-SERVER_VERSION = "1.1.0"
+SERVER_VERSION = "1.2.0"
 SERVER_DESCRIPTION = (
     "AutoPVS1-Link grounds research-use PVS1 variant classification by "
     "scraping the AutoPVS1 web service (https://autopvs1.bgi.com) and "
@@ -39,9 +39,10 @@ SERVER_DESCRIPTION = (
     "get_variants_pvs1_data_bulk, get_cnvs_pvs1_data_bulk, "
     "get_server_capabilities. The pvs1_workflow_help prompt scaffolds "
     "clinical_review, batch_screen, and search_first chains.\n\n"
-    "response_mode in {ids_only, summary, standard, full}; meta_mode "
-    "in {full, compact, minimal}. Start with summary for verdicts and "
-    "widen on demand.\n\n"
+    "response_mode in {ids_only, summary, standard, full}; meta_mode in "
+    "{compact (default), full, minimal}. Start with summary for verdicts "
+    "and widen on demand; request meta_mode=full for the verbatim "
+    "recommended_citation text.\n\n"
     "Error codes: invalid_variant_id | invalid_cnv_id | "
     "invalid_genome_build | invalid_search_query | "
     "invalid_search_cursor | invalid_bulk_input | invalid_response_mode "

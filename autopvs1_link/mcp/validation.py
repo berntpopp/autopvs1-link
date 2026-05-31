@@ -229,8 +229,8 @@ def _invalid_search_cursor(message: str) -> MCPInputError:
         code="invalid_search_cursor",
         message=message,
         suggestions=[
-            "Use the opaque next_cursor value returned by the previous search_variants call; "
-            "omit cursor to reset to the first page.",
+            "Echo back the next_cursor value returned by the previous "
+            "search_variants call; omit cursor to reset to the first page.",
         ],
     )
 

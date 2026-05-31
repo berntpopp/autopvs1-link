@@ -274,8 +274,8 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "limit_min": 1,
             "limit_max": 50,
             "cursor": (
-                "Opaque pagination token returned as next_cursor; "
-                "callers must pass it back unchanged."
+                "base64url JSON next_cursor token; transparent today "
+                "(decodable) but prefer echoing it back unchanged"
             ),
             "cursor_opacity": (
                 "Syntactic only: cursors are base64url-encoded JSON "
@@ -344,6 +344,20 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "standard just to read the rationale. Absent for "
                 "Strong / Very_Strong verdicts whose path code already "
                 "conveys the rationale."
+            ),
+            "pvs1_flowchart.path_gloss": (
+                "One-line deterministic rationale: the decision-tree "
+                "branch the variant traversed plus the terminal strength "
+                "(ASCII '->' separated). Present for EVERY path in "
+                "summary, standard, and full tiers (absent in ids_only). "
+                "Built only from upstream scraped node text; lets a "
+                "summary-mode caller explain the verdict without widening."
+            ),
+            "meta.expected_cold_latency_ms": (
+                "Present only on cold scrape-tier responses (cache_status "
+                "miss/coalesced); the coarse first-call latency in ms, in "
+                "lockstep with the performance block's cold_call_seconds. "
+                "Absent on warm calls so callers do not over-budget."
             ),
         },
         "bulk_behavior": {

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from autopvs1_link.mcp.contracts import CNVMCPData, VariantMCPData
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.mode_validation import ResponseMode, normalize_response_mode
+from autopvs1_link.mcp.pvs1_glossary import synthesize_path_gloss
 from autopvs1_link.models.autopvs1_models import AutoPVS1CNVData, AutoPVS1Data
 
 CNV_ID_RE = re.compile(
@@ -130,6 +131,11 @@ def _present_flowchart(
         presented_steps.append(step_data)
 
     raw["decision_tree"] = presented_steps
+    path_gloss = synthesize_path_gloss(
+        presented_steps,
+        final_strength=final_strength,
+        preliminary_decision_path=str(raw.get("preliminary_decision_path") or ""),
+    )
     if response_mode == "summary":
         summary: dict[str, Any] = {
             "preliminary_decision_path": raw["preliminary_decision_path"],
@@ -150,13 +156,19 @@ def _present_flowchart(
             )
             if note is not None:
                 summary["terminal_note"] = note
+        if path_gloss is not None:
+            summary["path_gloss"] = path_gloss
         raw = summary
     elif response_mode == "full":
         raw["decision_tree_raw"] = raw_decision_tree
+        if path_gloss is not None:
+            raw["path_gloss"] = path_gloss
     else:
         # standard: notes legend is duplicative because decision_tree
         # steps already carry note_text; drop it from the wire payload.
         raw.pop("notes", None)
+        if path_gloss is not None:
+            raw["path_gloss"] = path_gloss
     return raw, warnings
 
 

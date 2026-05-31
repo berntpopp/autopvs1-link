@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from autopvs1_link.mcp.cost_tiers import (
     CHEAP_TIER,
+    COLD_CALL_LATENCY_MS,
     SCRAPE_TIER,
     TOOL_COST_TIERS,
     UNKNOWN_TIER,
+    cold_latency_ms_for,
     cost_tier_for,
 )
 
@@ -68,3 +70,16 @@ def test_cost_tiers_stay_in_lockstep_with_performance_block() -> None:
         assert block_tier == tier, (
             f"Tool {name!r} disagrees: registry={tier!r}, _PERFORMANCE_BLOCK={block_tier!r}"
         )
+
+
+def test_cold_latency_lockstep_with_performance_block() -> None:
+    from autopvs1_link.mcp.presenters.capabilities import _PERFORMANCE_BLOCK
+
+    for tool, ms in COLD_CALL_LATENCY_MS.items():
+        expected = int(_PERFORMANCE_BLOCK[tool]["cold_call_seconds"] * 1000)
+        assert ms == expected, f"{tool}: {ms} != {expected}"
+
+
+def test_cold_latency_ms_for_unknown_is_none() -> None:
+    assert cold_latency_ms_for("get_server_health") is None
+    assert cold_latency_ms_for(None) is None

@@ -37,8 +37,8 @@ not clinical decision support.
       "type": "boolean"
     },
     "meta_mode": {
-      "default": "full",
-      "description": "Metadata detail level: full, compact, or minimal.",
+      "default": "compact",
+      "description": "Metadata detail level: compact (default -- doi+pmid), full (adds verbatim citation text+url), or minimal (no citation).",
       "enum": [
         "full",
         "compact",
@@ -213,7 +213,7 @@ not clinical decision support.
             "pvs1_flowchart": {
               "anyOf": [
                 {
-                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
+                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
                   "properties": {
                     "decision_tree": {
                       "items": {
@@ -312,6 +312,18 @@ not clinical decision support.
                       ],
                       "default": null,
                       "title": "Notes"
+                    },
+                    "path_gloss": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Path Gloss"
                     },
                     "preliminary_decision_path": {
                       "title": "Preliminary Decision Path",
@@ -474,6 +486,18 @@ not clinical decision support.
           "default": null,
           "title": "Elapsed Ms"
         },
+        "expected_cold_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Cold Latency Ms"
+        },
         "next_actions": {
           "anyOf": [
             {
@@ -500,6 +524,22 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Next Call Earliest At"
+        },
+        "next_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Commands"
         },
         "rate_limit_floor_ms": {
           "anyOf": [
@@ -562,7 +602,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -717,8 +757,8 @@ not. Order is first-seen-code-first.
       "type": "array"
     },
     "meta_mode": {
-      "default": "full",
-      "description": "Top-level metadata detail level.",
+      "default": "compact",
+      "description": "Metadata detail level: compact (default -- doi+pmid), full (adds verbatim citation text+url), or minimal (no citation).",
       "enum": [
         "full",
         "compact",
@@ -909,7 +949,7 @@ not. Order is first-seen-code-first.
                           "pvs1_flowchart": {
                             "anyOf": [
                               {
-                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
+                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
                                 "properties": {
                                   "decision_tree": {
                                     "items": {
@@ -1008,6 +1048,18 @@ not. Order is first-seen-code-first.
                                     ],
                                     "default": null,
                                     "title": "Notes"
+                                  },
+                                  "path_gloss": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Path Gloss"
                                   },
                                   "preliminary_decision_path": {
                                     "title": "Preliminary Decision Path",
@@ -1321,6 +1373,18 @@ not. Order is first-seen-code-first.
           "default": null,
           "title": "Elapsed Ms"
         },
+        "expected_cold_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Cold Latency Ms"
+        },
         "next_actions": {
           "anyOf": [
             {
@@ -1347,6 +1411,22 @@ not. Order is first-seen-code-first.
           ],
           "default": null,
           "title": "Next Call Earliest At"
+        },
+        "next_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Commands"
         },
         "rate_limit_floor_ms": {
           "anyOf": [
@@ -1409,7 +1489,7 @@ not. Order is first-seen-code-first.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -1738,6 +1818,18 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "default": null,
           "title": "Elapsed Ms"
         },
+        "expected_cold_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Cold Latency Ms"
+        },
         "next_actions": {
           "anyOf": [
             {
@@ -1764,6 +1856,22 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           ],
           "default": null,
           "title": "Next Call Earliest At"
+        },
+        "next_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Commands"
         },
         "rate_limit_floor_ms": {
           "anyOf": [
@@ -1826,7 +1934,7 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -1985,7 +2093,7 @@ cold scoring call.
               "type": "string"
             },
             "version": {
-              "default": "1.1.0",
+              "default": "1.2.0",
               "title": "Version",
               "type": "string"
             }
@@ -2099,6 +2207,18 @@ cold scoring call.
           "default": null,
           "title": "Elapsed Ms"
         },
+        "expected_cold_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Cold Latency Ms"
+        },
         "next_actions": {
           "anyOf": [
             {
@@ -2125,6 +2245,22 @@ cold scoring call.
           ],
           "default": null,
           "title": "Next Call Earliest At"
+        },
+        "next_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Commands"
         },
         "rate_limit_floor_ms": {
           "anyOf": [
@@ -2187,7 +2323,7 @@ cold scoring call.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -2312,8 +2448,8 @@ not clinical decision support.
       "type": "boolean"
     },
     "meta_mode": {
-      "default": "full",
-      "description": "Metadata detail level: full, compact, or minimal.",
+      "default": "compact",
+      "description": "Metadata detail level: compact (default -- doi+pmid), full (adds verbatim citation text+url), or minimal (no citation).",
       "enum": [
         "full",
         "compact",
@@ -2430,7 +2566,7 @@ not clinical decision support.
             "pvs1_flowchart": {
               "anyOf": [
                 {
-                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
+                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
                   "properties": {
                     "decision_tree": {
                       "items": {
@@ -2529,6 +2665,18 @@ not clinical decision support.
                       ],
                       "default": null,
                       "title": "Notes"
+                    },
+                    "path_gloss": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Path Gloss"
                     },
                     "preliminary_decision_path": {
                       "title": "Preliminary Decision Path",
@@ -2881,6 +3029,18 @@ not clinical decision support.
           "default": null,
           "title": "Elapsed Ms"
         },
+        "expected_cold_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Cold Latency Ms"
+        },
         "next_actions": {
           "anyOf": [
             {
@@ -2907,6 +3067,22 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Next Call Earliest At"
+        },
+        "next_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Commands"
         },
         "rate_limit_floor_ms": {
           "anyOf": [
@@ -2969,7 +3145,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -3144,8 +3320,8 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
       "type": "array"
     },
     "meta_mode": {
-      "default": "full",
-      "description": "Top-level metadata detail level.",
+      "default": "compact",
+      "description": "Metadata detail level: compact (default -- doi+pmid), full (adds verbatim citation text+url), or minimal (no citation).",
       "enum": [
         "full",
         "compact",
@@ -3274,7 +3450,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                           "pvs1_flowchart": {
                             "anyOf": [
                               {
-                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.",
+                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
                                 "properties": {
                                   "decision_tree": {
                                     "items": {
@@ -3373,6 +3549,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                                     ],
                                     "default": null,
                                     "title": "Notes"
+                                  },
+                                  "path_gloss": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "title": "Path Gloss"
                                   },
                                   "preliminary_decision_path": {
                                     "title": "Preliminary Decision Path",
@@ -3876,6 +4064,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "default": null,
           "title": "Elapsed Ms"
         },
+        "expected_cold_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Cold Latency Ms"
+        },
         "next_actions": {
           "anyOf": [
             {
@@ -3902,6 +4102,22 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           ],
           "default": null,
           "title": "Next Call Earliest At"
+        },
+        "next_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Commands"
         },
         "rate_limit_floor_ms": {
           "anyOf": [
@@ -3964,7 +4180,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -4056,8 +4272,9 @@ Search AutoPVS1 by gene symbol or variant text.
 
 Use ``response_mode='ids_only'`` (lowest-bandwidth lookup) to
 resolve a query to an AutoPVS1 ``variant_id`` you can hand to
-``get_variant_pvs1_data``. ``next_cursor`` is opaque base64url;
-pass it back unchanged. AutoPVS1 outputs are research-use only,
+``get_variant_pvs1_data``. ``next_cursor`` is base64url JSON today
+(decodable) but treat it as an echo-back token; it MAY become
+opaque later. AutoPVS1 outputs are research-use only,
 not clinical decision support.
 
 #### Input Schema
@@ -4076,7 +4293,7 @@ not clinical decision support.
         }
       ],
       "default": null,
-      "description": "Opaque pagination token returned as next_cursor; do not construct."
+      "description": "Pagination token from a prior response's next_cursor. Transparent base64url JSON today (you MAY decode it), but prefer echoing it back unchanged; it MAY become opaque later."
     },
     "genome_build": {
       "anyOf": [
@@ -4116,8 +4333,8 @@ not clinical decision support.
       "type": "integer"
     },
     "meta_mode": {
-      "default": "full",
-      "description": "Metadata detail level: full, compact, or minimal.",
+      "default": "compact",
+      "description": "Metadata detail level: compact (default -- doi+pmid), full (adds verbatim citation text+url), or minimal (no citation).",
       "enum": [
         "full",
         "compact",
@@ -4170,7 +4387,7 @@ not clinical decision support.
               "type": "string"
             },
             "pagination": {
-              "description": "Opaque pagination block for ``search_variants``.\n\nCursors are opaque base64url-encoded tokens; callers must not parse\nor construct them. ``offset`` is echoed for operator visibility only.\n``total_count_kind`` documents how to interpret ``total_count`` on the\nsurrounding ``SearchMCPData``: ``upstream_page`` means the count is\nonly what the upstream returned for this query (no guarantee of\nexhaustiveness); ``upstream_total`` means the upstream guarantees the\nfull result set was returned.\n\n``previous_cursor`` and ``next_cursor`` carry ``= None`` defaults so\nthe published JSON schema marks them non-required. The wire payload\nstrips null fields (``exclude_none=True``) and the MCP client\nvalidates structured content against that schema \u2014 without the\ndefaults, page 1 (no previous) and the last page (no next) would\nfail validation.",
+              "description": "Pagination block for ``search_variants``.\n\nCursors are base64url-encoded ``{\"offset\": N}`` tokens. They are\ntransparent by convention: a caller MAY decode one to read the row\noffset, but the encoding is not a stable contract and MAY change to an\nopaque form later, so prefer echoing ``next_cursor`` back verbatim.\n``offset`` is echoed for operator visibility only.\n``total_count_kind`` documents how to interpret ``total_count`` on the\nsurrounding ``SearchMCPData``: ``upstream_page`` means the count is\nonly what the upstream returned for this query (no guarantee of\nexhaustiveness); ``upstream_total`` means the upstream guarantees the\nfull result set was returned.\n\n``previous_cursor`` and ``next_cursor`` carry ``= None`` defaults so\nthe published JSON schema marks them non-required. The wire payload\nstrips null fields (``exclude_none=True``) and the MCP client\nvalidates structured content against that schema \u2014 without the\ndefaults, page 1 (no previous) and the last page (no next) would\nfail validation.",
               "properties": {
                 "has_more": {
                   "title": "Has More",
@@ -4416,6 +4633,18 @@ not clinical decision support.
           "default": null,
           "title": "Elapsed Ms"
         },
+        "expected_cold_latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Cold Latency Ms"
+        },
         "next_actions": {
           "anyOf": [
             {
@@ -4442,6 +4671,22 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Next Call Earliest At"
+        },
+        "next_commands": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Commands"
         },
         "rate_limit_floor_ms": {
           "anyOf": [
@@ -4504,7 +4749,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.1.0",
+          "default": "1.2.0",
           "title": "Server Version",
           "type": "string"
         },

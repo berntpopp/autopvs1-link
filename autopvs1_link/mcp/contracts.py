@@ -107,6 +107,14 @@ class PVS1FlowchartMCP(MCPContractModel):
     without re-fetching the full decision tree. Absent when the upstream
     note is empty or the verdict is unambiguous (PVS1_Strong /
     PVS1_Very_Strong) and the rationale adds no new signal.
+
+    ``path_gloss`` is a one-line, deterministic compression of the
+    decision-tree branch the variant traversed plus the terminal
+    strength (ASCII ``->`` separated). Unlike ``terminal_note`` it is
+    emitted for EVERY path in summary/standard/full modes (not just
+    ambiguous verdicts), so a summary-mode caller can always state why a
+    verdict landed without widening to standard. Built only from upstream
+    scraped node text — no hand-authored clinical mappings.
     """
 
     preliminary_decision_path: str
@@ -116,6 +124,7 @@ class PVS1FlowchartMCP(MCPContractModel):
     notes: dict[str, str] | None = None
     decision_tree_raw: list[dict[str, Any]] | None = None
     terminal_note: str | None = None
+    path_gloss: str | None = None
 
 
 class DiseaseMechanismMCP(MCPContractModel):
@@ -242,10 +251,13 @@ class CNVMCPData(BaseModel):
 
 
 class SearchPaginationMCP(BaseModel):
-    """Opaque pagination block for ``search_variants``.
+    """Pagination block for ``search_variants``.
 
-    Cursors are opaque base64url-encoded tokens; callers must not parse
-    or construct them. ``offset`` is echoed for operator visibility only.
+    Cursors are base64url-encoded ``{"offset": N}`` tokens. They are
+    transparent by convention: a caller MAY decode one to read the row
+    offset, but the encoding is not a stable contract and MAY change to an
+    opaque form later, so prefer echoing ``next_cursor`` back verbatim.
+    ``offset`` is echoed for operator visibility only.
     ``total_count_kind`` documents how to interpret ``total_count`` on the
     surrounding ``SearchMCPData``: ``upstream_page`` means the count is
     only what the upstream returned for this query (no guarantee of

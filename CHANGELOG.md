@@ -4,6 +4,31 @@ All notable changes to autopvs1-link are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.0
+
+### Changed (BREAKING)
+- Default `meta_mode` is now `compact` (was `full`) on every MCP tool.
+  Responses that omit `meta_mode` now carry `recommended_citation` as
+  `{doi, pmid}` only. Request `meta_mode=full` for the verbatim citation
+  `text` + `url`. Rationale: the full metadata block out-weighed the data
+  payload by default; trimming follows Anthropic ("return only high-signal
+  information") and Google ("trim ceremony, never trim grounding data").
+
+### Added
+- `pvs1_flowchart.path_gloss`: a deterministic one-line rationale (the
+  traversed decision-tree branch + terminal strength) on every PVS1
+  verdict in summary/standard/full modes — closes the bare-code
+  groundedness gap without widening to standard.
+- `meta.next_commands`: machine-executable `{tool, arguments, reason}`
+  next steps on variant/cnv/search/bulk success envelopes and on
+  `requires_disambiguation` errors.
+- `meta.expected_cold_latency_ms`: per-response cold-call latency hint on
+  cold scrape-tier envelopes.
+
+### Documentation
+- Cursor contract corrected: `next_cursor` is a base64url-encoded offset
+  (not opaque, not authenticated), documented honestly.
+
 ## [Unreleased]
 
 ### Breaking

@@ -40,6 +40,26 @@ TOOL_COST_TIERS: dict[str, str] = {
 }
 
 
+# Coarse cold-call latency per scrape-tier tool, in milliseconds. Kept in
+# lockstep with capabilities `_PERFORMANCE_BLOCK[tool]["cold_call_seconds"]`
+# by ``tests/unit/mcp/test_cost_tiers.py``. Surfaced on cold envelopes as
+# ``meta.expected_cold_latency_ms`` so a caller sees the first-call cost.
+COLD_CALL_LATENCY_MS: dict[str, int] = {
+    "get_variant_pvs1_data": 3500,
+    "get_cnv_pvs1_data": 3500,
+    "search_variants": 3000,
+    "get_variants_pvs1_data_bulk": 10000,
+    "get_cnvs_pvs1_data_bulk": 10000,
+}
+
+
+def cold_latency_ms_for(tool_name: str | None) -> int | None:
+    """Return the cold-call latency hint for a tool, or None if unknown."""
+    if tool_name is None:
+        return None
+    return COLD_CALL_LATENCY_MS.get(tool_name)
+
+
 def cost_tier_for(tool_name: str | None) -> str | None:
     """Return the registered cost tier for ``tool_name``.
 

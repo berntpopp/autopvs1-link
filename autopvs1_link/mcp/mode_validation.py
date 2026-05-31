@@ -63,5 +63,9 @@ def normalize_meta_mode(meta_mode: Any) -> MetaMode:
         parameter="meta_mode",
         value=meta_mode,
         supported_values="full, compact, or minimal",
-        suggestions=["Use meta_mode='full' unless compact or minimal metadata is needed."],
+        suggestions=[
+            "Omit meta_mode to accept the compact default (doi+pmid). "
+            "Pass meta_mode='full' for the verbatim citation text+url, "
+            "or 'minimal' to drop the citation."
+        ],
     )

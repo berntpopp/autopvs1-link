@@ -26,6 +26,7 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_meta_mode,
     normalize_response_mode,
 )
+from autopvs1_link.mcp.next_commands import bulk_retry_failed
 from autopvs1_link.mcp.telemetry import get_call_telemetry, reset_call_telemetry
 from autopvs1_link.mcp.tools._pvs1_runners import run_cnv_pvs1, run_variant_pvs1
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
@@ -237,10 +238,14 @@ def register(mcp: FastMCP) -> None:
         meta_mode: Annotated[
             Any,
             Field(
-                description="Top-level metadata detail level.",
+                description=(
+                    "Metadata detail level: compact (default -- doi+pmid), "
+                    "full (adds verbatim citation text+url), or minimal "
+                    "(no citation)."
+                ),
                 json_schema_extra=META_MODE_SCHEMA,
             ),
-        ] = "full",
+        ] = "compact",
         include_unmet: Annotated[
             Any,
             Field(
@@ -300,7 +305,7 @@ def register(mcp: FastMCP) -> None:
         Aggregated codes carry ``count`` (distinct items) and the sorted
         ``affected_indices`` list. Order is first-seen-code-first.
         """
-        normalized_meta_mode: MetaMode = "full"
+        normalized_meta_mode: MetaMode = "compact"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)
             normalized_response_mode = normalize_response_mode(response_mode)
@@ -383,6 +388,7 @@ def register(mcp: FastMCP) -> None:
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_VARIANTS_BULK_TOOL,
+            next_commands=bulk_retry_failed("get_variant_pvs1_data", results, "variant_id"),
             **aggregate_kwargs,
         )
 
@@ -424,10 +430,14 @@ def register(mcp: FastMCP) -> None:
         meta_mode: Annotated[
             Any,
             Field(
-                description="Top-level metadata detail level.",
+                description=(
+                    "Metadata detail level: compact (default -- doi+pmid), "
+                    "full (adds verbatim citation text+url), or minimal "
+                    "(no citation)."
+                ),
                 json_schema_extra=META_MODE_SCHEMA,
             ),
-        ] = "full",
+        ] = "compact",
         include_unmet: Annotated[
             Any,
             Field(
@@ -467,7 +477,7 @@ def register(mcp: FastMCP) -> None:
         carry ``count`` and ``affected_indices``; single-item codes do
         not. Order is first-seen-code-first.
         """
-        normalized_meta_mode: MetaMode = "full"
+        normalized_meta_mode: MetaMode = "compact"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)
             normalized_response_mode = normalize_response_mode(response_mode)
@@ -546,5 +556,6 @@ def register(mcp: FastMCP) -> None:
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_CNVS_BULK_TOOL,
+            next_commands=bulk_retry_failed("get_cnv_pvs1_data", results, "cnv_id"),
             **aggregate_kwargs,
         )

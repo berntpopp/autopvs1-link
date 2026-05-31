@@ -21,6 +21,7 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_meta_mode,
     normalize_response_mode,
 )
+from autopvs1_link.mcp.next_commands import widen_response_mode
 from autopvs1_link.mcp.presenters.variant import present_variant
 from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
@@ -88,10 +89,14 @@ def register(mcp: FastMCP) -> None:
         meta_mode: Annotated[
             Any,
             Field(
-                description="Metadata detail level: full, compact, or minimal.",
+                description=(
+                    "Metadata detail level: compact (default -- doi+pmid), "
+                    "full (adds verbatim citation text+url), or minimal "
+                    "(no citation)."
+                ),
                 json_schema_extra=META_MODE_SCHEMA,
             ),
-        ] = "full",
+        ] = "compact",
         include_unmet: Annotated[
             Any,
             Field(
@@ -117,7 +122,7 @@ def register(mcp: FastMCP) -> None:
         ``*_raw`` upstream fields. AutoPVS1 outputs are research-use only,
         not clinical decision support.
         """
-        normalized_meta_mode: MetaMode = "full"
+        normalized_meta_mode: MetaMode = "compact"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)
             normalized_response_mode = normalize_response_mode(response_mode)
@@ -141,6 +146,11 @@ def register(mcp: FastMCP) -> None:
                 warnings=resolution_warnings + warnings,
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
+                next_commands=widen_response_mode(
+                    _TOOL_NAME,
+                    {"genome_build": normalized_build, "variant_id": normalized_variant_id},
+                    normalized_response_mode,
+                ),
             )
         except InvalidMCPModeError as exc:
             return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode, tool_name=_TOOL_NAME)

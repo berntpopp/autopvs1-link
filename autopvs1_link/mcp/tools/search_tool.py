@@ -19,6 +19,7 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_meta_mode,
     normalize_response_mode,
 )
+from autopvs1_link.mcp.next_commands import search_next_page
 from autopvs1_link.mcp.presenters.search import present_search
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
 from autopvs1_link.mcp.validation import (
@@ -79,7 +80,11 @@ def register(mcp: FastMCP) -> None:
         cursor: Annotated[
             NullableStringParam,
             Field(
-                description="Opaque pagination token returned as next_cursor; do not construct.",
+                description=(
+                    "Pagination token from a prior response's next_cursor. "
+                    "Transparent base64url JSON today (you MAY decode it), but "
+                    "prefer echoing it back unchanged; it MAY become opaque later."
+                ),
             ),
         ] = None,
         genome_version: Annotated[
@@ -105,19 +110,24 @@ def register(mcp: FastMCP) -> None:
         meta_mode: Annotated[
             MetaModeParam,
             Field(
-                description="Metadata detail level: full, compact, or minimal.",
+                description=(
+                    "Metadata detail level: compact (default -- doi+pmid), "
+                    "full (adds verbatim citation text+url), or minimal "
+                    "(no citation)."
+                ),
             ),
-        ] = "full",
+        ] = "compact",
     ) -> ToolResponse:
         """Search AutoPVS1 by gene symbol or variant text.
 
         Use ``response_mode='ids_only'`` (lowest-bandwidth lookup) to
         resolve a query to an AutoPVS1 ``variant_id`` you can hand to
-        ``get_variant_pvs1_data``. ``next_cursor`` is opaque base64url;
-        pass it back unchanged. AutoPVS1 outputs are research-use only,
+        ``get_variant_pvs1_data``. ``next_cursor`` is base64url JSON today
+        (decodable) but treat it as an echo-back token; it MAY become
+        opaque later. AutoPVS1 outputs are research-use only,
         not clinical decision support.
         """
-        normalized_meta_mode: MetaMode = "full"
+        normalized_meta_mode: MetaMode = "compact"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)
             normalized_response_mode = normalize_response_mode(response_mode)
@@ -143,6 +153,14 @@ def register(mcp: FastMCP) -> None:
                 warnings=warnings,
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
+                next_commands=search_next_page(
+                    {
+                        "query": normalized_query,
+                        "genome_build": normalized_build,
+                        "limit": normalized_limit,
+                    },
+                    data.pagination.next_cursor,
+                ),
             )
         except InvalidMCPModeError as exc:
             return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode, tool_name=_TOOL_NAME)
