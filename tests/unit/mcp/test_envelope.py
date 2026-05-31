@@ -479,3 +479,20 @@ def test_error_envelope_without_candidates_drops_next_commands() -> None:
         tool_name="get_variant_pvs1_data",
     )
     assert "next_commands" not in result.structured_content["meta"]
+
+
+def test_ok_envelope_emits_cold_latency_only_on_cold_call() -> None:
+    cold = ok_envelope(
+        {"x": 1},
+        meta_mode="full",
+        tool_name="search_variants",
+        cache_status_override="miss",
+    )
+    assert cold["meta"]["expected_cold_latency_ms"] == 3000
+    warm = ok_envelope(
+        {"x": 1},
+        meta_mode="full",
+        tool_name="search_variants",
+        cache_status_override="hit",
+    )
+    assert "expected_cold_latency_ms" not in warm["meta"]

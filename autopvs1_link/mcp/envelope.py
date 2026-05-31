@@ -15,7 +15,7 @@ from pydantic.json_schema import SkipJsonSchema
 
 from autopvs1_link import __version__
 from autopvs1_link.config import settings
-from autopvs1_link.mcp.cost_tiers import SCRAPE_TIER, cost_tier_for
+from autopvs1_link.mcp.cost_tiers import SCRAPE_TIER, cold_latency_ms_for, cost_tier_for
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
 from autopvs1_link.mcp.next_commands import error_next_commands
 from autopvs1_link.mcp.registries import next_actions_for
@@ -165,6 +165,7 @@ class MCPMeta(BaseModel):
     cost_tier: str | None = None
     rate_limit_floor_ms: int | None = None
     next_call_earliest_at: str | None = None
+    expected_cold_latency_ms: int | None = None
     retry_after_ms: int | None = None
     next_actions: list[str] | None = None
     next_commands: list[dict[str, Any]] | None = None
@@ -345,6 +346,9 @@ def ok_envelope(
     )
     elapsed_ms = elapsed_ms_override if elapsed_ms_override is not None else telemetry_elapsed_ms
     cost_tier, rate_limit_floor_ms, next_call_earliest_at = _cost_hints_for(tool_name, cache_status)
+    expected_cold_latency_ms = (
+        cold_latency_ms_for(tool_name) if cache_status in ("miss", "coalesced") else None
+    )
     envelope: MCPEnvelope[Any] = MCPEnvelope(
         ok=True,
         data=payload,
@@ -357,6 +361,7 @@ def ok_envelope(
             cost_tier=cost_tier,
             rate_limit_floor_ms=rate_limit_floor_ms,
             next_call_earliest_at=next_call_earliest_at,
+            expected_cold_latency_ms=expected_cold_latency_ms,
             cached_count=cached_count,
             uncached_count=uncached_count,
             next_commands=next_commands,

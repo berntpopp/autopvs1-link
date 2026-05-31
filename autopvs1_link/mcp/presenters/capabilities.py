@@ -353,6 +353,12 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "Built only from upstream scraped node text; lets a "
                 "summary-mode caller explain the verdict without widening."
             ),
+            "meta.expected_cold_latency_ms": (
+                "Present only on cold scrape-tier responses (cache_status "
+                "miss/coalesced); the coarse first-call latency in ms, in "
+                "lockstep with the performance block's cold_call_seconds. "
+                "Absent on warm calls so callers do not over-budget."
+            ),
         },
         "bulk_behavior": {
             "max_items": 10,
