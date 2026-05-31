@@ -238,10 +238,14 @@ def register(mcp: FastMCP) -> None:
         meta_mode: Annotated[
             Any,
             Field(
-                description="Top-level metadata detail level.",
+                description=(
+                    "Metadata detail level: compact (default -- doi+pmid), "
+                    "full (adds verbatim citation text+url), or minimal "
+                    "(no citation)."
+                ),
                 json_schema_extra=META_MODE_SCHEMA,
             ),
-        ] = "full",
+        ] = "compact",
         include_unmet: Annotated[
             Any,
             Field(
@@ -301,7 +305,7 @@ def register(mcp: FastMCP) -> None:
         Aggregated codes carry ``count`` (distinct items) and the sorted
         ``affected_indices`` list. Order is first-seen-code-first.
         """
-        normalized_meta_mode: MetaMode = "full"
+        normalized_meta_mode: MetaMode = "compact"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)
             normalized_response_mode = normalize_response_mode(response_mode)
@@ -426,10 +430,14 @@ def register(mcp: FastMCP) -> None:
         meta_mode: Annotated[
             Any,
             Field(
-                description="Top-level metadata detail level.",
+                description=(
+                    "Metadata detail level: compact (default -- doi+pmid), "
+                    "full (adds verbatim citation text+url), or minimal "
+                    "(no citation)."
+                ),
                 json_schema_extra=META_MODE_SCHEMA,
             ),
-        ] = "full",
+        ] = "compact",
         include_unmet: Annotated[
             Any,
             Field(
@@ -469,7 +477,7 @@ def register(mcp: FastMCP) -> None:
         carry ``count`` and ``affected_indices``; single-item codes do
         not. Order is first-seen-code-first.
         """
-        normalized_meta_mode: MetaMode = "full"
+        normalized_meta_mode: MetaMode = "compact"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)
             normalized_response_mode = normalize_response_mode(response_mode)

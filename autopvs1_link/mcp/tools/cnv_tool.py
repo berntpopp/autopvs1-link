@@ -79,10 +79,14 @@ def register(mcp: FastMCP) -> None:
         meta_mode: Annotated[
             Any,
             Field(
-                description="Metadata detail level: full, compact, or minimal.",
+                description=(
+                    "Metadata detail level: compact (default -- doi+pmid), "
+                    "full (adds verbatim citation text+url), or minimal "
+                    "(no citation)."
+                ),
                 json_schema_extra=META_MODE_SCHEMA,
             ),
-        ] = "full",
+        ] = "compact",
         include_unmet: Annotated[
             Any,
             Field(
@@ -98,7 +102,7 @@ def register(mcp: FastMCP) -> None:
         for the full decision tree. AutoPVS1 outputs are research-use only,
         not clinical decision support.
         """
-        normalized_meta_mode: MetaMode = "full"
+        normalized_meta_mode: MetaMode = "compact"
         try:
             normalized_meta_mode = normalize_meta_mode(meta_mode)
             normalized_response_mode = normalize_response_mode(response_mode)

@@ -305,7 +305,7 @@ def ok_envelope(
     data: BaseModel | dict[str, Any],
     warnings: list[MCPWarning] | None = None,
     *,
-    meta_mode: Any = "full",
+    meta_mode: Any = "compact",
     tool_name: str | None = None,
     cache_status_override: str | None = None,
     elapsed_ms_override: float | None = None,
@@ -383,7 +383,7 @@ def error_envelope(
     suggestions: list[str] | None = None,
     details: dict[str, Any] | None = None,
     warnings: list[MCPWarning] | None = None,
-    meta_mode: Any = "full",
+    meta_mode: Any = "compact",
     tool_name: str | None = None,
     retry_after_ms: int | None = None,
 ) -> ErrorToolResult:

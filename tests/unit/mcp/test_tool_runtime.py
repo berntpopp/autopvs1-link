@@ -1613,3 +1613,45 @@ async def test_variant_success_offers_widen_next_command(mocker) -> None:
     cmds = result.structured_content["meta"]["next_commands"]
     assert cmds[0]["tool"] == "get_variant_pvs1_data"
     assert cmds[0]["arguments"]["response_mode"] == "standard"
+
+
+@pytest.mark.asyncio
+async def test_default_meta_mode_is_compact_and_validates_against_contract(mocker) -> None:
+    from autopvs1_link.mcp.contracts import VariantMCPEnvelope
+    from autopvs1_link.models.autopvs1_models import (
+        AutoPVS1Data,
+        FlowchartStep,
+        PVS1Flowchart,
+        VariantInfo,
+    )
+
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-82763936-A-T", variant_type="SNV", gene_symbol="POU3F4"
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF5",
+            final_strength="Strong",
+            decision_tree=[
+                FlowchartStep(code="Nonsense or Frameshift"),
+                FlowchartStep(code="Strong"),
+            ],
+        ),
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=mocker.AsyncMock(return_value=parsed),
+    )
+    mcp = build_mcp_server()
+    # No meta_mode passed -> must default to compact (citation trimmed to doi+pmid).
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
+    )
+    citation = result.structured_content["meta"]["recommended_citation"]
+    assert set(citation.keys()) == {"doi", "pmid"}
+
+    # Honor the MEMORY null-strip lesson: the default (compact) output still
+    # validates against the published envelope contract after null-stripping.
+    VariantMCPEnvelope.model_validate(result.structured_content)
