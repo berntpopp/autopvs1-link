@@ -345,6 +345,14 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "Strong / Very_Strong verdicts whose path code already "
                 "conveys the rationale."
             ),
+            "pvs1_flowchart.path_gloss": (
+                "One-line deterministic rationale: the decision-tree "
+                "branch the variant traversed plus the terminal strength "
+                "(ASCII '->' separated). Present for EVERY path in "
+                "summary, standard, and full tiers (absent in ids_only). "
+                "Built only from upstream scraped node text; lets a "
+                "summary-mode caller explain the verdict without widening."
+            ),
         },
         "bulk_behavior": {
             "max_items": 10,
