@@ -80,7 +80,11 @@ def register(mcp: FastMCP) -> None:
         cursor: Annotated[
             NullableStringParam,
             Field(
-                description="Opaque pagination token returned as next_cursor; do not construct.",
+                description=(
+                    "Pagination token from a prior response's next_cursor. "
+                    "Transparent base64url JSON today (you MAY decode it), but "
+                    "prefer echoing it back unchanged; it MAY become opaque later."
+                ),
             ),
         ] = None,
         genome_version: Annotated[
@@ -114,8 +118,9 @@ def register(mcp: FastMCP) -> None:
 
         Use ``response_mode='ids_only'`` (lowest-bandwidth lookup) to
         resolve a query to an AutoPVS1 ``variant_id`` you can hand to
-        ``get_variant_pvs1_data``. ``next_cursor`` is opaque base64url;
-        pass it back unchanged. AutoPVS1 outputs are research-use only,
+        ``get_variant_pvs1_data``. ``next_cursor`` is base64url JSON today
+        (decodable) but treat it as an echo-back token; it MAY become
+        opaque later. AutoPVS1 outputs are research-use only,
         not clinical decision support.
         """
         normalized_meta_mode: MetaMode = "full"

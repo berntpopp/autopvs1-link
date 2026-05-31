@@ -274,8 +274,8 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "limit_min": 1,
             "limit_max": 50,
             "cursor": (
-                "Opaque pagination token returned as next_cursor; "
-                "callers must pass it back unchanged."
+                "base64url JSON next_cursor token; transparent today "
+                "(decodable) but prefer echoing it back unchanged"
             ),
             "cursor_opacity": (
                 "Syntactic only: cursors are base64url-encoded JSON "

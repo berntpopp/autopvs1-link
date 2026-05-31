@@ -198,6 +198,20 @@ def test_decode_cursor_rejects_malformed_base64() -> None:
     assert exc.value.code == "invalid_search_cursor"
 
 
+def test_cursor_roundtrips_and_is_transparent_offset() -> None:
+    """The cursor is honestly a transparent base64url JSON offset token."""
+    from autopvs1_link.mcp.validation import _decode_cursor, _encode_cursor
+
+    cur = _encode_cursor(40)
+    assert _decode_cursor(cur) == 40
+    # Transparency contract: it really is base64url JSON of {"offset": 40}.
+    import base64
+    import json
+
+    padded = cur + "=" * (-len(cur) % 4)
+    assert json.loads(base64.urlsafe_b64decode(padded.encode()).decode()) == {"offset": 40}
+
+
 def test_decode_cursor_rejects_base64_without_offset_key() -> None:
     bad = base64.urlsafe_b64encode(json.dumps({"page": 1}).encode()).decode().rstrip("=")
     with pytest.raises(MCPInputError) as exc:
