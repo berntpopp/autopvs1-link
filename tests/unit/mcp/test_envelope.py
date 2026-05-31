@@ -14,7 +14,7 @@ def test_ok_envelope_contains_required_metadata() -> None:
     assert envelope["ok"] is True
     assert envelope["data"] == {"cleared": True, "message": "cleared"}
     assert envelope["error"] is None
-    assert envelope["meta"]["server_version"] == "1.1.0"
+    assert envelope["meta"]["server_version"] == "1.2.0"
     assert envelope["meta"]["research_use_only"] is True
     assert envelope["meta"]["recommended_citation"]["doi"] == "10.1002/humu.24051"
     UUID(envelope["meta"]["request_id"])
