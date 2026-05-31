@@ -1583,3 +1583,33 @@ async def test_search_variants_wire_returns_pagination_block_with_five_fields(mo
     assert pagination_two["offset"] == 10
     assert pagination_two["has_more"] is True
     assert pagination_two["previous_cursor"] is not None
+
+
+@pytest.mark.asyncio
+async def test_variant_success_offers_widen_next_command(mocker) -> None:
+    parsed = AutoPVS1Data(
+        genome_build="hg19",
+        variant_info=VariantInfo(
+            variant_id="X-82763936-A-T", variant_type="SNV", gene_symbol="POU3F4"
+        ),
+        pvs1_flowchart=PVS1Flowchart(
+            preliminary_decision_path="NF5",
+            final_strength="Strong",
+            decision_tree=[
+                FlowchartStep(code="Nonsense or Frameshift"),
+                FlowchartStep(code="Strong"),
+            ],
+        ),
+    )
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=mocker.AsyncMock(return_value=parsed),
+    )
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg19", "variant_id": "X-82763936-A-T", "response_mode": "summary"},
+    )
+    cmds = result.structured_content["meta"]["next_commands"]
+    assert cmds[0]["tool"] == "get_variant_pvs1_data"
+    assert cmds[0]["arguments"]["response_mode"] == "standard"

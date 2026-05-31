@@ -19,6 +19,7 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_meta_mode,
     normalize_response_mode,
 )
+from autopvs1_link.mcp.next_commands import search_next_page
 from autopvs1_link.mcp.presenters.search import present_search
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
 from autopvs1_link.mcp.validation import (
@@ -143,6 +144,14 @@ def register(mcp: FastMCP) -> None:
                 warnings=warnings,
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
+                next_commands=search_next_page(
+                    {
+                        "query": normalized_query,
+                        "genome_build": normalized_build,
+                        "limit": normalized_limit,
+                    },
+                    data.pagination.next_cursor,
+                ),
             )
         except InvalidMCPModeError as exc:
             return invalid_mode_envelope(exc, meta_mode=normalized_meta_mode, tool_name=_TOOL_NAME)

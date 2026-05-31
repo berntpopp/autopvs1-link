@@ -26,6 +26,7 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_meta_mode,
     normalize_response_mode,
 )
+from autopvs1_link.mcp.next_commands import bulk_retry_failed
 from autopvs1_link.mcp.telemetry import get_call_telemetry, reset_call_telemetry
 from autopvs1_link.mcp.tools._pvs1_runners import run_cnv_pvs1, run_variant_pvs1
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
@@ -383,6 +384,7 @@ def register(mcp: FastMCP) -> None:
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_VARIANTS_BULK_TOOL,
+            next_commands=bulk_retry_failed("get_variant_pvs1_data", results, "variant_id"),
             **aggregate_kwargs,
         )
 
@@ -546,5 +548,6 @@ def register(mcp: FastMCP) -> None:
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_CNVS_BULK_TOOL,
+            next_commands=bulk_retry_failed("get_cnv_pvs1_data", results, "cnv_id"),
             **aggregate_kwargs,
         )
