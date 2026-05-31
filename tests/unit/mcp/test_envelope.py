@@ -429,3 +429,53 @@ def test_ok_envelope_bulk_mixed_aggregate_overrides_telemetry() -> None:
         assert envelope["meta"]["uncached_count"] == 1
     finally:
         reset_call_telemetry()
+
+
+# ---------------------------------------------------------------------------
+# next_commands threading (groundedness polish)
+# ---------------------------------------------------------------------------
+
+
+def test_ok_envelope_carries_next_commands_when_supplied() -> None:
+    out = ok_envelope(
+        {"x": 1},
+        meta_mode="full",
+        tool_name="get_variant_pvs1_data",
+        next_commands=[{"tool": "get_variant_pvs1_data", "arguments": {"y": 2}, "reason": "r"}],
+    )
+    assert out["meta"]["next_commands"] == [
+        {"tool": "get_variant_pvs1_data", "arguments": {"y": 2}, "reason": "r"}
+    ]
+
+
+def test_ok_envelope_drops_next_commands_when_absent() -> None:
+    out = ok_envelope({"x": 1}, meta_mode="full", tool_name="get_variant_pvs1_data")
+    assert "next_commands" not in out["meta"]
+
+
+def test_error_envelope_derives_disambiguation_next_commands() -> None:
+    result = error_envelope(
+        code="requires_disambiguation",
+        message="pick one",
+        retryable=False,
+        details={"candidates": [{"id": "17-1-A-G", "genome_build": "hg38"}]},
+        tool_name="get_variant_pvs1_data",
+    )
+    meta = result.structured_content["meta"]
+    assert meta["next_commands"] == [
+        {
+            "tool": "get_variant_pvs1_data",
+            "arguments": {"variant_id": "17-1-A-G", "genome_build": "hg38"},
+            "reason": "Re-score with this disambiguated candidate id.",
+        }
+    ]
+
+
+def test_error_envelope_without_candidates_drops_next_commands() -> None:
+    result = error_envelope(
+        code="invalid_variant_id",
+        message="bad",
+        retryable=False,
+        tool_name="get_variant_pvs1_data",
+    )
+    assert "next_commands" not in result.structured_content["meta"]

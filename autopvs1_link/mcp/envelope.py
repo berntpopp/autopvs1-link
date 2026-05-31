@@ -17,6 +17,7 @@ from autopvs1_link import __version__
 from autopvs1_link.config import settings
 from autopvs1_link.mcp.cost_tiers import SCRAPE_TIER, cost_tier_for
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
+from autopvs1_link.mcp.next_commands import error_next_commands
 from autopvs1_link.mcp.registries import next_actions_for
 from autopvs1_link.mcp.telemetry import get_call_telemetry
 
@@ -166,6 +167,7 @@ class MCPMeta(BaseModel):
     next_call_earliest_at: str | None = None
     retry_after_ms: int | None = None
     next_actions: list[str] | None = None
+    next_commands: list[dict[str, Any]] | None = None
     cached_count: int | None = None
     uncached_count: int | None = None
 
@@ -240,6 +242,8 @@ def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
             "next_call_earliest_at",
             "retry_after_ms",
             "next_actions",
+            "next_commands",
+            "expected_cold_latency_ms",
             "cached_count",
             "uncached_count",
         ):
@@ -306,6 +310,7 @@ def ok_envelope(
     elapsed_ms_override: float | None = None,
     cached_count: int | None = None,
     uncached_count: int | None = None,
+    next_commands: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return a successful MCP envelope as a JSON-ready dict.
 
@@ -354,6 +359,7 @@ def ok_envelope(
             next_call_earliest_at=next_call_earliest_at,
             cached_count=cached_count,
             uncached_count=uncached_count,
+            next_commands=next_commands,
         ),
     )
     out = _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
@@ -427,6 +433,7 @@ def error_envelope(
             rate_limit_floor_ms=rate_limit_floor_ms,
             retry_after_ms=retry_after_ms,
             next_actions=next_actions_for(code),
+            next_commands=error_next_commands(code, details),
         ),
     )
     payload = envelope.model_dump(mode="json")
