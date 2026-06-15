@@ -4,6 +4,35 @@ All notable changes to autopvs1-link are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.0
+
+Adopts the [GeneFoundry Tool-Naming & Normalization Standard v1](https://github.com/berntpopp/autopvs1-link/issues/24)
+(closes #24). **No tool renames** — every tool name was already unprefixed,
+`verb_noun` snake_case, canonical-verb, and ≤ 50 chars, so this is a
+non-breaking MINOR release.
+
+### Added
+- Domain `tags` on every MCP tool (`variant`, `cnv`/`copy-number`,
+  `classification`, `discovery`, `bulk`, `meta`, `health`, `admin`) so the
+  `genefoundry-router` gateway can filter and curate the surfaced toolset.
+- `tests/unit/mcp/test_tool_names.py`: CI guard asserting every registered
+  tool name matches `^[a-z0-9_]{1,50}$`, starts with a canonical verb
+  (`get`/`search`/`list`/`resolve`/`find`/`compare`/`compute`), and never
+  self-prefixes the `autopvs1` namespace token. The gated, off-by-default
+  `clear_cache` (`clear` verb) is encoded as a documented exception.
+
+### Documentation
+- README now documents the canonical gateway **namespace token `autopvs1`**
+  (tools surface as `autopvs1_<tool>`) and the stable `serverInfo.name`
+  (`AutoPVS1 Link`), per Tool-Naming Standard v1 Rule 5.
+
+### Notes
+- `clear_cache` keeps the non-canonical `clear` verb as an approved
+  gated-destructive exception (off by default; never on the standard surface).
+- The `response_mode` enum (`ids_only|summary|standard|full`) and the
+  deprecated `genome_version` alias on `search_variants` are unchanged; both
+  are deferred to a future fleet-level decision / breaking release per #24.
+
 ## 1.2.0
 
 ### Changed (BREAKING)

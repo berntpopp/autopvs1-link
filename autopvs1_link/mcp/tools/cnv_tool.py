@@ -41,6 +41,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_cnv_pvs1_data",
         title="Get CNV PVS1 Data",
+        tags={"cnv", "copy-number", "classification"},
         output_schema=CNVMCPEnvelope.model_json_schema(),
         annotations=READ_ONLY_OPEN_WORLD,
     )

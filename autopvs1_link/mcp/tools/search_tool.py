@@ -52,6 +52,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="search_variants",
         title="Search AutoPVS1 Variants",
+        tags={"variant", "discovery"},
         output_schema=SearchMCPEnvelope.model_json_schema(),
         annotations=READ_ONLY_OPEN_WORLD,
     )

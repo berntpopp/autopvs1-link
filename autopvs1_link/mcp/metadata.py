@@ -39,6 +39,7 @@ def register_metadata(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_server_capabilities",
         title="Get AutoPVS1-Link Capabilities",
+        tags={"meta", "discovery"},
         output_schema=CompactCapabilitiesMCPEnvelope.model_json_schema(),
         annotations=READ_ONLY_CLOSED_WORLD,
     )

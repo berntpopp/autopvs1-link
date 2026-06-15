@@ -28,6 +28,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="clear_cache",
         title="Clear AutoPVS1-Link Cache",
+        tags={"meta", "admin"},
         output_schema=ClearCacheMCPEnvelope.model_json_schema(),
         annotations=DESTRUCTIVE_CLOSED_WORLD,
     )

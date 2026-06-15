@@ -203,6 +203,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_variants_pvs1_data_bulk",
         title="Get Variant PVS1 Data (Bulk)",
+        tags={"variant", "classification", "bulk"},
         output_schema=BulkVariantsMCPEnvelope.model_json_schema(),
         annotations=READ_ONLY_OPEN_WORLD,
     )
@@ -395,6 +396,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_cnvs_pvs1_data_bulk",
         title="Get CNV PVS1 Data (Bulk)",
+        tags={"cnv", "copy-number", "classification", "bulk"},
         output_schema=BulkCNVsMCPEnvelope.model_json_schema(),
         annotations=READ_ONLY_OPEN_WORLD,
     )

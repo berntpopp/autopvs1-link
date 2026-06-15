@@ -93,7 +93,7 @@ See [`docs/api.md`](docs/api.md) for the full reference.
 
 ### MCP tools and resources
 
-Default tools (5):
+Default tools (7):
 
 - `get_variant_pvs1_data(genome_build, variant_id)`
 - `get_cnv_pvs1_data(genome_build, cnv_id)`
@@ -101,10 +101,34 @@ Default tools (5):
 - `get_server_health()`
 - `get_server_capabilities()`
 
+Bulk tools:
+
+- `get_variants_pvs1_data_bulk(items, ...)`
+- `get_cnvs_pvs1_data_bulk(items, ...)`
+
 Opt-in destructive tool:
 
 - `clear_cache()` - registered only when
   `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`
+
+### GeneFoundry router / namespace token
+
+This server is a member of the GeneFoundry `*-link` MCP fleet and conforms to
+the [GeneFoundry Tool-Naming & Normalization Standard v1](https://github.com/berntpopp/autopvs1-link/issues/24).
+Tool names are left **unprefixed** (`get_variant_pvs1_data`, not
+`autopvs1_get_variant_pvs1_data`): namespacing is the gateway's job. When the
+`genefoundry-router` mounts this server it applies the canonical **namespace
+token `autopvs1`**, so tools surface at the gateway as `autopvs1_<tool>` (for
+example `autopvs1_get_variant_pvs1_data`). The stable `serverInfo.name` is
+**`AutoPVS1 Link`** (set in `autopvs1_link/mcp/server_info.py`).
+
+All tool names use the canonical verb set (`get`, `search`) and stay well under
+the 50-char limit. The sole exception is the gated, off-by-default `clear_cache`
+tool, whose `clear` verb is a documented exception for destructive cache
+management (it never pollutes the default surface). Tools also carry domain
+`tags` (`variant`, `cnv`/`copy-number`, `classification`, `discovery`, `bulk`,
+`meta`) so the gateway can filter and curate the surfaced toolset. The
+`tests/unit/mcp/test_tool_names.py` CI guard enforces this contract.
 
 Resources (2):
 
