@@ -6,6 +6,7 @@ from uuid import UUID
 from autopvs1_link.mcp.contracts import ClearCacheData, ClearCacheMCPEnvelope
 from autopvs1_link.mcp.envelope import MCPWarning, error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import MCPInputError
+from autopvs1_link.mcp.server_info import SERVER_VERSION
 
 
 def test_ok_envelope_contains_required_metadata() -> None:
@@ -14,7 +15,7 @@ def test_ok_envelope_contains_required_metadata() -> None:
     assert envelope["ok"] is True
     assert envelope["data"] == {"cleared": True, "message": "cleared"}
     assert envelope["error"] is None
-    assert envelope["meta"]["server_version"] == "1.2.0"
+    assert envelope["meta"]["server_version"] == SERVER_VERSION
     assert envelope["meta"]["research_use_only"] is True
     assert envelope["meta"]["recommended_citation"]["doi"] == "10.1002/humu.24051"
     UUID(envelope["meta"]["request_id"])

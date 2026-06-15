@@ -74,6 +74,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_server_health",
         title="Get AutoPVS1-Link Health",
+        tags={"meta", "health"},
         output_schema=HealthMCPEnvelope.model_json_schema(),
         annotations=READ_ONLY_CLOSED_WORLD,
     )

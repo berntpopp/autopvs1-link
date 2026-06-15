@@ -42,6 +42,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_variant_pvs1_data",
         title="Get Variant PVS1 Data",
+        tags={"variant", "classification"},
         output_schema=VariantMCPEnvelope.model_json_schema(),
         annotations=READ_ONLY_OPEN_WORLD,
     )
