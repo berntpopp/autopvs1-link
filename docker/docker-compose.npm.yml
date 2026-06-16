@@ -1,3 +1,7 @@
+# Pin the compose project name so layering base+prod+npm does not default to
+# the parent dir ("docker") and collide with other services' default project.
+name: autopvs1-link-npm
+
 services:
   autopvs1-link:
     ports: !reset []
@@ -11,4 +15,6 @@ services:
 networks:
   npm:
     external: true
-    name: nginx-proxy-manager_default
+    # Must match the network the Nginx Proxy Manager container is attached to
+    # (npm_default on the GeneFoundry VPS), not NPM's own compose-default net.
+    name: ${NPM_SHARED_NETWORK_NAME:-npm_default}
