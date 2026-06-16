@@ -16,6 +16,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp/autopvs1-link:rw,noexec,nosuid,size=64m,mode=1777
+      # gunicorn's control server writes a socket under the app user's home;
+      # give it a writable tmpfs so a read_only rootfs doesn't error on boot.
+      - /home/app/.gunicorn:rw,noexec,nosuid,size=8m,mode=1777
 
     security_opt:
       - no-new-privileges:true
