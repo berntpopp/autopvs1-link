@@ -118,11 +118,14 @@ class TestVariantEndpoints:
 
     @pytest.mark.asyncio
     async def test_health_endpoint(self, async_client):
-        """Test the health check endpoint."""
+        """Test the health check endpoint returns {status, version, transport}."""
         response = await async_client.get("http://test/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
+        assert "version" in data, "health must include 'version'"
+        assert "transport" in data, "health must include 'transport'"
+        assert data["transport"] == "streamable-http-stateless"
 
     @pytest.mark.asyncio
     @patch("autopvs1_link.api.autopvs1_client.AutoPVS1Client.get_variant_data")

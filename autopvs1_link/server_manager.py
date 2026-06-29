@@ -8,6 +8,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from autopvs1_link import __version__
 from autopvs1_link.api.client_manager import shutdown_clients
 from autopvs1_link.api.routes import cache, cnv, gene, variant
 from autopvs1_link.config import settings
@@ -72,7 +73,11 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "version": __version__,
+            "transport": "streamable-http-stateless",
+        }
 
     # Mount at root: the "/mcp" path is already baked into mcp_app's routes,
     # and the FastAPI routes registered above (/health, /api/...) take
