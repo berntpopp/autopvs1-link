@@ -2062,7 +2062,7 @@ cold scoring call.
               "type": "boolean"
             },
             "server": {
-              "default": "AutoPVS1 Link",
+              "default": "autopvs1-link",
               "title": "Server",
               "type": "string"
             },

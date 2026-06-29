@@ -76,6 +76,6 @@ def test_server_description_names_workflow_helper_prompt() -> None:
 
 def test_server_metadata_constants_are_well_formed() -> None:
     """SERVER_NAME / SERVER_VERSION shapes must stay legible to clients."""
-    assert SERVER_NAME == "AutoPVS1 Link"
+    assert SERVER_NAME == "autopvs1-link"
     assert SERVER_VERSION.count(".") == 2
     assert all(part.isdigit() for part in SERVER_VERSION.split("."))

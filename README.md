@@ -120,7 +120,8 @@ Tool names are left **unprefixed** (`get_variant_pvs1_data`, not
 `genefoundry-router` mounts this server it applies the canonical **namespace
 token `autopvs1`**, so tools surface at the gateway as `autopvs1_<tool>` (for
 example `autopvs1_get_variant_pvs1_data`). The stable `serverInfo.name` is
-**`AutoPVS1 Link`** (set in `autopvs1_link/mcp/server_info.py`).
+**`autopvs1-link`** (lowercase, hyphenated, matching the namespace; set in
+`autopvs1_link/mcp/server_info.py`).
 
 All tool names use the canonical verb set (`get`, `search`) and stay well under
 the 50-char limit. The sole exception is the gated, off-by-default `clear_cache`
