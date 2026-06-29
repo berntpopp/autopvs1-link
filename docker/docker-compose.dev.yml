@@ -3,7 +3,11 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-      target: builder
+      # Use the production stage so dev runs as the non-root `app` user with the
+      # package already installed (editable, pointing at /home/app/web). The old
+      # `target: builder` + `user: root` ran the dev container as root, which the
+      # Container & Deployment Hardening Standard v1 forbids for every stage.
+      target: production
 
     environment:
       AUTOPVS1_LINK_LOG_LEVEL: DEBUG
@@ -16,13 +20,10 @@ services:
       - ../pyproject.toml:/home/app/web/pyproject.toml:ro
       - ../README.md:/home/app/web/README.md:ro
 
+    # The image already did `pip install -e .` at build time, so dev just runs
+    # the app with auto-reload over the mounted source — no root, no reinstall.
     command: >
-      sh -c "
-        cd /home/app/web &&
-        pip install -e . &&
-        uvicorn autopvs1_link.server_manager:app --host 0.0.0.0 --port 8000 --reload --reload-dir autopvs1_link
-      "
-
-    user: root
+      uvicorn autopvs1_link.server_manager:app
+      --host 0.0.0.0 --port 8000 --reload --reload-dir autopvs1_link
 
     working_dir: /home/app/web

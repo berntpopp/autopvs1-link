@@ -123,6 +123,13 @@ class ServerConfig(BaseSettings):
                     raise ValueError(f"Invalid CORS origin: {origin}")
         return v
 
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """CORS origins as a list (``["*"]`` for the wildcard default)."""
+        if self.cors_origins == "*":
+            return ["*"]
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
 
 class LoggingConfig(BaseSettings):
     """Logging configuration settings."""

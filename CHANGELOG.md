@@ -4,6 +4,22 @@ All notable changes to autopvs1-link are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.1
+
+Adopts the GeneFoundry Container & Deployment Hardening Standard v1. Security/chore
+release, no API changes.
+
+### Security
+- Digest-pinned the `python:3.14-slim` base image (build now byte-reproducible).
+- Wired the previously dead `cors_origins` setting into the FastAPI app via
+  `CORSMiddleware`, and made it never pair wildcard origins with
+  `allow_credentials=True`.
+- Dev compose no longer runs as `root`: it now builds the production stage and
+  runs as the non-root `app` user (no stage runs as root).
+- `container-security` CI workflow now **fails on fixable HIGH/CRITICAL** Trivy
+  findings (in addition to the existing report + CycloneDX SBOM artifact).
+- Prod overlay log rotation raised to 50m x 5.
+
 ## 1.3.0
 
 Adopts the [GeneFoundry Tool-Naming & Normalization Standard v1](https://github.com/berntpopp/autopvs1-link/issues/24)

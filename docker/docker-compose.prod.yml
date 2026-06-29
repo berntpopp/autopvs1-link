@@ -45,3 +45,11 @@ services:
         delay: 5s
         max_attempts: 3
         window: 120s
+
+    # Bound log growth (Standard v1 rule 24); overrides the base 10m x 3.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=autopvs1-link,environment=production"
