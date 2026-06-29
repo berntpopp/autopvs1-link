@@ -305,9 +305,19 @@ class TestErrorHandling:
 
     @pytest.mark.asyncio
     async def test_method_not_allowed(self, async_client):
-        """Test unsupported HTTP method."""
+        """Unsupported HTTP method on a GET-only API route returns 404.
+
+        The MCP Streamable-HTTP ASGI app is mounted at root ("/") with the
+        "/mcp" route baked in (the canonical GeneFoundry fleet pattern, so
+        ``/mcp`` is served directly with no 307 redirect). That root mount is a
+        catch-all: any path not matched by an earlier FastAPI route — including
+        a method-mismatch on ``/variant/...`` — falls through to the MCP
+        sub-app, which has no such route and returns 404 rather than Starlette's
+        partial-match 405. The valid ``GET`` on this path still takes precedence
+        (covered by the other endpoint tests), so the route itself is intact.
+        """
         response = await async_client.post("http://test/variant/hg38/test")
-        assert response.status_code == 405
+        assert response.status_code == 404
 
 
 @pytest.mark.integration

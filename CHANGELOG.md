@@ -4,6 +4,20 @@ All notable changes to autopvs1-link are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- MCP Streamable-HTTP endpoint now serves `POST /mcp` directly (200) instead of
+  issuing a 307 redirect to `/mcp/`. The MCP route is now baked into the ASGI
+  sub-app (`http_app(path="/mcp")`) and the sub-app is mounted at root (`/`),
+  matching the rest of the GeneFoundry `-link` fleet. FastAPI routes
+  (`/health`, `/api/...`) still take precedence over the catch-all mount.
+
+### Changed
+- `serverInfo.name` standardized from `AutoPVS1 Link` to **`autopvs1-link`**
+  (lowercase, hyphenated, matching the `autopvs1` namespace token), per
+  Tool-Naming Standard v1 Rule 5.
+
 ## 1.3.1
 
 Adopts the GeneFoundry Container & Deployment Hardening Standard v1. Security/chore

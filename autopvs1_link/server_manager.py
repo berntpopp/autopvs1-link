@@ -22,8 +22,13 @@ def create_app() -> FastAPI:
     """Construct the FastAPI app, including the MCP Streamable-HTTP mount."""
     # Build the MCP server first so its lifespan can be chained.
     mcp = build_mcp_server()
+    # Bake the MCP route at the mcp path INSIDE the ASGI sub-app, then mount
+    # that sub-app at root ("/") below. Mounting the sub-app *at* "/mcp" would
+    # make Starlette's Mount emit a 307 trailing-slash redirect (/mcp -> /mcp/);
+    # baking "/mcp" into the sub-app and mounting at "/" serves /mcp directly,
+    # matching the rest of the GeneFoundry fleet (see gtex-link server_manager).
     mcp_app = mcp.http_app(
-        path="/",
+        path="/mcp",
         json_response=True,
         stateless_http=True,
     )
@@ -69,7 +74,10 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    app.mount("/mcp", mcp_app)
+    # Mount at root: the "/mcp" path is already baked into mcp_app's routes,
+    # and the FastAPI routes registered above (/health, /api/...) take
+    # precedence because they are matched before this catch-all mount.
+    app.mount("/", mcp_app)
     return app
 
 
