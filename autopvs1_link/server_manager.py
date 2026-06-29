@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from autopvs1_link.api.client_manager import shutdown_clients
 from autopvs1_link.api.routes import cache, cnv, gene, variant
@@ -44,6 +45,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.add_middleware(RequestLoggingMiddleware)
+    cors_origins = settings.server.cors_origins_list
+    # Never pair wildcard origins with credentials: browsers reject that
+    # combination and it is a CORS anti-pattern (reflected-origin credential
+    # exposure). Allow credentials only when an explicit allowlist is set.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=cors_origins != ["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     install_metrics(app)
     # Correlation middleware added LAST so it runs FIRST on requests, binding
     # the X-Request-ID before downstream middleware logs the request.
