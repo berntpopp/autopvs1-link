@@ -17,7 +17,7 @@ _COMPOSE = Path(__file__).resolve().parents[2] / "docker" / "docker-compose.prod
 
 
 def _prod_env() -> dict[str, object]:
-    data = yaml.load(_COMPOSE.read_text(), Loader=_ComposeLoader)
+    data = yaml.load(_COMPOSE.read_text(), Loader=_ComposeLoader)  # noqa: S506
     return data["services"]["autopvs1-link"]["environment"]
 
 
