@@ -63,3 +63,38 @@ def test_extract_client_ip_falls_back_to_request_client() -> None:
     request.headers = {}
     request.client.host = "10.0.0.1"
     assert mw._extract_client_ip(request) == "10.0.0.1"
+
+
+def test_request_log_context_omits_pii_by_default() -> None:
+    request = MagicMock()
+    request.method = "GET"
+    request.url.path = "/variant/17-43045712-G-A"
+    request.query_params = "genome=hg38"
+    request.headers = {"user-agent": "secret-agent", "x-forwarded-for": "8.8.8.8"}
+    request.client.host = "10.0.0.1"
+
+    mw = RequestLoggingMiddleware(app=MagicMock())
+    ctx = mw._request_log_context(request, "cid-123")
+
+    assert ctx == {
+        "correlation_id": "cid-123",
+        "method": "GET",
+        "path": "/variant/17-43045712-G-A",
+    }
+    assert "query_params" not in ctx
+    assert "client_ip" not in ctx
+    assert "user_agent" not in ctx
+
+
+def test_request_log_context_includes_client_ip_when_opted_in() -> None:
+    request = MagicMock()
+    request.method = "GET"
+    request.url.path = "/variant/17-43045712-G-A"
+    request.headers = {"user-agent": "ua-x", "x-forwarded-for": "8.8.8.8"}
+    request.client = None
+
+    mw = RequestLoggingMiddleware(app=MagicMock(), log_client_ip=True)
+    ctx = mw._request_log_context(request, "cid-123")
+
+    assert ctx["client_ip"] == "8.8.8.8"
+    assert ctx["user_agent"] == "ua-x"
