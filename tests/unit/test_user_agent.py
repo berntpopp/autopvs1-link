@@ -9,10 +9,7 @@ from autopvs1_link.config import APIConfig
 
 def test_default_user_agent_identifies_the_tool() -> None:
     ua = APIConfig().user_agent
-    assert ua == (
-        f"autopvs1-link/{__version__} "
-        "(+https://github.com/berntpopp/autopvs1-link)"
-    )
+    assert ua == (f"autopvs1-link/{__version__} (+https://github.com/berntpopp/autopvs1-link)")
     assert "Mozilla" not in ua
     assert "Chrome" not in ua
 

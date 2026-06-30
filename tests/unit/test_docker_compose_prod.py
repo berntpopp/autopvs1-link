@@ -13,9 +13,7 @@ class _ComposeLoader(yaml.SafeLoader):
 
 _ComposeLoader.add_constructor("!reset", lambda loader, node: None)
 
-_COMPOSE = (
-    Path(__file__).resolve().parents[2] / "docker" / "docker-compose.prod.yml"
-)
+_COMPOSE = Path(__file__).resolve().parents[2] / "docker" / "docker-compose.prod.yml"
 
 
 def _prod_env() -> dict[str, object]:
