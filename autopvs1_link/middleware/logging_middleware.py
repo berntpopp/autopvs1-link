@@ -1,5 +1,6 @@
 """Request logging middleware for enhanced observability."""
 
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -9,6 +10,28 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = structlog.get_logger()
+
+# Matches the two REST paths that carry per-variant genomic identifiers
+# (GDPR Art. 9 data):
+#   /variant/{genome_build}/{variant_id}
+#   /cnv/{genome_build}/{cnv_id}
+# Group 1: prefix including the genome_build (low-sensitivity, kept for
+# debugging); the final dynamic segment is redacted.
+_VARIANT_PATH_RE = re.compile(r"^(/(variant|cnv)/[^/]+)/(.+)$")
+
+
+def _sanitize_path(path: str) -> str:
+    """Redact GDPR Art. 9 genomic identifiers from REST paths before logging.
+
+    ``/variant/{genome_build}/{variant_id}`` and
+    ``/cnv/{genome_build}/{cnv_id}`` carry patient-derived variant IDs in the
+    final path segment.  This helper replaces that segment with the literal
+    ``<redacted>`` so it never enters a log field.  All other paths are
+    returned unchanged.
+    """
+    if m := _VARIANT_PATH_RE.match(path):
+        return f"{m.group(1)}/<redacted>"
+    return path
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -77,10 +100,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
 
-            # Log error with context
+            # Log error with context.
+            # ``error=str(e)`` is intentionally omitted: exception messages can
+            # echo patient-derived variant identifiers from the request path.
+            # ``error_type`` (exception class name) and ``exc_info=True``
+            # (full traceback) provide sufficient signal for debugging without
+            # leaking GDPR Art. 9 data.
             bound_logger.error(
                 "API request failed",
-                error=str(e),
                 error_type=type(e).__name__,
                 duration_ms=round(duration_ms, 2),
                 exc_info=True,
@@ -101,7 +128,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         context: dict[str, str] = {
             "correlation_id": correlation_id,
             "method": request.method,
-            "path": request.url.path,
+            "path": _sanitize_path(request.url.path),
         }
         if self.log_client_ip:
             context["client_ip"] = self._extract_client_ip(request)
