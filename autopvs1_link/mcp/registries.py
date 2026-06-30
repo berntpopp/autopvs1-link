@@ -137,6 +137,11 @@ KNOWN_WARNING_CODES: dict[str, str] = {
         "original input, the resolved id, the detected input form, and "
         "the resolver source so consumers can audit the resolution path."
     ),
+    "upstream_format_unrecognized": (
+        "AutoPVS1 returned a final PVS1 strength value that is not in the "
+        "recognized set. The scraped upstream HTML format may have changed; "
+        "treat this result as unverified pending a parser review."
+    ),
 }
 
 PAYLOAD_MODES: dict[str, PayloadModeSpec] = {

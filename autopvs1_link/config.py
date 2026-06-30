@@ -47,6 +47,18 @@ def _migrate_legacy_env() -> None:
 _migrate_legacy_env()
 
 
+def _default_user_agent() -> str:
+    """Honest outbound User-Agent: product token + version + project URL.
+
+    RFC 9110 product token (``name/version``) plus the RFC 9309 convention
+    of a descriptive identifier with a contact/info URL. No browser
+    spoofing — the upstream operator sees exactly what is calling.
+    """
+    from autopvs1_link import __version__
+
+    return f"autopvs1-link/{__version__} (+https://github.com/berntpopp/autopvs1-link)"
+
+
 class APIConfig(BaseSettings):
     """API-specific configuration settings."""
 
@@ -69,9 +81,8 @@ class APIConfig(BaseSettings):
         description="Delay between requests for rate limiting",
     )
     user_agent: str = Field(
-        default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        description="User agent string for HTTP requests",
+        default_factory=_default_user_agent,
+        description="Honest outbound User-Agent (tool/version + project URL).",
     )
 
 

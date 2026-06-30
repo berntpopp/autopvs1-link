@@ -4,7 +4,9 @@ services:
       - path: ../.env.docker.example
         required: false
     environment:
-      AUTOPVS1_LINK_LOG_LEVEL: INFO
+      # Drives the production preset: debug=False, level=WARNING (suppresses
+      # the per-request INFO log line that can carry variant IDs), JSON logs.
+      AUTOPVS1_LINK_ENVIRONMENT: production
       AUTOPVS1_LINK_LOG_JSON_FORMAT: "true"
       AUTOPVS1_LINK_PORT: 8000
     ports: !reset []

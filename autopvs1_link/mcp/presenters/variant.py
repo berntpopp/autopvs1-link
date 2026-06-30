@@ -60,6 +60,25 @@ _AMBIGUOUS_VERDICT_STRENGTHS = frozenset(
     }
 )
 
+# Mirrors autopvs1_parsers.PVS1_STRENGTH_LABELS plus the two sentinel
+# verdicts the client assigns when a section is missing/incompatible.
+# Anything outside this set means the scraped HTML shape changed.
+_KNOWN_FINAL_STRENGTHS = frozenset(
+    {
+        "VeryStrong",
+        "Strong",
+        "Moderate",
+        "Supporting",
+        "Not applicable",
+        "Unmet",
+        "Strong_RWS",
+        "Moderate_RWS",
+        "Supporting_RWS",
+        "PVS1_Not_Applicable",
+        "PVS1_Not_Determined",
+    }
+)
+
 
 def _terminal_note(
     *,
@@ -98,6 +117,18 @@ def _present_flowchart(
     raw["final_strength_source"] = "inferred" if final_strength_inferred else "asserted"
 
     final_strength = str(raw.get("final_strength") or "")
+    if final_strength not in _KNOWN_FINAL_STRENGTHS:
+        warnings.append(
+            MCPWarning(
+                code="upstream_format_unrecognized",
+                message=(
+                    "AutoPVS1 returned a final PVS1 strength "
+                    f"{final_strength!r} that is not in the recognized set; "
+                    "the scraped upstream HTML format may have changed. "
+                    "Treat this result as unverified pending a parser review."
+                ),
+            )
+        )
     if final_strength in {"PVS1_Not_Applicable", "PVS1_Not_Determined"}:
         warnings.append(
             MCPWarning(
