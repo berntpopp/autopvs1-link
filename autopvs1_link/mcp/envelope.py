@@ -19,7 +19,7 @@ from autopvs1_link.config import settings
 from autopvs1_link.mcp.cost_tiers import SCRAPE_TIER, cold_latency_ms_for, cost_tier_for
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
 from autopvs1_link.mcp.next_commands import error_next_commands
-from autopvs1_link.mcp.registries import next_actions_for
+from autopvs1_link.mcp.registries import capabilities_version, next_actions_for
 from autopvs1_link.mcp.telemetry import get_call_telemetry
 
 
@@ -121,7 +121,13 @@ class MCPError(BaseModel):
 
 
 class MCPMeta(BaseModel):
-    """Common metadata on every MCP tool envelope.
+    """Common metadata carried in the ``_meta`` block of every MCP tool envelope.
+
+    Response-Envelope Standard v1 field canon: ``tool``, ``request_id``,
+    tiered ``next_commands``, ``capabilities_version``, and provenance
+    (``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and
+    ``capabilities_version`` are populated by :func:`ok_envelope` /
+    :func:`error_envelope`; callers never set them directly.
 
     ``effective_chars`` is the byte length of the serialized ``data`` field
     (compact JSON). It lets LLM callers calibrate against the advertised
@@ -172,9 +178,11 @@ class MCPMeta(BaseModel):
     envelopes never carry these.
     """
 
+    tool: str | None = None
     request_id: str = Field(default_factory=lambda: correlation_id.get() or str(uuid4()))
     server_version: str = __version__
-    research_use_only: bool = True
+    capabilities_version: str | None = None
+    unsafe_for_clinical_use: bool = True
     recommended_citation: RecommendedCitation = Field(default_factory=RecommendedCitation)
     warnings: list[MCPWarning] = Field(default_factory=list)
     effective_chars: int | None = None
@@ -192,15 +200,6 @@ class MCPMeta(BaseModel):
     upstream: UpstreamProvenance | None = None
 
 
-class MCPEnvelope[DataT](BaseModel):
-    """Standard MCP tool response envelope."""
-
-    ok: bool
-    data: DataT | None
-    error: MCPError | None
-    meta: MCPMeta
-
-
 def _dump_warning(warning: MCPWarning) -> dict[str, Any]:
     return warning.model_dump(mode="json")
 
@@ -209,9 +208,70 @@ def _normalize_meta_mode(meta_mode: Any) -> MetaMode:
     return normalize_meta_mode(meta_mode)
 
 
+def _split_defs(schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Pop ``$defs`` off a pydantic JSON Schema so it can be re-hoisted to a new root.
+
+    ``$ref`` pointers (``#/$defs/Foo``) resolve against the schema ROOT, so
+    nesting a model's own schema as a property value only stays valid if
+    its ``$defs`` are hoisted alongside it rather than left nested.
+    """
+    schema = dict(schema)
+    defs = schema.pop("$defs", {})
+    schema.pop("title", None)
+    return schema, defs
+
+
+def success_output_schema(
+    data_model: type[BaseModel],
+    *,
+    collection_field: str | None = None,
+) -> dict[str, Any]:
+    """Build the MCP ``outputSchema`` for the flat Response-Envelope v1 banner.
+
+    Single-item tools (``collection_field=None``) get ``data_model``'s own
+    schema embedded as the ``result`` object. Collection tools pass the
+    ``data_model`` field name whose array becomes the canonical top-level
+    ``results`` key (Response-Envelope Standard v1 §1); every other field
+    on ``data_model`` becomes a sibling top-level key (e.g. ``pagination``,
+    ``total_count``) rather than a nested alias.
+
+    The frame declares both the success shape (``result``/``results``) and
+    the flat error shape (``error_code``/``message``/``retryable``/
+    ``recovery_action``) as optional properties on one schema, matching the
+    envelope's existing non-discriminated-union pattern: a given response is
+    one or the other, never both.
+    """
+    inner, inner_defs = _split_defs(data_model.model_json_schema())
+    meta_schema, meta_defs = _split_defs(MCPMeta.model_json_schema())
+    properties: dict[str, Any] = {
+        "success": {"type": "boolean"},
+        "error_code": {"type": "string"},
+        "message": {"type": "string"},
+        "retryable": {"type": "boolean"},
+        "recovery_action": {"type": "string"},
+        "_meta": meta_schema,
+    }
+    if collection_field is None:
+        properties["result"] = inner
+    else:
+        inner_properties = dict(inner.get("properties", {}))
+        results_schema = inner_properties.pop(collection_field, {"type": "array"})
+        properties["results"] = results_schema
+        properties.update(inner_properties)
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+        "required": ["success", "_meta"],
+    }
+    defs = {**inner_defs, **meta_defs}
+    if defs:
+        schema["$defs"] = defs
+    return schema
+
+
 def _apply_meta_mode(payload: dict[str, Any], meta_mode: Any) -> dict[str, Any]:
     mode = _normalize_meta_mode(meta_mode)
-    meta = payload["meta"]
+    meta = payload["_meta"]
     if mode == "compact":
         citation = RecommendedCitation()
         meta["recommended_citation"] = {
@@ -250,11 +310,15 @@ def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
     ``None`` and the fields would otherwise ship as ``null`` and mislead
     callers reading them as ``0ms`` or as advertised latency hints that
     do not apply. ``retry_after_ms`` is also stripped on success
-    envelopes.
+    envelopes. ``tool`` drops when a low-level caller built an envelope
+    without threading ``tool_name`` through (every registered MCP tool
+    passes it; this only affects internal/unit-test call sites).
     """
-    meta = payload.get("meta")
+    meta = payload.get("_meta")
     if isinstance(meta, dict):
         for key in (
+            "tool",
+            "effective_chars",
             "elapsed_ms",
             "cache_status",
             "cost_tier",
@@ -311,7 +375,7 @@ def _strip_none_warning_aggregate_fields(payload: dict[str, Any]) -> dict[str, A
     Pydantic emits them as ``null`` by default; we want them absent for
     single-tool callers and present (non-null) for aggregated bulk warnings.
     """
-    meta = payload.get("meta")
+    meta = payload.get("_meta")
     if isinstance(meta, dict):
         warnings = meta.get("warnings") or []
         for warning in warnings:
@@ -327,6 +391,24 @@ _RETRYABLE_TRANSIENT_CODES = frozenset(
 )
 
 
+def _recovery_action_for(
+    suggestions: list[str] | None,
+    next_actions: list[str] | None,
+) -> str | None:
+    """Pick one imperative hint for the flat banner's ``recovery_action``.
+
+    Prefers the call-specific ``suggestions`` (more precise for this exact
+    failure) over the generic per-code ``next_actions`` registry entry, so
+    the model gets the single most actionable instruction. ``None`` when
+    neither is available (kept absent from the wire, not null).
+    """
+    if suggestions:
+        return suggestions[0]
+    if next_actions:
+        return next_actions[0]
+    return None
+
+
 def ok_envelope(
     data: BaseModel | dict[str, Any],
     warnings: list[MCPWarning] | None = None,
@@ -338,20 +420,27 @@ def ok_envelope(
     cached_count: int | None = None,
     uncached_count: int | None = None,
     next_commands: list[dict[str, Any]] | None = None,
+    collection_field: str | None = None,
 ) -> dict[str, Any]:
-    """Return a successful MCP envelope as a JSON-ready dict.
+    """Return a successful MCP envelope as a JSON-ready dict (Response-Envelope Standard v1).
 
     Null leaves are always stripped from the inner data dump so the wire
     payload reflects the response_mode-shaped contract rather than the
     Pydantic schema's optional-with-default-None scaffolding. The outer
-    envelope ``ok``/``data``/``error``/``meta`` shape is preserved so the
-    documented ``required_fields`` contract still holds.
+    frame is the flat banner: ``{"success": true, "result"|"results": ...,
+    "_meta": {...}}`` — never a nested wrapper.
+
+    ``collection_field`` names the field on ``data`` (once dumped) whose
+    list value is hoisted to the canonical top-level ``results`` key; every
+    other field on ``data`` becomes a sibling top-level key (e.g. a search
+    page's ``pagination``, ``total_count``). ``None`` (default) keeps the
+    whole dump as the single top-level ``result`` object.
 
     ``tool_name`` enables cost-tier and rate-limit-floor hints in
-    ``meta``; pass the declared MCP tool name (e.g.
-    ``"get_variant_pvs1_data"``) so the envelope can look up the
-    tier registered in :mod:`autopvs1_link.mcp.cost_tiers` without each
-    caller hard-coding the value.
+    ``_meta``, and is echoed verbatim as ``_meta.tool``; pass the declared
+    MCP tool name (e.g. ``"get_variant_pvs1_data"``) so the envelope can
+    look up the tier registered in :mod:`autopvs1_link.mcp.cost_tiers`
+    without each caller hard-coding the value.
 
     ``cache_status_override`` and ``elapsed_ms_override`` let bulk tools
     supply an aggregate across per-item upstream calls instead of the
@@ -364,7 +453,7 @@ def ok_envelope(
     if isinstance(data, BaseModel):
         payload = data.model_dump(mode="json", exclude_none=True)
     else:
-        payload = data
+        payload = dict(data)
     effective_chars = len(json.dumps(payload, separators=(",", ":")))
     telemetry_elapsed_ms, telemetry_cache_status = get_call_telemetry()
     cache_status = (
@@ -376,26 +465,30 @@ def ok_envelope(
         cold_latency_ms_for(tool_name) if cache_status in ("miss", "coalesced") else None
     )
     upstream = _upstream_provenance() if cost_tier == SCRAPE_TIER else None
-    envelope: MCPEnvelope[Any] = MCPEnvelope(
-        ok=True,
-        data=payload,
-        error=None,
-        meta=MCPMeta(
-            warnings=warnings or [],
-            effective_chars=effective_chars,
-            elapsed_ms=round(elapsed_ms, 2) if elapsed_ms is not None else None,
-            cache_status=cache_status,
-            cost_tier=cost_tier,
-            rate_limit_floor_ms=rate_limit_floor_ms,
-            next_call_earliest_at=next_call_earliest_at,
-            expected_cold_latency_ms=expected_cold_latency_ms,
-            cached_count=cached_count,
-            uncached_count=uncached_count,
-            next_commands=next_commands,
-            upstream=upstream,
-        ),
+    meta = MCPMeta(
+        tool=tool_name,
+        capabilities_version=capabilities_version(),
+        warnings=warnings or [],
+        effective_chars=effective_chars,
+        elapsed_ms=round(elapsed_ms, 2) if elapsed_ms is not None else None,
+        cache_status=cache_status,
+        cost_tier=cost_tier,
+        rate_limit_floor_ms=rate_limit_floor_ms,
+        next_call_earliest_at=next_call_earliest_at,
+        expected_cold_latency_ms=expected_cold_latency_ms,
+        cached_count=cached_count,
+        uncached_count=uncached_count,
+        next_commands=next_commands,
+        upstream=upstream,
     )
-    out = _apply_meta_mode(envelope.model_dump(mode="json"), meta_mode)
+    banner: dict[str, Any] = {"success": True}
+    if collection_field is None:
+        banner["result"] = payload
+    else:
+        banner["results"] = payload.pop(collection_field, [])
+        banner.update(payload)
+    banner["_meta"] = meta.model_dump(mode="json")
+    out = _apply_meta_mode(banner, meta_mode)
     cleaned = _strip_none_error_details(out)
     assert isinstance(cleaned, dict)
     cleaned = _strip_none_warning_aggregate_fields(cleaned)
@@ -417,10 +510,11 @@ def error_envelope(
 ) -> ErrorToolResult:
     """Return a failed MCP result that flips ``CallToolResult.isError=true``.
 
-    The structured payload retains the canonical ``ok/data/error/meta`` shape,
-    so dict-style callers (and existing tests) keep working. The wire-level
-    ``isError`` flag is set so MCP-spec clients can distinguish failed calls
-    from successful ones without parsing the envelope.
+    The structured payload is the Response-Envelope Standard v1 flat error
+    frame: ``{"success": false, "error_code", "message", "retryable",
+    "recovery_action", "_meta"}`` — no nested ``error`` object. The
+    wire-level ``isError`` flag is set so MCP-spec clients can distinguish
+    failed calls from successful ones without parsing the envelope.
 
     For transient upstream errors (``upstream_timeout``,
     ``upstream_unavailable``, ``external_resolver_unavailable``) we
@@ -450,32 +544,36 @@ def error_envelope(
         and code in _RETRYABLE_TRANSIENT_CODES
     ):
         retry_after_ms = rate_limit_floor_ms
-    envelope: MCPEnvelope[Any] = MCPEnvelope(
-        ok=False,
-        data=None,
-        error=MCPError(
-            code=code,
-            message=message,
-            retryable=retryable,
-            suggestions=suggestions or [],
-            details=details,
-        ),
-        meta=MCPMeta(
-            warnings=warnings or [],
-            cost_tier=cost_tier,
-            rate_limit_floor_ms=rate_limit_floor_ms,
-            retry_after_ms=retry_after_ms,
-            next_actions=next_actions_for(code),
-            next_commands=error_next_commands(code, details),
-        ),
+    next_actions = next_actions_for(code)
+    meta = MCPMeta(
+        tool=tool_name,
+        capabilities_version=capabilities_version(),
+        warnings=warnings or [],
+        cost_tier=cost_tier,
+        rate_limit_floor_ms=rate_limit_floor_ms,
+        retry_after_ms=retry_after_ms,
+        next_actions=next_actions,
+        next_commands=error_next_commands(code, details),
     )
-    payload = envelope.model_dump(mode="json")
-    if payload["error"]["details"] is None:
-        payload["error"].pop("details")
+    payload: dict[str, Any] = {
+        "success": False,
+        "error_code": code,
+        "message": message,
+        "retryable": retryable,
+        "recovery_action": _recovery_action_for(suggestions, next_actions),
+        "_meta": meta.model_dump(mode="json"),
+    }
+    if payload["recovery_action"] is None:
+        payload.pop("recovery_action")
+    if suggestions:
+        payload["suggestions"] = suggestions
+    if details:
+        payload["details"] = details
     payload = _apply_meta_mode(payload, meta_mode)
     payload = _strip_none_warning_aggregate_fields(payload)
     payload = _strip_none_telemetry_fields(payload)
     return ErrorToolResult(
         content=[TextContent(type="text", text=json.dumps(payload, separators=(",", ":")))],
         structured_content=payload,
+        is_error=True,
     )

@@ -37,11 +37,16 @@ The destructive `clear_cache()` tool is not registered on the default MCP
 surface. It appears only when
 `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true` is set before server startup.
 
-All MCP tools return structured content with the standard envelope:
-`ok`, `data`, `error`, and `meta`. `meta.research_use_only` is always `true`,
-and `meta.recommended_citation` cites AutoPVS1. Expected validation and
-upstream failures use `ok: false` with stable `error.code` values rather than
-raw HTML, tracebacks, or JSON-RPC protocol failures.
+All MCP tools return structured content using the GeneFoundry
+[Response-Envelope Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/RESPONSE-ENVELOPE-STANDARD-v1.md)
+flat banner: `{"success": true, "result"|"results", "_meta"}` on success
+(single-item tools use `result`; `search_variants` and the bulk tools use
+`results`), `{"success": false, "error_code", "message", "retryable",
+"recovery_action", "_meta"}` on failure with MCP `isError: true`.
+`_meta.unsafe_for_clinical_use` is always `true`, and
+`_meta.recommended_citation` cites AutoPVS1. Expected validation and
+upstream failures use `success: false` with stable `error_code` values
+rather than raw HTML, tracebacks, or JSON-RPC protocol failures.
 
 Read tools accept optional response-shaping controls:
 
@@ -57,17 +62,18 @@ Read tools accept optional response-shaping controls:
 
 CNV validation accepts AutoPVS1 hyphen IDs and rejects colon-form input with a
 structured correction when possible. For example,
-`chr11:2797090-2869333:DEL` returns `ok: false`,
-`error.code: "invalid_cnv_id"`, and
-`error.details.corrected_id: "11-2797090-2869333-DEL"`.
+`chr11:2797090-2869333:DEL` returns `success: false`,
+`error_code: "invalid_cnv_id"`, and
+`details.corrected_id: "11-2797090-2869333-DEL"`.
 
 Search pagination uses `limit` and `cursor`. The first call may omit `cursor`;
-when `data.pagination.next_cursor` is present, pass that opaque token back as
+when `pagination.next_cursor` is present, pass that opaque token back as
 the next call's `cursor`. Cursors are base64url-encoded; callers must not
-parse or construct them. `data.pagination` also carries `previous_cursor`,
-`has_more`, `offset`, and `total_count_kind`. `limit` defaults to 10 and is
-bounded to the server-supported range. If `genome_build` is omitted, MCP
-search defaults to `hg38` and emits a `default_genome_build_used` warning.
+parse or construct them. `search_variants`' top-level `pagination` also
+carries `previous_cursor`, `has_more`, `offset`, and `total_count_kind`.
+`limit` defaults to 10 and is bounded to the server-supported range. If
+`genome_build` is omitted, MCP search defaults to `hg38` and emits a
+`default_genome_build_used` warning.
 
 ### Available Prompts
 

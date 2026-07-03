@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from autopvs1_link.mcp.envelope import MCPEnvelope, MCPError
+from autopvs1_link.mcp.envelope import MCPError
 
 GenomeBuild = Literal["hg19", "hg38"]
 ExampleValue = Any
@@ -363,14 +363,6 @@ class CacheStatisticsResource(BaseModel):
     statistics: dict[str, CacheStatBlock]
 
 
-class VariantMCPEnvelope(MCPEnvelope[VariantMCPData]):
-    """Envelope schema for ``get_variant_pvs1_data``."""
-
-
-class CNVMCPEnvelope(MCPEnvelope[CNVMCPData]):
-    """Envelope schema for ``get_cnv_pvs1_data``."""
-
-
 class BulkVariantPVS1InputItem(BaseModel):
     """One item in a bulk variant PVS1 request."""
 
@@ -463,23 +455,3 @@ class BulkCNVsMCPData(BaseModel):
     succeeded: int
     failed: int
     items: list[BulkCNVPVS1ResultItem] = Field(default_factory=list)
-
-
-class BulkVariantsMCPEnvelope(MCPEnvelope[BulkVariantsMCPData]):
-    """Envelope schema for ``get_variants_pvs1_data_bulk``."""
-
-
-class BulkCNVsMCPEnvelope(MCPEnvelope[BulkCNVsMCPData]):
-    """Envelope schema for ``get_cnvs_pvs1_data_bulk``."""
-
-
-class SearchMCPEnvelope(MCPEnvelope[SearchMCPData]):
-    """Envelope schema for ``search_variants``."""
-
-
-class CompactCapabilitiesMCPEnvelope(MCPEnvelope[CompactCapabilitiesData]):
-    """Envelope schema for ``get_server_capabilities``."""
-
-
-class ClearCacheMCPEnvelope(MCPEnvelope[ClearCacheData]):
-    """Envelope schema for ``clear_cache``."""

@@ -558,13 +558,13 @@ def test_ok_envelope_standard_mode_data_has_no_null_leaves() -> None:
         response_mode="standard",
     )
     envelope = ok_envelope(data, warnings=warnings)
-    hit = _has_null_field(envelope["data"])
+    hit = _has_null_field(envelope["result"])
     assert hit is None, f"standard-mode wire data must drop null fields; first hit: {hit}"
     # And the specific fields the LLM-consumer flagged are gone:
-    assert "decision_tree_raw" not in envelope["data"]["pvs1_flowchart"]
-    assert "external_links_raw" not in envelope["data"]["variant_info"]
+    assert "decision_tree_raw" not in envelope["result"]["pvs1_flowchart"]
+    assert "external_links_raw" not in envelope["result"]["variant_info"]
     # Inner dict nulls inside external_links are semantically intentional and stay.
-    assert envelope["data"]["variant_info"]["external_links"]["ClinVar"] is None
+    assert envelope["result"]["variant_info"]["external_links"]["ClinVar"] is None
 
 
 def test_ok_envelope_full_mode_data_has_no_null_fields() -> None:
@@ -576,11 +576,11 @@ def test_ok_envelope_full_mode_data_has_no_null_fields() -> None:
         response_mode="full",
     )
     envelope = ok_envelope(data, warnings=warnings)
-    hit = _has_null_field(envelope["data"])
+    hit = _has_null_field(envelope["result"])
     assert hit is None, f"full-mode wire data must drop null fields; first hit: {hit}"
     # And the audit fields are still present:
-    assert "decision_tree_raw" in envelope["data"]["pvs1_flowchart"]
-    assert "external_links_raw" in envelope["data"]["variant_info"]
+    assert "decision_tree_raw" in envelope["result"]["pvs1_flowchart"]
+    assert "external_links_raw" in envelope["result"]["variant_info"]
 
 
 def test_present_variant_summary_drops_invalid_external_link_warning() -> None:
