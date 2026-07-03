@@ -6,6 +6,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 2.0.0
+
+**BREAKING.** Adopts the [GeneFoundry Response-Envelope Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/RESPONSE-ENVELOPE-STANDARD-v1.md)
+flat banner. Every MCP tool's `structuredContent` shape changed; there is no
+compatibility shim (pre-alpha fleet standard). Migration: replace `ok` reads
+with `success`; replace `data` reads with `result` (single-item tools:
+`get_variant_pvs1_data`, `get_cnv_pvs1_data`, `get_server_health`,
+`get_server_capabilities`, `clear_cache`) or `results` plus sibling
+top-level keys (collection tools: `search_variants` — `pagination`,
+`total_count`, etc. move to the top level; the bulk tools — `total`,
+`attempted`, `succeeded`, `failed` move to the top level, and the aggregate
+list is renamed `items` -> `results`); replace `error.code` /
+`error.message` / `error.retryable` / `error.suggestions` /
+`error.details` reads with the flat top-level `error_code`, `message`,
+`retryable`, `suggestions`, `details`, plus a new `recovery_action` hint;
+replace `meta` reads with `_meta` (`meta.research_use_only` is now
+`_meta.unsafe_for_clinical_use`; `_meta` gains `tool` and
+`capabilities_version`). Per-item bulk envelopes (`results[i]` ->
+`{ok, input, data, error, meta}`) are unchanged — the standard governs the
+outer MCP result frame only.
+
 ### Fixed
 - MCP Streamable-HTTP endpoint now serves `POST /mcp` directly (200) instead of
   issuing a 307 redirect to `/mcp/`. The MCP route is now baked into the ASGI

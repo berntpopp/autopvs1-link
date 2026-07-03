@@ -39,7 +39,7 @@ def _resolve_ref(root: JsonSchema, schema: JsonSchema) -> JsonSchema:
 
 
 def _data_schema(output_schema: JsonSchema) -> JsonSchema:
-    return _non_null_schema(output_schema["properties"]["data"])
+    return _non_null_schema(output_schema["properties"]["result"])
 
 
 def _property_schema(root: JsonSchema, schema: JsonSchema, property_name: str) -> JsonSchema:
@@ -110,7 +110,15 @@ async def test_clear_cache_is_registered_only_when_destructive_tools_enabled(mon
     schema = tools["clear_cache"].parameters
     assert schema.get("properties", {}) == {}
     assert "_" not in schema.get("properties", {})
-    assert set(tools["clear_cache"].output_schema["properties"]) == {"ok", "data", "error", "meta"}
+    assert set(tools["clear_cache"].output_schema["properties"]) == {
+        "success",
+        "result",
+        "error_code",
+        "message",
+        "retryable",
+        "recovery_action",
+        "_meta",
+    }
 
 
 @pytest.mark.asyncio
@@ -202,7 +210,15 @@ async def test_data_tools_have_titles_annotations_and_output_schemas() -> None:
         tool = tools[name]
         assert tool.title
         assert tool.output_schema is not None
-        assert set(tool.output_schema["properties"]) == {"ok", "data", "error", "meta"}
+        assert set(tool.output_schema["properties"]) == {
+            "success",
+            "result",
+            "error_code",
+            "message",
+            "retryable",
+            "recovery_action",
+            "_meta",
+        }
         assert tool.annotations is not None
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False
@@ -268,8 +284,7 @@ async def test_data_tool_output_schemas_expose_typed_nested_payloads() -> None:
     )
 
     search_schema = tools["search_variants"].output_schema
-    search_data = _data_schema(search_schema)
-    search_result = _resolve_ref(search_schema, search_data["properties"]["results"]["items"])
+    search_result = _resolve_ref(search_schema, search_schema["properties"]["results"]["items"])
     _assert_typed_object_schema(
         search_schema,
         search_result,

@@ -70,361 +70,9 @@ not clinical decision support.
 
 ```json
 {
-  "description": "Envelope schema for ``get_cnv_pvs1_data``.",
   "properties": {
-    "data": {
-      "anyOf": [
-        {
-          "description": "MCP-presented CNV data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
-          "properties": {
-            "cnv_info": {
-              "description": "Typed copy-number variant information exposed through MCP.\n\nOnly ``cnv_id`` is required at the contract level; the other fields\nare dropped when ``response_mode='ids_only'``.",
-              "properties": {
-                "cnv_id": {
-                  "title": "Cnv Id",
-                  "type": "string"
-                },
-                "cnv_type": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Cnv Type"
-                },
-                "coordinates": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Coordinates"
-                },
-                "gene_symbol": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Gene Symbol"
-                },
-                "size": {
-                  "anyOf": [
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Size"
-                }
-              },
-              "required": [
-                "cnv_id"
-              ],
-              "title": "CNVInfoMCP",
-              "type": "object"
-            },
-            "disease_mechanisms": {
-              "items": {
-                "description": "Typed disease mechanism row from AutoPVS1.",
-                "properties": {
-                  "adjusted_strength": {
-                    "title": "Adjusted Strength",
-                    "type": "string"
-                  },
-                  "clinical_validity": {
-                    "title": "Clinical Validity",
-                    "type": "string"
-                  },
-                  "consideration": {
-                    "title": "Consideration",
-                    "type": "string"
-                  },
-                  "disease": {
-                    "title": "Disease",
-                    "type": "string"
-                  },
-                  "disease_url": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Disease Url"
-                  },
-                  "gene": {
-                    "title": "Gene",
-                    "type": "string"
-                  },
-                  "gene_url": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Gene Url"
-                  },
-                  "inheritance": {
-                    "title": "Inheritance",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "gene",
-                  "disease",
-                  "inheritance",
-                  "clinical_validity",
-                  "consideration",
-                  "adjusted_strength"
-                ],
-                "title": "DiseaseMechanismMCP",
-                "type": "object"
-              },
-              "title": "Disease Mechanisms",
-              "type": "array"
-            },
-            "genome_build": {
-              "title": "Genome Build",
-              "type": "string"
-            },
-            "pvs1_flowchart": {
-              "anyOf": [
-                {
-                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
-                  "properties": {
-                    "decision_tree": {
-                      "items": {
-                        "description": "One typed step in the PVS1 decision flowchart.",
-                        "properties": {
-                          "code": {
-                            "title": "Code",
-                            "type": "string"
-                          },
-                          "description": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Description"
-                          },
-                          "note_id": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Note Id"
-                          },
-                          "note_text": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Note Text"
-                          }
-                        },
-                        "required": [
-                          "code"
-                        ],
-                        "title": "FlowchartStepMCP",
-                        "type": "object"
-                      },
-                      "title": "Decision Tree",
-                      "type": "array"
-                    },
-                    "decision_tree_raw": {
-                      "anyOf": [
-                        {
-                          "items": {
-                            "additionalProperties": true,
-                            "type": "object"
-                          },
-                          "type": "array"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Decision Tree Raw"
-                    },
-                    "final_strength": {
-                      "title": "Final Strength",
-                      "type": "string"
-                    },
-                    "final_strength_source": {
-                      "default": "asserted",
-                      "enum": [
-                        "asserted",
-                        "inferred"
-                      ],
-                      "title": "Final Strength Source",
-                      "type": "string"
-                    },
-                    "notes": {
-                      "anyOf": [
-                        {
-                          "additionalProperties": {
-                            "type": "string"
-                          },
-                          "type": "object"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Notes"
-                    },
-                    "path_gloss": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Path Gloss"
-                    },
-                    "preliminary_decision_path": {
-                      "title": "Preliminary Decision Path",
-                      "type": "string"
-                    },
-                    "terminal_note": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Terminal Note"
-                    }
-                  },
-                  "required": [
-                    "preliminary_decision_path",
-                    "final_strength"
-                  ],
-                  "title": "PVS1FlowchartMCP",
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null
-            },
-            "source_url": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Source Url"
-            },
-            "upstream_service": {
-              "default": "AutoPVS1",
-              "title": "Upstream Service",
-              "type": "string"
-            }
-          },
-          "required": [
-            "genome_build",
-            "cnv_info"
-          ],
-          "title": "CNVMCPData",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "error": {
-      "anyOf": [
-        {
-          "description": "Structured MCP tool error.",
-          "properties": {
-            "code": {
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "title": "Message",
-              "type": "string"
-            },
-            "retryable": {
-              "title": "Retryable",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "title": "MCPError",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
+    "_meta": {
+      "description": "Common metadata carried in the ``_meta`` block of every MCP tool envelope.\n\nResponse-Envelope Standard v1 field canon: ``tool``, ``request_id``,\ntiered ``next_commands``, ``capabilities_version``, and provenance\n(``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and\n``capabilities_version`` are populated by :func:`ok_envelope` /\n:func:`error_envelope`; callers never set them directly.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -449,6 +97,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Cached Count"
+        },
+        "capabilities_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilities Version"
         },
         "cost_tier": {
           "anyOf": [
@@ -584,11 +244,6 @@ not clinical decision support.
           "title": "Request Id",
           "type": "string"
         },
-        "research_use_only": {
-          "default": true,
-          "title": "Research Use Only",
-          "type": "boolean"
-        },
         "retry_after_ms": {
           "anyOf": [
             {
@@ -602,9 +257,21 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.3.0",
+          "default": "2.0.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
         },
         "uncached_count": {
           "anyOf": [
@@ -617,6 +284,11 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Uncached Count"
+        },
+        "unsafe_for_clinical_use": {
+          "default": true,
+          "title": "Unsafe For Clinical Use",
+          "type": "boolean"
         },
         "warnings": {
           "items": {
@@ -669,21 +341,333 @@ not clinical decision support.
           "type": "array"
         }
       },
-      "title": "MCPMeta",
       "type": "object"
     },
-    "ok": {
-      "title": "Ok",
+    "error_code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "recovery_action": {
+      "type": "string"
+    },
+    "result": {
+      "description": "MCP-presented CNV data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
+      "properties": {
+        "cnv_info": {
+          "description": "Typed copy-number variant information exposed through MCP.\n\nOnly ``cnv_id`` is required at the contract level; the other fields\nare dropped when ``response_mode='ids_only'``.",
+          "properties": {
+            "cnv_id": {
+              "title": "Cnv Id",
+              "type": "string"
+            },
+            "cnv_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Cnv Type"
+            },
+            "coordinates": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Coordinates"
+            },
+            "gene_symbol": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Gene Symbol"
+            },
+            "size": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Size"
+            }
+          },
+          "required": [
+            "cnv_id"
+          ],
+          "title": "CNVInfoMCP",
+          "type": "object"
+        },
+        "disease_mechanisms": {
+          "items": {
+            "description": "Typed disease mechanism row from AutoPVS1.",
+            "properties": {
+              "adjusted_strength": {
+                "title": "Adjusted Strength",
+                "type": "string"
+              },
+              "clinical_validity": {
+                "title": "Clinical Validity",
+                "type": "string"
+              },
+              "consideration": {
+                "title": "Consideration",
+                "type": "string"
+              },
+              "disease": {
+                "title": "Disease",
+                "type": "string"
+              },
+              "disease_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Disease Url"
+              },
+              "gene": {
+                "title": "Gene",
+                "type": "string"
+              },
+              "gene_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Gene Url"
+              },
+              "inheritance": {
+                "title": "Inheritance",
+                "type": "string"
+              }
+            },
+            "required": [
+              "gene",
+              "disease",
+              "inheritance",
+              "clinical_validity",
+              "consideration",
+              "adjusted_strength"
+            ],
+            "title": "DiseaseMechanismMCP",
+            "type": "object"
+          },
+          "title": "Disease Mechanisms",
+          "type": "array"
+        },
+        "genome_build": {
+          "title": "Genome Build",
+          "type": "string"
+        },
+        "pvs1_flowchart": {
+          "anyOf": [
+            {
+              "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+              "properties": {
+                "decision_tree": {
+                  "items": {
+                    "description": "One typed step in the PVS1 decision flowchart.",
+                    "properties": {
+                      "code": {
+                        "title": "Code",
+                        "type": "string"
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Description"
+                      },
+                      "note_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Note Id"
+                      },
+                      "note_text": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Note Text"
+                      }
+                    },
+                    "required": [
+                      "code"
+                    ],
+                    "title": "FlowchartStepMCP",
+                    "type": "object"
+                  },
+                  "title": "Decision Tree",
+                  "type": "array"
+                },
+                "decision_tree_raw": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "additionalProperties": true,
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Decision Tree Raw"
+                },
+                "final_strength": {
+                  "title": "Final Strength",
+                  "type": "string"
+                },
+                "final_strength_source": {
+                  "default": "asserted",
+                  "enum": [
+                    "asserted",
+                    "inferred"
+                  ],
+                  "title": "Final Strength Source",
+                  "type": "string"
+                },
+                "notes": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Notes"
+                },
+                "path_gloss": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Path Gloss"
+                },
+                "preliminary_decision_path": {
+                  "title": "Preliminary Decision Path",
+                  "type": "string"
+                },
+                "terminal_note": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Terminal Note"
+                }
+              },
+              "required": [
+                "preliminary_decision_path",
+                "final_strength"
+              ],
+              "title": "PVS1FlowchartMCP",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Url"
+        },
+        "upstream_service": {
+          "default": "AutoPVS1",
+          "title": "Upstream Service",
+          "type": "string"
+        }
+      },
+      "required": [
+        "genome_build",
+        "cnv_info"
+      ],
+      "type": "object"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "success": {
       "type": "boolean"
     }
   },
   "required": [
-    "ok",
-    "data",
-    "error",
-    "meta"
+    "success",
+    "_meta"
   ],
-  "title": "CNVMCPEnvelope",
   "type": "object"
 }
 ```
@@ -703,14 +687,14 @@ each item's upstream outcome; output items preserve input order;
 ``meta_mode`` controls the envelope. Per-item failures do not
 stop the batch unless ``continue_on_error=false``.
 
-Aggregate cache observability: top-level ``meta.cache_status``
+Aggregate cache observability: top-level ``_meta.cache_status``
 is ``"mixed"`` when items had varied outcomes (with
 ``cached_count`` / ``uncached_count``) or echoes the unanimous
-status. ``meta.elapsed_ms`` is the SUM of per-item upstream
+status. ``_meta.elapsed_ms`` is the SUM of per-item upstream
 wall-clocks.
 
 Warning aggregation: per-item warnings collapse into
-``meta.warnings``; codes emitted by more than one distinct item
+``_meta.warnings``; codes emitted by more than one distinct item
 carry ``count`` and ``affected_indices``; single-item codes do
 not. Order is first-seen-code-first.
 
@@ -789,529 +773,9 @@ not. Order is first-seen-code-first.
 
 ```json
 {
-  "description": "Envelope schema for ``get_cnvs_pvs1_data_bulk``.",
   "properties": {
-    "data": {
-      "anyOf": [
-        {
-          "description": "Aggregate payload for ``get_cnvs_pvs1_data_bulk``.\n\nSame semantics as :class:`BulkVariantsMCPData`.",
-          "properties": {
-            "attempted": {
-              "title": "Attempted",
-              "type": "integer"
-            },
-            "failed": {
-              "title": "Failed",
-              "type": "integer"
-            },
-            "items": {
-              "items": {
-                "description": "Per-item result for a bulk CNV PVS1 request.",
-                "properties": {
-                  "data": {
-                    "anyOf": [
-                      {
-                        "description": "MCP-presented CNV data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
-                        "properties": {
-                          "cnv_info": {
-                            "description": "Typed copy-number variant information exposed through MCP.\n\nOnly ``cnv_id`` is required at the contract level; the other fields\nare dropped when ``response_mode='ids_only'``.",
-                            "properties": {
-                              "cnv_id": {
-                                "title": "Cnv Id",
-                                "type": "string"
-                              },
-                              "cnv_type": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Cnv Type"
-                              },
-                              "coordinates": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Coordinates"
-                              },
-                              "gene_symbol": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Gene Symbol"
-                              },
-                              "size": {
-                                "anyOf": [
-                                  {
-                                    "type": "integer"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Size"
-                              }
-                            },
-                            "required": [
-                              "cnv_id"
-                            ],
-                            "title": "CNVInfoMCP",
-                            "type": "object"
-                          },
-                          "disease_mechanisms": {
-                            "items": {
-                              "description": "Typed disease mechanism row from AutoPVS1.",
-                              "properties": {
-                                "adjusted_strength": {
-                                  "title": "Adjusted Strength",
-                                  "type": "string"
-                                },
-                                "clinical_validity": {
-                                  "title": "Clinical Validity",
-                                  "type": "string"
-                                },
-                                "consideration": {
-                                  "title": "Consideration",
-                                  "type": "string"
-                                },
-                                "disease": {
-                                  "title": "Disease",
-                                  "type": "string"
-                                },
-                                "disease_url": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "default": null,
-                                  "title": "Disease Url"
-                                },
-                                "gene": {
-                                  "title": "Gene",
-                                  "type": "string"
-                                },
-                                "gene_url": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "default": null,
-                                  "title": "Gene Url"
-                                },
-                                "inheritance": {
-                                  "title": "Inheritance",
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "gene",
-                                "disease",
-                                "inheritance",
-                                "clinical_validity",
-                                "consideration",
-                                "adjusted_strength"
-                              ],
-                              "title": "DiseaseMechanismMCP",
-                              "type": "object"
-                            },
-                            "title": "Disease Mechanisms",
-                            "type": "array"
-                          },
-                          "genome_build": {
-                            "title": "Genome Build",
-                            "type": "string"
-                          },
-                          "pvs1_flowchart": {
-                            "anyOf": [
-                              {
-                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
-                                "properties": {
-                                  "decision_tree": {
-                                    "items": {
-                                      "description": "One typed step in the PVS1 decision flowchart.",
-                                      "properties": {
-                                        "code": {
-                                          "title": "Code",
-                                          "type": "string"
-                                        },
-                                        "description": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ],
-                                          "default": null,
-                                          "title": "Description"
-                                        },
-                                        "note_id": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ],
-                                          "default": null,
-                                          "title": "Note Id"
-                                        },
-                                        "note_text": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ],
-                                          "default": null,
-                                          "title": "Note Text"
-                                        }
-                                      },
-                                      "required": [
-                                        "code"
-                                      ],
-                                      "title": "FlowchartStepMCP",
-                                      "type": "object"
-                                    },
-                                    "title": "Decision Tree",
-                                    "type": "array"
-                                  },
-                                  "decision_tree_raw": {
-                                    "anyOf": [
-                                      {
-                                        "items": {
-                                          "additionalProperties": true,
-                                          "type": "object"
-                                        },
-                                        "type": "array"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Decision Tree Raw"
-                                  },
-                                  "final_strength": {
-                                    "title": "Final Strength",
-                                    "type": "string"
-                                  },
-                                  "final_strength_source": {
-                                    "default": "asserted",
-                                    "enum": [
-                                      "asserted",
-                                      "inferred"
-                                    ],
-                                    "title": "Final Strength Source",
-                                    "type": "string"
-                                  },
-                                  "notes": {
-                                    "anyOf": [
-                                      {
-                                        "additionalProperties": {
-                                          "type": "string"
-                                        },
-                                        "type": "object"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Notes"
-                                  },
-                                  "path_gloss": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Path Gloss"
-                                  },
-                                  "preliminary_decision_path": {
-                                    "title": "Preliminary Decision Path",
-                                    "type": "string"
-                                  },
-                                  "terminal_note": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Terminal Note"
-                                  }
-                                },
-                                "required": [
-                                  "preliminary_decision_path",
-                                  "final_strength"
-                                ],
-                                "title": "PVS1FlowchartMCP",
-                                "type": "object"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null
-                          },
-                          "source_url": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Source Url"
-                          },
-                          "upstream_service": {
-                            "default": "AutoPVS1",
-                            "title": "Upstream Service",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "genome_build",
-                          "cnv_info"
-                        ],
-                        "title": "CNVMCPData",
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null
-                  },
-                  "error": {
-                    "anyOf": [
-                      {
-                        "description": "Structured MCP tool error.",
-                        "properties": {
-                          "code": {
-                            "title": "Code",
-                            "type": "string"
-                          },
-                          "message": {
-                            "title": "Message",
-                            "type": "string"
-                          },
-                          "retryable": {
-                            "title": "Retryable",
-                            "type": "boolean"
-                          },
-                          "suggestions": {
-                            "items": {
-                              "type": "string"
-                            },
-                            "title": "Suggestions",
-                            "type": "array"
-                          }
-                        },
-                        "required": [
-                          "code",
-                          "message",
-                          "retryable"
-                        ],
-                        "title": "MCPError",
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null
-                  },
-                  "input": {
-                    "description": "One item in a bulk CNV PVS1 request.",
-                    "properties": {
-                      "cnv_id": {
-                        "description": "AutoPVS1 CNV ID in {chrom}-{start}-{end}-{TYPE} form.",
-                        "maxLength": 128,
-                        "minLength": 1,
-                        "title": "Cnv Id",
-                        "type": "string"
-                      },
-                      "genome_build": {
-                        "description": "Genome build: hg19 or hg38. Invalid values yield a per-item error.",
-                        "title": "Genome Build",
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "genome_build",
-                      "cnv_id"
-                    ],
-                    "title": "BulkCNVPVS1InputItem",
-                    "type": "object"
-                  },
-                  "meta": {
-                    "anyOf": [
-                      {
-                        "description": "Per-item cost/cache observability for bulk PVS1 result items.\n\nTop-level ``meta.cache_status`` aggregates the batch (\"mixed\" when\nitems had varying outcomes) \u2014 agents that need to forecast cost on a\nper-item basis read this block. Absent when the item short-circuited\nbefore any upstream call (e.g. invalid input).",
-                        "properties": {
-                          "cache_status": {
-                            "anyOf": [
-                              {
-                                "enum": [
-                                  "hit",
-                                  "miss",
-                                  "coalesced",
-                                  "bypass"
-                                ],
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Cache Status"
-                          },
-                          "elapsed_ms": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Elapsed Ms"
-                          }
-                        },
-                        "title": "BulkPerItemMeta",
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null
-                  },
-                  "ok": {
-                    "title": "Ok",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "ok",
-                  "input"
-                ],
-                "title": "BulkCNVPVS1ResultItem",
-                "type": "object"
-              },
-              "title": "Items",
-              "type": "array"
-            },
-            "skipped": {
-              "title": "Skipped",
-              "type": "integer"
-            },
-            "succeeded": {
-              "title": "Succeeded",
-              "type": "integer"
-            },
-            "total": {
-              "title": "Total",
-              "type": "integer"
-            }
-          },
-          "required": [
-            "total",
-            "attempted",
-            "skipped",
-            "succeeded",
-            "failed"
-          ],
-          "title": "BulkCNVsMCPData",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "error": {
-      "anyOf": [
-        {
-          "description": "Structured MCP tool error.",
-          "properties": {
-            "code": {
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "title": "Message",
-              "type": "string"
-            },
-            "retryable": {
-              "title": "Retryable",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "title": "MCPError",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
+    "_meta": {
+      "description": "Common metadata carried in the ``_meta`` block of every MCP tool envelope.\n\nResponse-Envelope Standard v1 field canon: ``tool``, ``request_id``,\ntiered ``next_commands``, ``capabilities_version``, and provenance\n(``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and\n``capabilities_version`` are populated by :func:`ok_envelope` /\n:func:`error_envelope`; callers never set them directly.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1336,6 +800,18 @@ not. Order is first-seen-code-first.
           ],
           "default": null,
           "title": "Cached Count"
+        },
+        "capabilities_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilities Version"
         },
         "cost_tier": {
           "anyOf": [
@@ -1471,11 +947,6 @@ not. Order is first-seen-code-first.
           "title": "Request Id",
           "type": "string"
         },
-        "research_use_only": {
-          "default": true,
-          "title": "Research Use Only",
-          "type": "boolean"
-        },
         "retry_after_ms": {
           "anyOf": [
             {
@@ -1489,9 +960,21 @@ not. Order is first-seen-code-first.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.3.0",
+          "default": "2.0.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
         },
         "uncached_count": {
           "anyOf": [
@@ -1504,6 +987,11 @@ not. Order is first-seen-code-first.
           ],
           "default": null,
           "title": "Uncached Count"
+        },
+        "unsafe_for_clinical_use": {
+          "default": true,
+          "title": "Unsafe For Clinical Use",
+          "type": "boolean"
         },
         "warnings": {
           "items": {
@@ -1556,21 +1044,488 @@ not. Order is first-seen-code-first.
           "type": "array"
         }
       },
-      "title": "MCPMeta",
       "type": "object"
     },
-    "ok": {
-      "title": "Ok",
+    "attempted": {
+      "title": "Attempted",
+      "type": "integer"
+    },
+    "error_code": {
+      "type": "string"
+    },
+    "failed": {
+      "title": "Failed",
+      "type": "integer"
+    },
+    "message": {
+      "type": "string"
+    },
+    "recovery_action": {
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "description": "Per-item result for a bulk CNV PVS1 request.",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "description": "MCP-presented CNV data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
+                "properties": {
+                  "cnv_info": {
+                    "description": "Typed copy-number variant information exposed through MCP.\n\nOnly ``cnv_id`` is required at the contract level; the other fields\nare dropped when ``response_mode='ids_only'``.",
+                    "properties": {
+                      "cnv_id": {
+                        "title": "Cnv Id",
+                        "type": "string"
+                      },
+                      "cnv_type": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Cnv Type"
+                      },
+                      "coordinates": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Coordinates"
+                      },
+                      "gene_symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Gene Symbol"
+                      },
+                      "size": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Size"
+                      }
+                    },
+                    "required": [
+                      "cnv_id"
+                    ],
+                    "title": "CNVInfoMCP",
+                    "type": "object"
+                  },
+                  "disease_mechanisms": {
+                    "items": {
+                      "description": "Typed disease mechanism row from AutoPVS1.",
+                      "properties": {
+                        "adjusted_strength": {
+                          "title": "Adjusted Strength",
+                          "type": "string"
+                        },
+                        "clinical_validity": {
+                          "title": "Clinical Validity",
+                          "type": "string"
+                        },
+                        "consideration": {
+                          "title": "Consideration",
+                          "type": "string"
+                        },
+                        "disease": {
+                          "title": "Disease",
+                          "type": "string"
+                        },
+                        "disease_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "title": "Disease Url"
+                        },
+                        "gene": {
+                          "title": "Gene",
+                          "type": "string"
+                        },
+                        "gene_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "title": "Gene Url"
+                        },
+                        "inheritance": {
+                          "title": "Inheritance",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "gene",
+                        "disease",
+                        "inheritance",
+                        "clinical_validity",
+                        "consideration",
+                        "adjusted_strength"
+                      ],
+                      "title": "DiseaseMechanismMCP",
+                      "type": "object"
+                    },
+                    "title": "Disease Mechanisms",
+                    "type": "array"
+                  },
+                  "genome_build": {
+                    "title": "Genome Build",
+                    "type": "string"
+                  },
+                  "pvs1_flowchart": {
+                    "anyOf": [
+                      {
+                        "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+                        "properties": {
+                          "decision_tree": {
+                            "items": {
+                              "description": "One typed step in the PVS1 decision flowchart.",
+                              "properties": {
+                                "code": {
+                                  "title": "Code",
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "default": null,
+                                  "title": "Description"
+                                },
+                                "note_id": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "default": null,
+                                  "title": "Note Id"
+                                },
+                                "note_text": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "default": null,
+                                  "title": "Note Text"
+                                }
+                              },
+                              "required": [
+                                "code"
+                              ],
+                              "title": "FlowchartStepMCP",
+                              "type": "object"
+                            },
+                            "title": "Decision Tree",
+                            "type": "array"
+                          },
+                          "decision_tree_raw": {
+                            "anyOf": [
+                              {
+                                "items": {
+                                  "additionalProperties": true,
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Decision Tree Raw"
+                          },
+                          "final_strength": {
+                            "title": "Final Strength",
+                            "type": "string"
+                          },
+                          "final_strength_source": {
+                            "default": "asserted",
+                            "enum": [
+                              "asserted",
+                              "inferred"
+                            ],
+                            "title": "Final Strength Source",
+                            "type": "string"
+                          },
+                          "notes": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Notes"
+                          },
+                          "path_gloss": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Path Gloss"
+                          },
+                          "preliminary_decision_path": {
+                            "title": "Preliminary Decision Path",
+                            "type": "string"
+                          },
+                          "terminal_note": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Terminal Note"
+                          }
+                        },
+                        "required": [
+                          "preliminary_decision_path",
+                          "final_strength"
+                        ],
+                        "title": "PVS1FlowchartMCP",
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "source_url": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Source Url"
+                  },
+                  "upstream_service": {
+                    "default": "AutoPVS1",
+                    "title": "Upstream Service",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "genome_build",
+                  "cnv_info"
+                ],
+                "title": "CNVMCPData",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "error": {
+            "anyOf": [
+              {
+                "description": "Structured MCP tool error.",
+                "properties": {
+                  "code": {
+                    "title": "Code",
+                    "type": "string"
+                  },
+                  "message": {
+                    "title": "Message",
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "title": "Retryable",
+                    "type": "boolean"
+                  },
+                  "suggestions": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "Suggestions",
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "title": "MCPError",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "input": {
+            "description": "One item in a bulk CNV PVS1 request.",
+            "properties": {
+              "cnv_id": {
+                "description": "AutoPVS1 CNV ID in {chrom}-{start}-{end}-{TYPE} form.",
+                "maxLength": 128,
+                "minLength": 1,
+                "title": "Cnv Id",
+                "type": "string"
+              },
+              "genome_build": {
+                "description": "Genome build: hg19 or hg38. Invalid values yield a per-item error.",
+                "title": "Genome Build",
+                "type": "string"
+              }
+            },
+            "required": [
+              "genome_build",
+              "cnv_id"
+            ],
+            "title": "BulkCNVPVS1InputItem",
+            "type": "object"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "description": "Per-item cost/cache observability for bulk PVS1 result items.\n\nTop-level ``meta.cache_status`` aggregates the batch (\"mixed\" when\nitems had varying outcomes) \u2014 agents that need to forecast cost on a\nper-item basis read this block. Absent when the item short-circuited\nbefore any upstream call (e.g. invalid input).",
+                "properties": {
+                  "cache_status": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "hit",
+                          "miss",
+                          "coalesced",
+                          "bypass"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Cache Status"
+                  },
+                  "elapsed_ms": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Elapsed Ms"
+                  }
+                },
+                "title": "BulkPerItemMeta",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "input"
+        ],
+        "title": "BulkCNVPVS1ResultItem",
+        "type": "object"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "retryable": {
       "type": "boolean"
+    },
+    "skipped": {
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "succeeded": {
+      "title": "Succeeded",
+      "type": "integer"
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "total": {
+      "title": "Total",
+      "type": "integer"
     }
   },
   "required": [
-    "ok",
-    "data",
-    "error",
-    "meta"
+    "success",
+    "_meta"
   ],
-  "title": "BulkCNVsMCPEnvelope",
   "type": "object"
 }
 ```
@@ -1593,170 +1548,9 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
 
 ```json
 {
-  "description": "Envelope schema for ``get_server_capabilities``.",
   "properties": {
-    "data": {
-      "anyOf": [
-        {
-          "description": "Compact first-turn MCP capabilities payload.",
-          "properties": {
-            "canonical_parameters": {
-              "additionalProperties": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "title": "Canonical Parameters",
-              "type": "object"
-            },
-            "capabilities_version": {
-              "title": "Capabilities Version",
-              "type": "string"
-            },
-            "compact_workflow": {
-              "items": {
-                "description": "Compact ordered workflow guidance for first-turn discovery.",
-                "properties": {
-                  "step": {
-                    "title": "Step",
-                    "type": "string"
-                  },
-                  "when": {
-                    "title": "When",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "step",
-                  "when"
-                ],
-                "title": "WorkflowStepMCP",
-                "type": "object"
-              },
-              "title": "Compact Workflow",
-              "type": "array"
-            },
-            "details_resource": {
-              "title": "Details Resource",
-              "type": "string"
-            },
-            "endpoint": {
-              "title": "Endpoint",
-              "type": "string"
-            },
-            "research_use_only": {
-              "title": "Research Use Only",
-              "type": "boolean"
-            },
-            "server": {
-              "title": "Server",
-              "type": "string"
-            },
-            "tool_summaries": {
-              "additionalProperties": {
-                "description": "Compact MCP tool summary for first-turn discovery.\n\n``default_response_mode`` is the response_mode the tool emits when\nthe caller omits the parameter. Surfaced so LLM consumers can plan\nbandwidth without parsing the tool description; cheap tools that do\nnot accept response_mode leave it absent.",
-                "properties": {
-                  "default_response_mode": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Default Response Mode"
-                  },
-                  "example": {
-                    "additionalProperties": true,
-                    "title": "Example",
-                    "type": "object"
-                  },
-                  "purpose": {
-                    "title": "Purpose",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "purpose"
-                ],
-                "title": "ToolSummaryMCP",
-                "type": "object"
-              },
-              "title": "Tool Summaries",
-              "type": "object"
-            },
-            "transport": {
-              "title": "Transport",
-              "type": "string"
-            },
-            "version": {
-              "title": "Version",
-              "type": "string"
-            }
-          },
-          "required": [
-            "server",
-            "version",
-            "capabilities_version",
-            "transport",
-            "endpoint",
-            "research_use_only",
-            "tool_summaries",
-            "canonical_parameters",
-            "compact_workflow",
-            "details_resource"
-          ],
-          "title": "CompactCapabilitiesData",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "error": {
-      "anyOf": [
-        {
-          "description": "Structured MCP tool error.",
-          "properties": {
-            "code": {
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "title": "Message",
-              "type": "string"
-            },
-            "retryable": {
-              "title": "Retryable",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "title": "MCPError",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
+    "_meta": {
+      "description": "Common metadata carried in the ``_meta`` block of every MCP tool envelope.\n\nResponse-Envelope Standard v1 field canon: ``tool``, ``request_id``,\ntiered ``next_commands``, ``capabilities_version``, and provenance\n(``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and\n``capabilities_version`` are populated by :func:`ok_envelope` /\n:func:`error_envelope`; callers never set them directly.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -1781,6 +1575,18 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           ],
           "default": null,
           "title": "Cached Count"
+        },
+        "capabilities_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilities Version"
         },
         "cost_tier": {
           "anyOf": [
@@ -1916,11 +1722,6 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "title": "Request Id",
           "type": "string"
         },
-        "research_use_only": {
-          "default": true,
-          "title": "Research Use Only",
-          "type": "boolean"
-        },
         "retry_after_ms": {
           "anyOf": [
             {
@@ -1934,9 +1735,21 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.3.0",
+          "default": "2.0.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
         },
         "uncached_count": {
           "anyOf": [
@@ -1949,6 +1762,11 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           ],
           "default": null,
           "title": "Uncached Count"
+        },
+        "unsafe_for_clinical_use": {
+          "default": true,
+          "title": "Unsafe For Clinical Use",
+          "type": "boolean"
         },
         "warnings": {
           "items": {
@@ -2001,21 +1819,142 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "type": "array"
         }
       },
-      "title": "MCPMeta",
       "type": "object"
     },
-    "ok": {
-      "title": "Ok",
+    "error_code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "recovery_action": {
+      "type": "string"
+    },
+    "result": {
+      "description": "Compact first-turn MCP capabilities payload.",
+      "properties": {
+        "canonical_parameters": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Canonical Parameters",
+          "type": "object"
+        },
+        "capabilities_version": {
+          "title": "Capabilities Version",
+          "type": "string"
+        },
+        "compact_workflow": {
+          "items": {
+            "description": "Compact ordered workflow guidance for first-turn discovery.",
+            "properties": {
+              "step": {
+                "title": "Step",
+                "type": "string"
+              },
+              "when": {
+                "title": "When",
+                "type": "string"
+              }
+            },
+            "required": [
+              "step",
+              "when"
+            ],
+            "title": "WorkflowStepMCP",
+            "type": "object"
+          },
+          "title": "Compact Workflow",
+          "type": "array"
+        },
+        "details_resource": {
+          "title": "Details Resource",
+          "type": "string"
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "research_use_only": {
+          "title": "Research Use Only",
+          "type": "boolean"
+        },
+        "server": {
+          "title": "Server",
+          "type": "string"
+        },
+        "tool_summaries": {
+          "additionalProperties": {
+            "description": "Compact MCP tool summary for first-turn discovery.\n\n``default_response_mode`` is the response_mode the tool emits when\nthe caller omits the parameter. Surfaced so LLM consumers can plan\nbandwidth without parsing the tool description; cheap tools that do\nnot accept response_mode leave it absent.",
+            "properties": {
+              "default_response_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Default Response Mode"
+              },
+              "example": {
+                "additionalProperties": true,
+                "title": "Example",
+                "type": "object"
+              },
+              "purpose": {
+                "title": "Purpose",
+                "type": "string"
+              }
+            },
+            "required": [
+              "purpose"
+            ],
+            "title": "ToolSummaryMCP",
+            "type": "object"
+          },
+          "title": "Tool Summaries",
+          "type": "object"
+        },
+        "transport": {
+          "title": "Transport",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server",
+        "version",
+        "capabilities_version",
+        "transport",
+        "endpoint",
+        "research_use_only",
+        "tool_summaries",
+        "canonical_parameters",
+        "compact_workflow",
+        "details_resource"
+      ],
+      "type": "object"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "success": {
       "type": "boolean"
     }
   },
   "required": [
-    "ok",
-    "data",
-    "error",
-    "meta"
+    "success",
+    "_meta"
   ],
-  "title": "CompactCapabilitiesMCPEnvelope",
   "type": "object"
 }
 ```
@@ -2049,103 +1988,9 @@ cold scoring call.
 
 ```json
 {
-  "description": "Envelope schema for ``get_server_health``.",
   "properties": {
-    "data": {
-      "anyOf": [
-        {
-          "description": "Local MCP server health status.\n\n``upstream_reachable`` and ``upstream_status`` are populated only when\nthe caller passes ``check_upstream=true``; otherwise the fields stay\nat their default ``False`` / ``\"not_checked\"`` so the cheap-tool\ncontract (no upstream cost, sub-millisecond) is preserved.",
-          "properties": {
-            "destructive_tools_enabled": {
-              "default": false,
-              "title": "Destructive Tools Enabled",
-              "type": "boolean"
-            },
-            "server": {
-              "default": "autopvs1-link",
-              "title": "Server",
-              "type": "string"
-            },
-            "status": {
-              "const": "ok",
-              "default": "ok",
-              "title": "Status",
-              "type": "string"
-            },
-            "upstream_checked": {
-              "default": false,
-              "title": "Upstream Checked",
-              "type": "boolean"
-            },
-            "upstream_reachable": {
-              "default": false,
-              "title": "Upstream Reachable",
-              "type": "boolean"
-            },
-            "upstream_status": {
-              "default": "not_checked",
-              "enum": [
-                "not_checked",
-                "reachable",
-                "unreachable"
-              ],
-              "title": "Upstream Status",
-              "type": "string"
-            },
-            "version": {
-              "default": "1.3.0",
-              "title": "Version",
-              "type": "string"
-            }
-          },
-          "title": "HealthData",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "error": {
-      "anyOf": [
-        {
-          "description": "Structured MCP tool error.",
-          "properties": {
-            "code": {
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "title": "Message",
-              "type": "string"
-            },
-            "retryable": {
-              "title": "Retryable",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "title": "MCPError",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
+    "_meta": {
+      "description": "Common metadata carried in the ``_meta`` block of every MCP tool envelope.\n\nResponse-Envelope Standard v1 field canon: ``tool``, ``request_id``,\ntiered ``next_commands``, ``capabilities_version``, and provenance\n(``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and\n``capabilities_version`` are populated by :func:`ok_envelope` /\n:func:`error_envelope`; callers never set them directly.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -2170,6 +2015,18 @@ cold scoring call.
           ],
           "default": null,
           "title": "Cached Count"
+        },
+        "capabilities_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilities Version"
         },
         "cost_tier": {
           "anyOf": [
@@ -2305,11 +2162,6 @@ cold scoring call.
           "title": "Request Id",
           "type": "string"
         },
-        "research_use_only": {
-          "default": true,
-          "title": "Research Use Only",
-          "type": "boolean"
-        },
         "retry_after_ms": {
           "anyOf": [
             {
@@ -2323,9 +2175,21 @@ cold scoring call.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.3.0",
+          "default": "2.0.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
         },
         "uncached_count": {
           "anyOf": [
@@ -2338,6 +2202,11 @@ cold scoring call.
           ],
           "default": null,
           "title": "Uncached Count"
+        },
+        "unsafe_for_clinical_use": {
+          "default": true,
+          "title": "Unsafe For Clinical Use",
+          "type": "boolean"
         },
         "warnings": {
           "items": {
@@ -2390,21 +2259,75 @@ cold scoring call.
           "type": "array"
         }
       },
-      "title": "MCPMeta",
       "type": "object"
     },
-    "ok": {
-      "title": "Ok",
+    "error_code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "recovery_action": {
+      "type": "string"
+    },
+    "result": {
+      "description": "Local MCP server health status.\n\n``upstream_reachable`` and ``upstream_status`` are populated only when\nthe caller passes ``check_upstream=true``; otherwise the fields stay\nat their default ``False`` / ``\"not_checked\"`` so the cheap-tool\ncontract (no upstream cost, sub-millisecond) is preserved.",
+      "properties": {
+        "destructive_tools_enabled": {
+          "default": false,
+          "title": "Destructive Tools Enabled",
+          "type": "boolean"
+        },
+        "server": {
+          "default": "autopvs1-link",
+          "title": "Server",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "default": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "upstream_checked": {
+          "default": false,
+          "title": "Upstream Checked",
+          "type": "boolean"
+        },
+        "upstream_reachable": {
+          "default": false,
+          "title": "Upstream Reachable",
+          "type": "boolean"
+        },
+        "upstream_status": {
+          "default": "not_checked",
+          "enum": [
+            "not_checked",
+            "reachable",
+            "unreachable"
+          ],
+          "title": "Upstream Status",
+          "type": "string"
+        },
+        "version": {
+          "default": "2.0.0",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "success": {
       "type": "boolean"
     }
   },
   "required": [
-    "ok",
-    "data",
-    "error",
-    "meta"
+    "success",
+    "_meta"
   ],
-  "title": "HealthMCPEnvelope",
   "type": "object"
 }
 ```
@@ -2485,489 +2408,9 @@ not clinical decision support.
 
 ```json
 {
-  "description": "Envelope schema for ``get_variant_pvs1_data``.",
   "properties": {
-    "data": {
-      "anyOf": [
-        {
-          "description": "MCP-presented variant data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
-          "properties": {
-            "disease_mechanisms": {
-              "items": {
-                "description": "Typed disease mechanism row from AutoPVS1.",
-                "properties": {
-                  "adjusted_strength": {
-                    "title": "Adjusted Strength",
-                    "type": "string"
-                  },
-                  "clinical_validity": {
-                    "title": "Clinical Validity",
-                    "type": "string"
-                  },
-                  "consideration": {
-                    "title": "Consideration",
-                    "type": "string"
-                  },
-                  "disease": {
-                    "title": "Disease",
-                    "type": "string"
-                  },
-                  "disease_url": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Disease Url"
-                  },
-                  "gene": {
-                    "title": "Gene",
-                    "type": "string"
-                  },
-                  "gene_url": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Gene Url"
-                  },
-                  "inheritance": {
-                    "title": "Inheritance",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "gene",
-                  "disease",
-                  "inheritance",
-                  "clinical_validity",
-                  "consideration",
-                  "adjusted_strength"
-                ],
-                "title": "DiseaseMechanismMCP",
-                "type": "object"
-              },
-              "title": "Disease Mechanisms",
-              "type": "array"
-            },
-            "genome_build": {
-              "title": "Genome Build",
-              "type": "string"
-            },
-            "pvs1_flowchart": {
-              "anyOf": [
-                {
-                  "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
-                  "properties": {
-                    "decision_tree": {
-                      "items": {
-                        "description": "One typed step in the PVS1 decision flowchart.",
-                        "properties": {
-                          "code": {
-                            "title": "Code",
-                            "type": "string"
-                          },
-                          "description": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Description"
-                          },
-                          "note_id": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Note Id"
-                          },
-                          "note_text": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Note Text"
-                          }
-                        },
-                        "required": [
-                          "code"
-                        ],
-                        "title": "FlowchartStepMCP",
-                        "type": "object"
-                      },
-                      "title": "Decision Tree",
-                      "type": "array"
-                    },
-                    "decision_tree_raw": {
-                      "anyOf": [
-                        {
-                          "items": {
-                            "additionalProperties": true,
-                            "type": "object"
-                          },
-                          "type": "array"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Decision Tree Raw"
-                    },
-                    "final_strength": {
-                      "title": "Final Strength",
-                      "type": "string"
-                    },
-                    "final_strength_source": {
-                      "default": "asserted",
-                      "enum": [
-                        "asserted",
-                        "inferred"
-                      ],
-                      "title": "Final Strength Source",
-                      "type": "string"
-                    },
-                    "notes": {
-                      "anyOf": [
-                        {
-                          "additionalProperties": {
-                            "type": "string"
-                          },
-                          "type": "object"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Notes"
-                    },
-                    "path_gloss": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Path Gloss"
-                    },
-                    "preliminary_decision_path": {
-                      "title": "Preliminary Decision Path",
-                      "type": "string"
-                    },
-                    "terminal_note": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "default": null,
-                      "title": "Terminal Note"
-                    }
-                  },
-                  "required": [
-                    "preliminary_decision_path",
-                    "final_strength"
-                  ],
-                  "title": "PVS1FlowchartMCP",
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null
-            },
-            "source_url": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Source Url"
-            },
-            "upstream_service": {
-              "default": "AutoPVS1",
-              "title": "Upstream Service",
-              "type": "string"
-            },
-            "variant_info": {
-              "description": "Typed variant information exposed through MCP.\n\nOnly ``variant_id`` is required at the contract level. ``variant_type``\nand ``gene_symbol`` are populated for summary/standard/full but absent\nwhen ``response_mode='ids_only'`` returns just the upstream identifier.",
-              "properties": {
-                "chgvs": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Chgvs"
-                },
-                "exon": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Exon"
-                },
-                "external_links": {
-                  "anyOf": [
-                    {
-                      "additionalProperties": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "type": "object"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "External Links"
-                },
-                "external_links_raw": {
-                  "anyOf": [
-                    {
-                      "additionalProperties": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "type": "object"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "External Links Raw"
-                },
-                "gene_symbol": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Gene Symbol"
-                },
-                "gene_url": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Gene Url"
-                },
-                "haploinsufficiency": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Haploinsufficiency"
-                },
-                "haploinsufficiency_url": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Haploinsufficiency Url"
-                },
-                "intron": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Intron"
-                },
-                "phgvs": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Phgvs"
-                },
-                "pli_score": {
-                  "anyOf": [
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Pli Score"
-                },
-                "pli_score_display": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Pli Score Display"
-                },
-                "variant_id": {
-                  "title": "Variant Id",
-                  "type": "string"
-                },
-                "variant_type": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Variant Type"
-                }
-              },
-              "required": [
-                "variant_id"
-              ],
-              "title": "VariantInfoMCP",
-              "type": "object"
-            }
-          },
-          "required": [
-            "genome_build",
-            "variant_info"
-          ],
-          "title": "VariantMCPData",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "error": {
-      "anyOf": [
-        {
-          "description": "Structured MCP tool error.",
-          "properties": {
-            "code": {
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "title": "Message",
-              "type": "string"
-            },
-            "retryable": {
-              "title": "Retryable",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "title": "MCPError",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
+    "_meta": {
+      "description": "Common metadata carried in the ``_meta`` block of every MCP tool envelope.\n\nResponse-Envelope Standard v1 field canon: ``tool``, ``request_id``,\ntiered ``next_commands``, ``capabilities_version``, and provenance\n(``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and\n``capabilities_version`` are populated by :func:`ok_envelope` /\n:func:`error_envelope`; callers never set them directly.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -2992,6 +2435,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Cached Count"
+        },
+        "capabilities_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilities Version"
         },
         "cost_tier": {
           "anyOf": [
@@ -3127,11 +2582,6 @@ not clinical decision support.
           "title": "Request Id",
           "type": "string"
         },
-        "research_use_only": {
-          "default": true,
-          "title": "Research Use Only",
-          "type": "boolean"
-        },
         "retry_after_ms": {
           "anyOf": [
             {
@@ -3145,9 +2595,21 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.3.0",
+          "default": "2.0.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
         },
         "uncached_count": {
           "anyOf": [
@@ -3160,6 +2622,11 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Uncached Count"
+        },
+        "unsafe_for_clinical_use": {
+          "default": true,
+          "title": "Unsafe For Clinical Use",
+          "type": "boolean"
         },
         "warnings": {
           "items": {
@@ -3212,21 +2679,461 @@ not clinical decision support.
           "type": "array"
         }
       },
-      "title": "MCPMeta",
       "type": "object"
     },
-    "ok": {
-      "title": "Ok",
+    "error_code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "recovery_action": {
+      "type": "string"
+    },
+    "result": {
+      "description": "MCP-presented variant data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
+      "properties": {
+        "disease_mechanisms": {
+          "items": {
+            "description": "Typed disease mechanism row from AutoPVS1.",
+            "properties": {
+              "adjusted_strength": {
+                "title": "Adjusted Strength",
+                "type": "string"
+              },
+              "clinical_validity": {
+                "title": "Clinical Validity",
+                "type": "string"
+              },
+              "consideration": {
+                "title": "Consideration",
+                "type": "string"
+              },
+              "disease": {
+                "title": "Disease",
+                "type": "string"
+              },
+              "disease_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Disease Url"
+              },
+              "gene": {
+                "title": "Gene",
+                "type": "string"
+              },
+              "gene_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Gene Url"
+              },
+              "inheritance": {
+                "title": "Inheritance",
+                "type": "string"
+              }
+            },
+            "required": [
+              "gene",
+              "disease",
+              "inheritance",
+              "clinical_validity",
+              "consideration",
+              "adjusted_strength"
+            ],
+            "title": "DiseaseMechanismMCP",
+            "type": "object"
+          },
+          "title": "Disease Mechanisms",
+          "type": "array"
+        },
+        "genome_build": {
+          "title": "Genome Build",
+          "type": "string"
+        },
+        "pvs1_flowchart": {
+          "anyOf": [
+            {
+              "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+              "properties": {
+                "decision_tree": {
+                  "items": {
+                    "description": "One typed step in the PVS1 decision flowchart.",
+                    "properties": {
+                      "code": {
+                        "title": "Code",
+                        "type": "string"
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Description"
+                      },
+                      "note_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Note Id"
+                      },
+                      "note_text": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Note Text"
+                      }
+                    },
+                    "required": [
+                      "code"
+                    ],
+                    "title": "FlowchartStepMCP",
+                    "type": "object"
+                  },
+                  "title": "Decision Tree",
+                  "type": "array"
+                },
+                "decision_tree_raw": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "additionalProperties": true,
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Decision Tree Raw"
+                },
+                "final_strength": {
+                  "title": "Final Strength",
+                  "type": "string"
+                },
+                "final_strength_source": {
+                  "default": "asserted",
+                  "enum": [
+                    "asserted",
+                    "inferred"
+                  ],
+                  "title": "Final Strength Source",
+                  "type": "string"
+                },
+                "notes": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Notes"
+                },
+                "path_gloss": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Path Gloss"
+                },
+                "preliminary_decision_path": {
+                  "title": "Preliminary Decision Path",
+                  "type": "string"
+                },
+                "terminal_note": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Terminal Note"
+                }
+              },
+              "required": [
+                "preliminary_decision_path",
+                "final_strength"
+              ],
+              "title": "PVS1FlowchartMCP",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Url"
+        },
+        "upstream_service": {
+          "default": "AutoPVS1",
+          "title": "Upstream Service",
+          "type": "string"
+        },
+        "variant_info": {
+          "description": "Typed variant information exposed through MCP.\n\nOnly ``variant_id`` is required at the contract level. ``variant_type``\nand ``gene_symbol`` are populated for summary/standard/full but absent\nwhen ``response_mode='ids_only'`` returns just the upstream identifier.",
+          "properties": {
+            "chgvs": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Chgvs"
+            },
+            "exon": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Exon"
+            },
+            "external_links": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "External Links"
+            },
+            "external_links_raw": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "External Links Raw"
+            },
+            "gene_symbol": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Gene Symbol"
+            },
+            "gene_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Gene Url"
+            },
+            "haploinsufficiency": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Haploinsufficiency"
+            },
+            "haploinsufficiency_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Haploinsufficiency Url"
+            },
+            "intron": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Intron"
+            },
+            "phgvs": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Phgvs"
+            },
+            "pli_score": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pli Score"
+            },
+            "pli_score_display": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pli Score Display"
+            },
+            "variant_id": {
+              "title": "Variant Id",
+              "type": "string"
+            },
+            "variant_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Variant Type"
+            }
+          },
+          "required": [
+            "variant_id"
+          ],
+          "title": "VariantInfoMCP",
+          "type": "object"
+        }
+      },
+      "required": [
+        "genome_build",
+        "variant_info"
+      ],
+      "type": "object"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "success": {
       "type": "boolean"
     }
   },
   "required": [
-    "ok",
-    "data",
-    "error",
-    "meta"
+    "success",
+    "_meta"
   ],
-  "title": "VariantMCPEnvelope",
   "type": "object"
 }
 ```
@@ -3252,26 +3159,27 @@ allele-keyed candidates so the caller picks one and re-calls that
 single item; a resolver outage returns the retryable
 ``external_resolver_unavailable`` code.
 
-Per-item envelope: each result has ``{ok, input, data, error,
-meta}`` where ``meta.cache_status`` and ``meta.elapsed_ms`` echo
-that one upstream call's outcome (absent when the item
-short-circuited before upstream). Output items preserve input
-order. ``response_mode`` and ``include_unmet`` apply per item;
-the outer ``meta_mode`` controls the envelope. Per-item failures
-do not stop the batch unless ``continue_on_error=false``. Bulk
-dispatch errors (malformed ``items``) use error code
-``invalid_bulk_input``.
+Per-item envelope: each row in the top-level ``results`` array has
+``{ok, input, data, error, meta}`` where ``meta.cache_status`` and
+``meta.elapsed_ms`` echo that one upstream call's outcome (absent
+when the item short-circuited before upstream). This per-item
+shape predates and is scoped separately from the Response-Envelope
+Standard v1 outer frame. Output items preserve input order.
+``response_mode`` and ``include_unmet`` apply per item; the outer
+``meta_mode`` controls the envelope. Per-item failures do not stop
+the batch unless ``continue_on_error=false``. Bulk dispatch errors
+(malformed ``items``) use error code ``invalid_bulk_input``.
 
-Aggregate cache observability: top-level ``meta.cache_status``
+Aggregate cache observability: top-level ``_meta.cache_status``
 echoes the unanimous status when every item agrees; on a mixed
-batch it is ``"mixed"`` and ``meta.cached_count`` /
-``meta.uncached_count`` split items by warm
+batch it is ``"mixed"`` and ``_meta.cached_count`` /
+``_meta.uncached_count`` split items by warm
 (``hit``+``coalesced``) vs cold (``miss``+``bypass``).
-``meta.elapsed_ms`` is the SUM of per-item upstream wall-clocks
+``_meta.elapsed_ms`` is the SUM of per-item upstream wall-clocks
 (the honest total for a sequential bulk).
 
 Warning aggregation: per-item warnings are NOT echoed; they are
-collapsed into ``meta.warnings`` at the top level. A warning code
+collapsed into ``_meta.warnings`` at the top level. A warning code
 is aggregated only when more than one distinct item emitted it;
 single-item codes appear without ``count`` or ``affected_indices``.
 Aggregated codes carry ``count`` (distinct items) and the sorted
@@ -3352,657 +3260,9 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
 
 ```json
 {
-  "description": "Envelope schema for ``get_variants_pvs1_data_bulk``.",
   "properties": {
-    "data": {
-      "anyOf": [
-        {
-          "description": "Aggregate payload for ``get_variants_pvs1_data_bulk``.\n\n``total`` is always the requested item count. ``attempted`` is the count\nthat ran (= ``len(items)``). ``skipped`` is the count that the server did\nnot attempt because ``continue_on_error=False`` broke the loop early.\nInvariant: ``attempted == succeeded + failed`` and ``total == attempted + skipped``.",
-          "properties": {
-            "attempted": {
-              "title": "Attempted",
-              "type": "integer"
-            },
-            "failed": {
-              "title": "Failed",
-              "type": "integer"
-            },
-            "items": {
-              "items": {
-                "description": "Per-item result for a bulk variant PVS1 request.",
-                "properties": {
-                  "data": {
-                    "anyOf": [
-                      {
-                        "description": "MCP-presented variant data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
-                        "properties": {
-                          "disease_mechanisms": {
-                            "items": {
-                              "description": "Typed disease mechanism row from AutoPVS1.",
-                              "properties": {
-                                "adjusted_strength": {
-                                  "title": "Adjusted Strength",
-                                  "type": "string"
-                                },
-                                "clinical_validity": {
-                                  "title": "Clinical Validity",
-                                  "type": "string"
-                                },
-                                "consideration": {
-                                  "title": "Consideration",
-                                  "type": "string"
-                                },
-                                "disease": {
-                                  "title": "Disease",
-                                  "type": "string"
-                                },
-                                "disease_url": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "default": null,
-                                  "title": "Disease Url"
-                                },
-                                "gene": {
-                                  "title": "Gene",
-                                  "type": "string"
-                                },
-                                "gene_url": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "default": null,
-                                  "title": "Gene Url"
-                                },
-                                "inheritance": {
-                                  "title": "Inheritance",
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "gene",
-                                "disease",
-                                "inheritance",
-                                "clinical_validity",
-                                "consideration",
-                                "adjusted_strength"
-                              ],
-                              "title": "DiseaseMechanismMCP",
-                              "type": "object"
-                            },
-                            "title": "Disease Mechanisms",
-                            "type": "array"
-                          },
-                          "genome_build": {
-                            "title": "Genome Build",
-                            "type": "string"
-                          },
-                          "pvs1_flowchart": {
-                            "anyOf": [
-                              {
-                                "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
-                                "properties": {
-                                  "decision_tree": {
-                                    "items": {
-                                      "description": "One typed step in the PVS1 decision flowchart.",
-                                      "properties": {
-                                        "code": {
-                                          "title": "Code",
-                                          "type": "string"
-                                        },
-                                        "description": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ],
-                                          "default": null,
-                                          "title": "Description"
-                                        },
-                                        "note_id": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ],
-                                          "default": null,
-                                          "title": "Note Id"
-                                        },
-                                        "note_text": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ],
-                                          "default": null,
-                                          "title": "Note Text"
-                                        }
-                                      },
-                                      "required": [
-                                        "code"
-                                      ],
-                                      "title": "FlowchartStepMCP",
-                                      "type": "object"
-                                    },
-                                    "title": "Decision Tree",
-                                    "type": "array"
-                                  },
-                                  "decision_tree_raw": {
-                                    "anyOf": [
-                                      {
-                                        "items": {
-                                          "additionalProperties": true,
-                                          "type": "object"
-                                        },
-                                        "type": "array"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Decision Tree Raw"
-                                  },
-                                  "final_strength": {
-                                    "title": "Final Strength",
-                                    "type": "string"
-                                  },
-                                  "final_strength_source": {
-                                    "default": "asserted",
-                                    "enum": [
-                                      "asserted",
-                                      "inferred"
-                                    ],
-                                    "title": "Final Strength Source",
-                                    "type": "string"
-                                  },
-                                  "notes": {
-                                    "anyOf": [
-                                      {
-                                        "additionalProperties": {
-                                          "type": "string"
-                                        },
-                                        "type": "object"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Notes"
-                                  },
-                                  "path_gloss": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Path Gloss"
-                                  },
-                                  "preliminary_decision_path": {
-                                    "title": "Preliminary Decision Path",
-                                    "type": "string"
-                                  },
-                                  "terminal_note": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "default": null,
-                                    "title": "Terminal Note"
-                                  }
-                                },
-                                "required": [
-                                  "preliminary_decision_path",
-                                  "final_strength"
-                                ],
-                                "title": "PVS1FlowchartMCP",
-                                "type": "object"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null
-                          },
-                          "source_url": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Source Url"
-                          },
-                          "upstream_service": {
-                            "default": "AutoPVS1",
-                            "title": "Upstream Service",
-                            "type": "string"
-                          },
-                          "variant_info": {
-                            "description": "Typed variant information exposed through MCP.\n\nOnly ``variant_id`` is required at the contract level. ``variant_type``\nand ``gene_symbol`` are populated for summary/standard/full but absent\nwhen ``response_mode='ids_only'`` returns just the upstream identifier.",
-                            "properties": {
-                              "chgvs": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Chgvs"
-                              },
-                              "exon": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Exon"
-                              },
-                              "external_links": {
-                                "anyOf": [
-                                  {
-                                    "additionalProperties": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "type": "object"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "External Links"
-                              },
-                              "external_links_raw": {
-                                "anyOf": [
-                                  {
-                                    "additionalProperties": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "type": "object"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "External Links Raw"
-                              },
-                              "gene_symbol": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Gene Symbol"
-                              },
-                              "gene_url": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Gene Url"
-                              },
-                              "haploinsufficiency": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Haploinsufficiency"
-                              },
-                              "haploinsufficiency_url": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Haploinsufficiency Url"
-                              },
-                              "intron": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Intron"
-                              },
-                              "phgvs": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Phgvs"
-                              },
-                              "pli_score": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Pli Score"
-                              },
-                              "pli_score_display": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Pli Score Display"
-                              },
-                              "variant_id": {
-                                "title": "Variant Id",
-                                "type": "string"
-                              },
-                              "variant_type": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "default": null,
-                                "title": "Variant Type"
-                              }
-                            },
-                            "required": [
-                              "variant_id"
-                            ],
-                            "title": "VariantInfoMCP",
-                            "type": "object"
-                          }
-                        },
-                        "required": [
-                          "genome_build",
-                          "variant_info"
-                        ],
-                        "title": "VariantMCPData",
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null
-                  },
-                  "error": {
-                    "anyOf": [
-                      {
-                        "description": "Structured MCP tool error.",
-                        "properties": {
-                          "code": {
-                            "title": "Code",
-                            "type": "string"
-                          },
-                          "message": {
-                            "title": "Message",
-                            "type": "string"
-                          },
-                          "retryable": {
-                            "title": "Retryable",
-                            "type": "boolean"
-                          },
-                          "suggestions": {
-                            "items": {
-                              "type": "string"
-                            },
-                            "title": "Suggestions",
-                            "type": "array"
-                          }
-                        },
-                        "required": [
-                          "code",
-                          "message",
-                          "retryable"
-                        ],
-                        "title": "MCPError",
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null
-                  },
-                  "input": {
-                    "description": "One item in a bulk variant PVS1 request.",
-                    "properties": {
-                      "genome_build": {
-                        "description": "Genome build: hg19 or hg38. Invalid values yield a per-item error.",
-                        "title": "Genome Build",
-                        "type": "string"
-                      },
-                      "variant_id": {
-                        "description": "AutoPVS1 variant ID, for example X-82763936-A-T.",
-                        "maxLength": 128,
-                        "minLength": 1,
-                        "title": "Variant Id",
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "genome_build",
-                      "variant_id"
-                    ],
-                    "title": "BulkVariantPVS1InputItem",
-                    "type": "object"
-                  },
-                  "meta": {
-                    "anyOf": [
-                      {
-                        "description": "Per-item cost/cache observability for bulk PVS1 result items.\n\nTop-level ``meta.cache_status`` aggregates the batch (\"mixed\" when\nitems had varying outcomes) \u2014 agents that need to forecast cost on a\nper-item basis read this block. Absent when the item short-circuited\nbefore any upstream call (e.g. invalid input).",
-                        "properties": {
-                          "cache_status": {
-                            "anyOf": [
-                              {
-                                "enum": [
-                                  "hit",
-                                  "miss",
-                                  "coalesced",
-                                  "bypass"
-                                ],
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Cache Status"
-                          },
-                          "elapsed_ms": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "default": null,
-                            "title": "Elapsed Ms"
-                          }
-                        },
-                        "title": "BulkPerItemMeta",
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null
-                  },
-                  "ok": {
-                    "title": "Ok",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "ok",
-                  "input"
-                ],
-                "title": "BulkVariantPVS1ResultItem",
-                "type": "object"
-              },
-              "title": "Items",
-              "type": "array"
-            },
-            "skipped": {
-              "title": "Skipped",
-              "type": "integer"
-            },
-            "succeeded": {
-              "title": "Succeeded",
-              "type": "integer"
-            },
-            "total": {
-              "title": "Total",
-              "type": "integer"
-            }
-          },
-          "required": [
-            "total",
-            "attempted",
-            "skipped",
-            "succeeded",
-            "failed"
-          ],
-          "title": "BulkVariantsMCPData",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "error": {
-      "anyOf": [
-        {
-          "description": "Structured MCP tool error.",
-          "properties": {
-            "code": {
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "title": "Message",
-              "type": "string"
-            },
-            "retryable": {
-              "title": "Retryable",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "title": "MCPError",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
+    "_meta": {
+      "description": "Common metadata carried in the ``_meta`` block of every MCP tool envelope.\n\nResponse-Envelope Standard v1 field canon: ``tool``, ``request_id``,\ntiered ``next_commands``, ``capabilities_version``, and provenance\n(``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and\n``capabilities_version`` are populated by :func:`ok_envelope` /\n:func:`error_envelope`; callers never set them directly.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -4027,6 +3287,18 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           ],
           "default": null,
           "title": "Cached Count"
+        },
+        "capabilities_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilities Version"
         },
         "cost_tier": {
           "anyOf": [
@@ -4162,11 +3434,6 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "title": "Request Id",
           "type": "string"
         },
-        "research_use_only": {
-          "default": true,
-          "title": "Research Use Only",
-          "type": "boolean"
-        },
         "retry_after_ms": {
           "anyOf": [
             {
@@ -4180,9 +3447,21 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.3.0",
+          "default": "2.0.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
         },
         "uncached_count": {
           "anyOf": [
@@ -4195,6 +3474,11 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           ],
           "default": null,
           "title": "Uncached Count"
+        },
+        "unsafe_for_clinical_use": {
+          "default": true,
+          "title": "Unsafe For Clinical Use",
+          "type": "boolean"
         },
         "warnings": {
           "items": {
@@ -4247,21 +3531,616 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "type": "array"
         }
       },
-      "title": "MCPMeta",
       "type": "object"
     },
-    "ok": {
-      "title": "Ok",
+    "attempted": {
+      "title": "Attempted",
+      "type": "integer"
+    },
+    "error_code": {
+      "type": "string"
+    },
+    "failed": {
+      "title": "Failed",
+      "type": "integer"
+    },
+    "message": {
+      "type": "string"
+    },
+    "recovery_action": {
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "description": "Per-item result for a bulk variant PVS1 request.",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "description": "MCP-presented variant data.\n\n``pvs1_flowchart`` is required in summary/standard/full modes but\nomitted entirely when ``response_mode='ids_only'`` returns just the\nupstream identifier.",
+                "properties": {
+                  "disease_mechanisms": {
+                    "items": {
+                      "description": "Typed disease mechanism row from AutoPVS1.",
+                      "properties": {
+                        "adjusted_strength": {
+                          "title": "Adjusted Strength",
+                          "type": "string"
+                        },
+                        "clinical_validity": {
+                          "title": "Clinical Validity",
+                          "type": "string"
+                        },
+                        "consideration": {
+                          "title": "Consideration",
+                          "type": "string"
+                        },
+                        "disease": {
+                          "title": "Disease",
+                          "type": "string"
+                        },
+                        "disease_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "title": "Disease Url"
+                        },
+                        "gene": {
+                          "title": "Gene",
+                          "type": "string"
+                        },
+                        "gene_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "title": "Gene Url"
+                        },
+                        "inheritance": {
+                          "title": "Inheritance",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "gene",
+                        "disease",
+                        "inheritance",
+                        "clinical_validity",
+                        "consideration",
+                        "adjusted_strength"
+                      ],
+                      "title": "DiseaseMechanismMCP",
+                      "type": "object"
+                    },
+                    "title": "Disease Mechanisms",
+                    "type": "array"
+                  },
+                  "genome_build": {
+                    "title": "Genome Build",
+                    "type": "string"
+                  },
+                  "pvs1_flowchart": {
+                    "anyOf": [
+                      {
+                        "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+                        "properties": {
+                          "decision_tree": {
+                            "items": {
+                              "description": "One typed step in the PVS1 decision flowchart.",
+                              "properties": {
+                                "code": {
+                                  "title": "Code",
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "default": null,
+                                  "title": "Description"
+                                },
+                                "note_id": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "default": null,
+                                  "title": "Note Id"
+                                },
+                                "note_text": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "default": null,
+                                  "title": "Note Text"
+                                }
+                              },
+                              "required": [
+                                "code"
+                              ],
+                              "title": "FlowchartStepMCP",
+                              "type": "object"
+                            },
+                            "title": "Decision Tree",
+                            "type": "array"
+                          },
+                          "decision_tree_raw": {
+                            "anyOf": [
+                              {
+                                "items": {
+                                  "additionalProperties": true,
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Decision Tree Raw"
+                          },
+                          "final_strength": {
+                            "title": "Final Strength",
+                            "type": "string"
+                          },
+                          "final_strength_source": {
+                            "default": "asserted",
+                            "enum": [
+                              "asserted",
+                              "inferred"
+                            ],
+                            "title": "Final Strength Source",
+                            "type": "string"
+                          },
+                          "notes": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Notes"
+                          },
+                          "path_gloss": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Path Gloss"
+                          },
+                          "preliminary_decision_path": {
+                            "title": "Preliminary Decision Path",
+                            "type": "string"
+                          },
+                          "terminal_note": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Terminal Note"
+                          }
+                        },
+                        "required": [
+                          "preliminary_decision_path",
+                          "final_strength"
+                        ],
+                        "title": "PVS1FlowchartMCP",
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "source_url": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Source Url"
+                  },
+                  "upstream_service": {
+                    "default": "AutoPVS1",
+                    "title": "Upstream Service",
+                    "type": "string"
+                  },
+                  "variant_info": {
+                    "description": "Typed variant information exposed through MCP.\n\nOnly ``variant_id`` is required at the contract level. ``variant_type``\nand ``gene_symbol`` are populated for summary/standard/full but absent\nwhen ``response_mode='ids_only'`` returns just the upstream identifier.",
+                    "properties": {
+                      "chgvs": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Chgvs"
+                      },
+                      "exon": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Exon"
+                      },
+                      "external_links": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "External Links"
+                      },
+                      "external_links_raw": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "External Links Raw"
+                      },
+                      "gene_symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Gene Symbol"
+                      },
+                      "gene_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Gene Url"
+                      },
+                      "haploinsufficiency": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Haploinsufficiency"
+                      },
+                      "haploinsufficiency_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Haploinsufficiency Url"
+                      },
+                      "intron": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Intron"
+                      },
+                      "phgvs": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Phgvs"
+                      },
+                      "pli_score": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Pli Score"
+                      },
+                      "pli_score_display": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Pli Score Display"
+                      },
+                      "variant_id": {
+                        "title": "Variant Id",
+                        "type": "string"
+                      },
+                      "variant_type": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "title": "Variant Type"
+                      }
+                    },
+                    "required": [
+                      "variant_id"
+                    ],
+                    "title": "VariantInfoMCP",
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "genome_build",
+                  "variant_info"
+                ],
+                "title": "VariantMCPData",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "error": {
+            "anyOf": [
+              {
+                "description": "Structured MCP tool error.",
+                "properties": {
+                  "code": {
+                    "title": "Code",
+                    "type": "string"
+                  },
+                  "message": {
+                    "title": "Message",
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "title": "Retryable",
+                    "type": "boolean"
+                  },
+                  "suggestions": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "Suggestions",
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "title": "MCPError",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "input": {
+            "description": "One item in a bulk variant PVS1 request.",
+            "properties": {
+              "genome_build": {
+                "description": "Genome build: hg19 or hg38. Invalid values yield a per-item error.",
+                "title": "Genome Build",
+                "type": "string"
+              },
+              "variant_id": {
+                "description": "AutoPVS1 variant ID, for example X-82763936-A-T.",
+                "maxLength": 128,
+                "minLength": 1,
+                "title": "Variant Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "genome_build",
+              "variant_id"
+            ],
+            "title": "BulkVariantPVS1InputItem",
+            "type": "object"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "description": "Per-item cost/cache observability for bulk PVS1 result items.\n\nTop-level ``meta.cache_status`` aggregates the batch (\"mixed\" when\nitems had varying outcomes) \u2014 agents that need to forecast cost on a\nper-item basis read this block. Absent when the item short-circuited\nbefore any upstream call (e.g. invalid input).",
+                "properties": {
+                  "cache_status": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "hit",
+                          "miss",
+                          "coalesced",
+                          "bypass"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Cache Status"
+                  },
+                  "elapsed_ms": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Elapsed Ms"
+                  }
+                },
+                "title": "BulkPerItemMeta",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "input"
+        ],
+        "title": "BulkVariantPVS1ResultItem",
+        "type": "object"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "retryable": {
       "type": "boolean"
+    },
+    "skipped": {
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "succeeded": {
+      "title": "Succeeded",
+      "type": "integer"
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "total": {
+      "title": "Total",
+      "type": "integer"
     }
   },
   "required": [
-    "ok",
-    "data",
-    "error",
-    "meta"
+    "success",
+    "_meta"
   ],
-  "title": "BulkVariantsMCPEnvelope",
   "type": "object"
 }
 ```
@@ -4369,209 +4248,9 @@ not clinical decision support.
 
 ```json
 {
-  "description": "Envelope schema for ``search_variants``.",
   "properties": {
-    "data": {
-      "anyOf": [
-        {
-          "description": "MCP-presented search page.",
-          "properties": {
-            "genome_build": {
-              "title": "Genome Build",
-              "type": "string"
-            },
-            "ordering": {
-              "const": "upstream",
-              "default": "upstream",
-              "title": "Ordering",
-              "type": "string"
-            },
-            "pagination": {
-              "description": "Pagination block for ``search_variants``.\n\nCursors are base64url-encoded ``{\"offset\": N}`` tokens. They are\ntransparent by convention: a caller MAY decode one to read the row\noffset, but the encoding is not a stable contract and MAY change to an\nopaque form later, so prefer echoing ``next_cursor`` back verbatim.\n``offset`` is echoed for operator visibility only.\n``total_count_kind`` documents how to interpret ``total_count`` on the\nsurrounding ``SearchMCPData``: ``upstream_page`` means the count is\nonly what the upstream returned for this query (no guarantee of\nexhaustiveness); ``upstream_total`` means the upstream guarantees the\nfull result set was returned.\n\n``previous_cursor`` and ``next_cursor`` carry ``= None`` defaults so\nthe published JSON schema marks them non-required. The wire payload\nstrips null fields (``exclude_none=True``) and the MCP client\nvalidates structured content against that schema \u2014 without the\ndefaults, page 1 (no previous) and the last page (no next) would\nfail validation.",
-              "properties": {
-                "has_more": {
-                  "title": "Has More",
-                  "type": "boolean"
-                },
-                "next_cursor": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Next Cursor"
-                },
-                "offset": {
-                  "title": "Offset",
-                  "type": "integer"
-                },
-                "previous_cursor": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "title": "Previous Cursor"
-                },
-                "total_count_kind": {
-                  "default": "upstream_page",
-                  "enum": [
-                    "upstream_total",
-                    "upstream_page"
-                  ],
-                  "title": "Total Count Kind",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "has_more",
-                "offset"
-              ],
-              "title": "SearchPaginationMCP",
-              "type": "object"
-            },
-            "query": {
-              "title": "Query",
-              "type": "string"
-            },
-            "results": {
-              "items": {
-                "description": "Typed AutoPVS1 search result row.\n\nOnly ``variant_id`` and ``url`` are guaranteed to be present.\n``response_mode='ids_only'`` drops the descriptive fields so callers\nthat only need the identifier and a re-fetch URL pay no extra bytes.",
-                "properties": {
-                  "gene": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Gene"
-                  },
-                  "genome_build": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Genome Build"
-                  },
-                  "url": {
-                    "title": "Url",
-                    "type": "string"
-                  },
-                  "variant_id": {
-                    "title": "Variant Id",
-                    "type": "string"
-                  },
-                  "variant_type": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "default": null,
-                    "title": "Variant Type"
-                  }
-                },
-                "required": [
-                  "variant_id",
-                  "url"
-                ],
-                "title": "SearchResultMCP",
-                "type": "object"
-              },
-              "title": "Results",
-              "type": "array"
-            },
-            "returned_count": {
-              "title": "Returned Count",
-              "type": "integer"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            },
-            "total_count": {
-              "title": "Total Count",
-              "type": "integer"
-            }
-          },
-          "required": [
-            "query",
-            "genome_build",
-            "total_count",
-            "returned_count",
-            "pagination"
-          ],
-          "title": "SearchMCPData",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "error": {
-      "anyOf": [
-        {
-          "description": "Structured MCP tool error.",
-          "properties": {
-            "code": {
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "title": "Message",
-              "type": "string"
-            },
-            "retryable": {
-              "title": "Retryable",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "title": "Suggestions",
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "title": "MCPError",
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "meta": {
-      "description": "Common metadata on every MCP tool envelope.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
+    "_meta": {
+      "description": "Common metadata carried in the ``_meta`` block of every MCP tool envelope.\n\nResponse-Envelope Standard v1 field canon: ``tool``, ``request_id``,\ntiered ``next_commands``, ``capabilities_version``, and provenance\n(``recommended_citation``, ``unsafe_for_clinical_use``). ``tool`` and\n``capabilities_version`` are populated by :func:`ok_envelope` /\n:func:`error_envelope`; callers never set them directly.\n\n``effective_chars`` is the byte length of the serialized ``data`` field\n(compact JSON). It lets LLM callers calibrate against the advertised\nper-mode ``char_budget`` after the first call instead of guessing.\n\n``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's\nwall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``\n| ``bypass``). Populated by the cache wrapper via the telemetry\nContextVar; both drop from the wire when the tool made no upstream\ncall (e.g. ``get_server_health`` or ``get_server_capabilities``).\n\n``cost_tier`` is a coarse latency hint sourced from\n:data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value\nappears in the detailed capabilities resource so the wire and the\ndiscovery doc stay in lockstep. LLM callers use it to plan call\nsequencing without re-fetching capabilities every turn.\n\n``rate_limit_floor_ms`` is the configured AutoPVS1 upstream gap\n(default 1000 ms; tunable via\n``AUTOPVS1_LINK_API_RATE_LIMIT_DELAY``). Surfaced only on\nscrape-tier envelopes since it is meaningless for cheap tools.\n\n``next_call_earliest_at`` is an ISO-8601 UTC timestamp populated\nonly when this call actually drove an upstream request\n(``cache_status in {\"miss\", \"coalesced\"}``) \u2014 those reset the\nrate-limit clock, so the next upstream call is gated until that\ninstant. ``hit`` / ``bypass`` cannot determine the next earliest\ntime (the clock may already have elapsed), so the field stays\nabsent.\n\n``retry_after_ms`` populates only on error envelopes for which the\ncaller can sensibly retry after a delay; on success envelopes it\ndrops from the wire.\n\n``next_actions`` is a per-error-code list of recovery hints\nsourced from\n:data:`autopvs1_link.mcp.registries.ERROR_NEXT_ACTIONS`. Populates\non every error envelope so a failing LLM dispatcher can pick the\nnext move without paying a ToolSearch round-trip to re-discover\nthe surface; absent on success envelopes.\n\n``cached_count`` and ``uncached_count`` populate only on bulk\nsuccess envelopes when items had mixed cache outcomes. In that\ncase ``cache_status='mixed'`` and the counts split items by\nwhether they returned warm (``hit`` + ``coalesced``) or cold\n(``miss`` + ``bypass``). Unanimous batches emit the single\nunderlying status and drop both counts. Cheap and single-tool\nenvelopes never carry these.",
       "properties": {
         "cache_status": {
           "anyOf": [
@@ -4596,6 +4275,18 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Cached Count"
+        },
+        "capabilities_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilities Version"
         },
         "cost_tier": {
           "anyOf": [
@@ -4731,11 +4422,6 @@ not clinical decision support.
           "title": "Request Id",
           "type": "string"
         },
-        "research_use_only": {
-          "default": true,
-          "title": "Research Use Only",
-          "type": "boolean"
-        },
         "retry_after_ms": {
           "anyOf": [
             {
@@ -4749,9 +4435,21 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "1.3.0",
+          "default": "2.0.0",
           "title": "Server Version",
           "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
         },
         "uncached_count": {
           "anyOf": [
@@ -4764,6 +4462,11 @@ not clinical decision support.
           ],
           "default": null,
           "title": "Uncached Count"
+        },
+        "unsafe_for_clinical_use": {
+          "default": true,
+          "title": "Unsafe For Clinical Use",
+          "type": "boolean"
         },
         "warnings": {
           "items": {
@@ -4816,21 +4519,168 @@ not clinical decision support.
           "type": "array"
         }
       },
-      "title": "MCPMeta",
       "type": "object"
     },
-    "ok": {
-      "title": "Ok",
+    "error_code": {
+      "type": "string"
+    },
+    "genome_build": {
+      "title": "Genome Build",
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "ordering": {
+      "const": "upstream",
+      "default": "upstream",
+      "title": "Ordering",
+      "type": "string"
+    },
+    "pagination": {
+      "description": "Pagination block for ``search_variants``.\n\nCursors are base64url-encoded ``{\"offset\": N}`` tokens. They are\ntransparent by convention: a caller MAY decode one to read the row\noffset, but the encoding is not a stable contract and MAY change to an\nopaque form later, so prefer echoing ``next_cursor`` back verbatim.\n``offset`` is echoed for operator visibility only.\n``total_count_kind`` documents how to interpret ``total_count`` on the\nsurrounding ``SearchMCPData``: ``upstream_page`` means the count is\nonly what the upstream returned for this query (no guarantee of\nexhaustiveness); ``upstream_total`` means the upstream guarantees the\nfull result set was returned.\n\n``previous_cursor`` and ``next_cursor`` carry ``= None`` defaults so\nthe published JSON schema marks them non-required. The wire payload\nstrips null fields (``exclude_none=True``) and the MCP client\nvalidates structured content against that schema \u2014 without the\ndefaults, page 1 (no previous) and the last page (no next) would\nfail validation.",
+      "properties": {
+        "has_more": {
+          "title": "Has More",
+          "type": "boolean"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "offset": {
+          "title": "Offset",
+          "type": "integer"
+        },
+        "previous_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Cursor"
+        },
+        "total_count_kind": {
+          "default": "upstream_page",
+          "enum": [
+            "upstream_total",
+            "upstream_page"
+          ],
+          "title": "Total Count Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "has_more",
+        "offset"
+      ],
+      "title": "SearchPaginationMCP",
+      "type": "object"
+    },
+    "query": {
+      "title": "Query",
+      "type": "string"
+    },
+    "recovery_action": {
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "description": "Typed AutoPVS1 search result row.\n\nOnly ``variant_id`` and ``url`` are guaranteed to be present.\n``response_mode='ids_only'`` drops the descriptive fields so callers\nthat only need the identifier and a re-fetch URL pay no extra bytes.",
+        "properties": {
+          "gene": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Gene"
+          },
+          "genome_build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Genome Build"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "variant_id": {
+            "title": "Variant Id",
+            "type": "string"
+          },
+          "variant_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Variant Type"
+          }
+        },
+        "required": [
+          "variant_id",
+          "url"
+        ],
+        "title": "SearchResultMCP",
+        "type": "object"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "retryable": {
       "type": "boolean"
+    },
+    "returned_count": {
+      "title": "Returned Count",
+      "type": "integer"
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "suggestions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suggestions",
+      "type": "array"
+    },
+    "total_count": {
+      "title": "Total Count",
+      "type": "integer"
     }
   },
   "required": [
-    "ok",
-    "data",
-    "error",
-    "meta"
+    "success",
+    "_meta"
   ],
-  "title": "SearchMCPEnvelope",
   "type": "object"
 }
 ```

@@ -76,13 +76,13 @@ async def test_bulk_variants_happy_path(mocker) -> None:
         },
     )
     payload = result.structured_content
-    assert payload["ok"] is True
-    assert payload["data"]["total"] == 2
-    assert payload["data"]["attempted"] == 2
-    assert payload["data"]["skipped"] == 0
-    assert payload["data"]["succeeded"] == 2
-    assert payload["data"]["failed"] == 0
-    items = payload["data"]["items"]
+    assert payload["success"] is True
+    assert payload["total"] == 2
+    assert payload["attempted"] == 2
+    assert payload["skipped"] == 0
+    assert payload["succeeded"] == 2
+    assert payload["failed"] == 0
+    items = payload["results"]
     assert all(item["ok"] for item in items)
     assert [item["input"]["variant_id"] for item in items] == ["X-1-A-T", "X-2-G-A"]
     assert items[0]["data"]["pvs1_flowchart"]["final_strength"] == "Strong"
@@ -108,10 +108,10 @@ async def test_bulk_variants_mixed_per_item_errors(mocker) -> None:
         },
     )
     payload = result.structured_content
-    assert payload["ok"] is True
-    assert payload["data"]["succeeded"] == 1
-    assert payload["data"]["failed"] == 1
-    first, second = payload["data"]["items"]
+    assert payload["success"] is True
+    assert payload["succeeded"] == 1
+    assert payload["failed"] == 1
+    first, second = payload["results"]
     assert first["ok"] is True and "error" not in first
     assert second["ok"] is False
     # Null-stripping drops ``data`` from failed per-item envelopes too.
@@ -137,11 +137,11 @@ async def test_bulk_variants_continue_on_error_false_stops_early(mocker) -> None
         },
     )
     payload = result.structured_content
-    assert payload["data"]["total"] == 2
-    assert payload["data"]["attempted"] == 1
-    assert payload["data"]["skipped"] == 1
-    assert payload["data"]["succeeded"] == 0
-    assert payload["data"]["failed"] == 1
+    assert payload["total"] == 2
+    assert payload["attempted"] == 1
+    assert payload["skipped"] == 1
+    assert payload["succeeded"] == 0
+    assert payload["failed"] == 1
     assert fake.await_count == 1
 
 
@@ -154,9 +154,9 @@ async def test_bulk_variants_rejects_too_many_items() -> None:
         {"items": items},
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "invalid_bulk_input"
-    assert "10" in payload["error"]["message"]
+    assert payload["success"] is False
+    assert payload["error_code"] == "invalid_bulk_input"
+    assert "10" in payload["message"]
 
 
 @pytest.mark.asyncio
@@ -167,8 +167,8 @@ async def test_bulk_variants_rejects_empty_list() -> None:
         {"items": []},
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "invalid_bulk_input"
+    assert payload["success"] is False
+    assert payload["error_code"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -186,7 +186,7 @@ async def test_bulk_variants_per_item_input_validation_yields_per_item_error(moc
         },
     )
     payload = result.structured_content
-    first, second = payload["data"]["items"]
+    first, second = payload["results"]
     assert first["ok"] is False
     assert first["error"]["code"] == "invalid_variant_id"
     assert second["ok"] is True
@@ -209,9 +209,9 @@ async def test_bulk_variants_propagates_response_and_meta_modes(mocker) -> None:
         },
     )
     payload = result.structured_content
-    item_data = payload["data"]["items"][0]["data"]
+    item_data = payload["results"][0]["data"]
     assert item_data["disease_mechanisms"] == []
-    assert "recommended_citation" not in payload["meta"]
+    assert "recommended_citation" not in payload["_meta"]
 
 
 @pytest.mark.asyncio
@@ -232,8 +232,8 @@ async def test_bulk_cnvs_happy_path_with_size_int(mocker) -> None:
         },
     )
     payload = result.structured_content
-    assert payload["ok"] is True
-    item = payload["data"]["items"][0]
+    assert payload["success"] is True
+    item = payload["results"][0]
     assert item["ok"] is True
     assert item["data"]["cnv_info"]["size"] == 72243
     assert item["data"]["cnv_info"]["cnv_type"] == "DEL"
@@ -245,8 +245,8 @@ async def test_bulk_cnvs_rejects_too_many_items() -> None:
     mcp = build_mcp_server()
     result = await mcp.call_tool("get_cnvs_pvs1_data_bulk", {"items": items})
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "invalid_bulk_input"
+    assert payload["success"] is False
+    assert payload["error_code"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -254,8 +254,8 @@ async def test_bulk_variants_rejects_non_list_items() -> None:
     mcp = build_mcp_server()
     result = await mcp.call_tool("get_variants_pvs1_data_bulk", {"items": "not_a_list"})
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "invalid_bulk_input"
+    assert payload["success"] is False
+    assert payload["error_code"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -266,8 +266,8 @@ async def test_bulk_variants_rejects_non_object_item() -> None:
         {"items": [{"genome_build": "hg19", "variant_id": "X-1-A-T"}, "garbage"]},
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "invalid_bulk_input"
+    assert payload["success"] is False
+    assert payload["error_code"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -285,10 +285,10 @@ async def test_bulk_variants_per_item_invalid_genome_build_yields_per_item_error
         },
     )
     payload = result.structured_content
-    assert payload["ok"] is True
-    assert payload["data"]["succeeded"] == 1
-    assert payload["data"]["failed"] == 1
-    first, second = payload["data"]["items"]
+    assert payload["success"] is True
+    assert payload["succeeded"] == 1
+    assert payload["failed"] == 1
+    first, second = payload["results"]
     assert first["ok"] is False
     assert first["error"]["code"] == "invalid_genome_build"
     assert second["ok"] is True
@@ -319,7 +319,7 @@ async def test_bulk_variants_maps_upstream_errors_per_item(
         {"items": [{"genome_build": "hg19", "variant_id": "X-1-A-T"}]},
     )
     payload = result.structured_content
-    item = payload["data"]["items"][0]
+    item = payload["results"][0]
     assert item["ok"] is False
     assert item["error"]["code"] == expected_code
     assert item["error"]["retryable"] is expected_retryable
@@ -375,7 +375,7 @@ async def test_bulk_variants_propagates_include_unmet_false(mocker) -> None:
             "response_mode": "standard",
         },
     )
-    rows = result.structured_content["data"]["items"][0]["data"]["disease_mechanisms"]
+    rows = result.structured_content["results"][0]["data"]["disease_mechanisms"]
     assert [row["adjusted_strength"] for row in rows] == ["Strong"]
 
 
@@ -390,8 +390,8 @@ async def test_bulk_variants_invalid_response_mode_returns_top_level_error() -> 
         },
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "invalid_response_mode"
+    assert payload["success"] is False
+    assert payload["error_code"] == "invalid_response_mode"
 
 
 @pytest.mark.asyncio
@@ -403,7 +403,7 @@ async def test_bulk_per_item_error_details_absent_when_null(mocker) -> None:
         {"items": [{"genome_build": "hg19", "variant_id": "not_a_variant"}]},
     )
     payload = result.structured_content
-    error_obj = payload["data"]["items"][0]["error"]
+    error_obj = payload["results"][0]["error"]
     assert error_obj is not None
     assert "details" not in error_obj
 
@@ -447,7 +447,7 @@ async def test_bulk_variants_dedupes_warnings_by_code(mocker) -> None:
             "response_mode": "standard",
         },
     )
-    codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
+    codes = [w["code"] for w in result.structured_content["_meta"]["warnings"]]
     # Three items each emit invalid_external_link — aggregated must collapse to one.
     assert codes.count("invalid_external_link") == 1
 
@@ -493,7 +493,7 @@ async def test_bulk_aggregated_warning_carries_count_and_affected_indices(mocker
     )
     warnings = [
         w
-        for w in result.structured_content["meta"]["warnings"]
+        for w in result.structured_content["_meta"]["warnings"]
         if w["code"] == "invalid_external_link"
     ]
     assert len(warnings) == 1
@@ -548,7 +548,7 @@ async def test_bulk_per_item_multi_emission_stays_unaggregated(mocker) -> None:
     )
     warnings = [
         w
-        for w in result.structured_content["meta"]["warnings"]
+        for w in result.structured_content["_meta"]["warnings"]
         if w["code"] == "invalid_external_link"
     ]
     assert len(warnings) == 1
@@ -621,7 +621,7 @@ async def test_bulk_mixed_code_aggregation_keeps_distinct_index_sets(mocker) -> 
             "response_mode": "standard",
         },
     )
-    warnings = result.structured_content["meta"]["warnings"]
+    warnings = result.structured_content["_meta"]["warnings"]
     codes_in_order = [w["code"] for w in warnings]
     # First-seen-code-first ordering.
     assert codes_in_order.index("invalid_external_link") < codes_in_order.index(
@@ -678,7 +678,7 @@ async def test_bulk_cnvs_aggregated_warning_carries_count_and_affected_indices(m
     )
     warnings = [
         w
-        for w in result.structured_content["meta"]["warnings"]
+        for w in result.structured_content["_meta"]["warnings"]
         if w["code"] == "pvs1_not_applicable"
     ]
     assert len(warnings) == 1
@@ -719,7 +719,7 @@ async def test_single_tool_warning_omits_aggregate_fields(mocker) -> None:
             "response_mode": "standard",
         },
     )
-    warnings = result.structured_content["meta"]["warnings"]
+    warnings = result.structured_content["_meta"]["warnings"]
     assert warnings, "expected at least one warning"
     for w in warnings:
         assert "count" not in w
@@ -737,8 +737,8 @@ async def test_bulk_cnvs_invalid_mode_returns_top_level_error() -> None:
         },
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "invalid_meta_mode"
+    assert payload["success"] is False
+    assert payload["error_code"] == "invalid_meta_mode"
 
 
 # ---------------------------------------------------------------------------
@@ -779,11 +779,11 @@ async def test_bulk_variants_auto_resolves_rsid_per_item(mocker) -> None:
         {"items": [{"genome_build": "hg19", "variant_id": "rs12345"}]},
     )
     payload = result.structured_content
-    assert payload["ok"] is True
-    item = payload["data"]["items"][0]
+    assert payload["success"] is True
+    item = payload["results"][0]
     assert item["ok"] is True
     # The auto_resolved warning aggregates into top-level meta.warnings.
-    warning_codes = {w["code"] for w in payload["meta"]["warnings"]}
+    warning_codes = {w["code"] for w in payload["_meta"]["warnings"]}
     assert "auto_resolved" in warning_codes
 
 
@@ -816,13 +816,13 @@ async def test_bulk_variants_per_item_cache_status_and_aggregate_mixed(mocker) -
     )
     payload = result.structured_content
     # Aggregate cache_status is "mixed" with the counts split correctly.
-    assert payload["meta"]["cache_status"] == "mixed"
-    assert payload["meta"]["cached_count"] == 1
-    assert payload["meta"]["uncached_count"] == 1
+    assert payload["_meta"]["cache_status"] == "mixed"
+    assert payload["_meta"]["cached_count"] == 1
+    assert payload["_meta"]["uncached_count"] == 1
     # elapsed_ms is the honest SUM of per-item upstream wall-clocks.
-    assert payload["meta"]["elapsed_ms"] == 1505.0
+    assert payload["_meta"]["elapsed_ms"] == 1505.0
     # Per-item meta carries each item's own cache_status + elapsed_ms.
-    items = payload["data"]["items"]
+    items = payload["results"]
     assert items[0]["meta"]["cache_status"] == "hit"
     assert items[1]["meta"]["cache_status"] == "miss"
     assert items[0]["meta"]["elapsed_ms"] == 5.0
@@ -850,6 +850,6 @@ async def test_bulk_variants_unanimous_cache_status_does_not_emit_counts(mocker)
         },
     )
     payload = result.structured_content
-    assert payload["meta"]["cache_status"] == "hit"
-    assert "cached_count" not in payload["meta"]
-    assert "uncached_count" not in payload["meta"]
+    assert payload["_meta"]["cache_status"] == "hit"
+    assert "cached_count" not in payload["_meta"]
+    assert "uncached_count" not in payload["_meta"]

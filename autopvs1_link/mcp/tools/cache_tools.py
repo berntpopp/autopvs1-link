@@ -8,8 +8,13 @@ from fastmcp import FastMCP
 
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import DESTRUCTIVE_CLOSED_WORLD
-from autopvs1_link.mcp.contracts import ClearCacheData, ClearCacheMCPEnvelope
-from autopvs1_link.mcp.envelope import ToolResponse, error_envelope, ok_envelope
+from autopvs1_link.mcp.contracts import ClearCacheData
+from autopvs1_link.mcp.envelope import (
+    ToolResponse,
+    error_envelope,
+    ok_envelope,
+    success_output_schema,
+)
 from autopvs1_link.mcp.errors import DestructiveOperationDisabledError
 
 _TOOL_NAME = "clear_cache"
@@ -29,7 +34,7 @@ def register(mcp: FastMCP) -> None:
         name="clear_cache",
         title="Clear AutoPVS1-Link Cache",
         tags={"meta", "admin"},
-        output_schema=ClearCacheMCPEnvelope.model_json_schema(),
+        output_schema=success_output_schema(ClearCacheData),
         annotations=DESTRUCTIVE_CLOSED_WORLD,
     )
     async def clear_cache() -> ToolResponse:

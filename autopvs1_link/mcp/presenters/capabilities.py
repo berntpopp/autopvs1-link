@@ -292,21 +292,38 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             ),
             "deprecated_alias": ("genome_version is accepted for one release; use genome_build."),
         },
-        "error_envelope": {
-            "required_fields": ["ok", "data", "error", "meta"],
+        "response_envelope": {
+            "standard": "GeneFoundry Response-Envelope Standard v1 (flat banner)",
+            "success_fields": ["success", "result | results", "_meta"],
+            "error_fields": [
+                "success",
+                "error_code",
+                "message",
+                "retryable",
+                "recovery_action",
+                "_meta",
+            ],
+            "collection_tools": (
+                "search_variants, get_variants_pvs1_data_bulk, and "
+                "get_cnvs_pvs1_data_bulk return the array at top-level "
+                "results with sibling domain keys beside it (e.g. "
+                "pagination, total_count for search; total/attempted/"
+                "succeeded/failed for bulk). All other tools return a "
+                "single top-level result object."
+            ),
             "stable_error_codes": sorted(KNOWN_ERROR_CODES),
             "stable_warning_codes": sorted(KNOWN_WARNING_CODES),
             "meta_recovery_hints": (
-                "Every error envelope's meta.next_actions[] is a per-code "
+                "Every error envelope's _meta.next_actions[] is a per-code "
                 "list of recovery hints so a failing LLM dispatcher can "
                 "pick the next move without paying a ToolSearch round-trip "
                 "to re-discover the surface. Transient codes also carry "
-                "meta.retry_after_ms set to the rate-limit floor unless "
+                "_meta.retry_after_ms set to the rate-limit floor unless "
                 "the caller overrides it (e.g. from a 429 Retry-After "
                 "header)."
             ),
             "cost_hint_semantics": (
-                "meta.cost_tier and meta.rate_limit_floor_ms appear on "
+                "_meta.cost_tier and _meta.rate_limit_floor_ms appear on "
                 "an error envelope ONLY when the call drove an upstream "
                 "request whose retry will too — i.e. the transient codes "
                 "upstream_timeout, upstream_unavailable, and "
@@ -353,7 +370,7 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "Built only from upstream scraped node text; lets a "
                 "summary-mode caller explain the verdict without widening."
             ),
-            "meta.expected_cold_latency_ms": (
+            "_meta.expected_cold_latency_ms": (
                 "Present only on cold scrape-tier responses (cache_status "
                 "miss/coalesced); the coarse first-call latency in ms, in "
                 "lockstep with the performance block's cold_call_seconds. "
@@ -392,18 +409,18 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "applies_meta_mode_top_level_only": True,
             "accounting_invariant": "total == attempted + skipped",
             "warning_aggregation": {
-                "scope": ("top-level meta.warnings only; per-item warnings are not echoed"),
+                "scope": ("top-level _meta.warnings only; per-item warnings are not echoed"),
                 "gate": ("code aggregated only when emitted by more than one distinct item"),
                 "fields": ("count and affected_indices populated; absent on single-item codes"),
                 "ordering": "first-seen-code-first",
             },
             "cache_status_aggregation": (
-                "Top-level meta.cache_status echoes the unanimous "
+                "Top-level _meta.cache_status echoes the unanimous "
                 "per-item status when every item agrees, or 'mixed' "
                 "when items had varied outcomes. On 'mixed', "
-                "meta.cached_count and meta.uncached_count split items "
+                "_meta.cached_count and _meta.uncached_count split items "
                 "by warm (hit+coalesced) vs cold (miss+bypass). "
-                "Top-level meta.elapsed_ms is the SUM of per-item "
+                "Top-level _meta.elapsed_ms is the SUM of per-item "
                 "upstream wall-clocks (honest sequential bulk total)."
             ),
         },
@@ -412,7 +429,7 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "semantics": ("Method-keyed counters with stable keys and cache key shapes."),
             "wire_cache_status_values": ["hit", "miss", "coalesced", "bypass", "mixed"],
             "wire_cache_status_notes": (
-                "meta.cache_status on each ok envelope is one of: 'hit' "
+                "_meta.cache_status on each success envelope is one of: 'hit' "
                 "(cache pre-populated; instant return), 'miss' (we drove "
                 "the upstream call; elapsed_ms reflects the round trip), "
                 "'coalesced' (another concurrent call's miss was already "
@@ -479,19 +496,19 @@ _AUTO_RESOLUTION_BLOCK: dict[str, Any] = {
             "detected form, and Ensembl allele key."
         ),
         "zero_hits": (
-            "error.code='not_found' with concrete suggestions (confirm rsID "
+            "error_code='not_found' with concrete suggestions (confirm rsID "
             "exists in current dbSNP; confirm genome_build; or supply a "
             "canonical CHROM-POS-REF-ALT directly to skip resolution)."
         ),
         "multi_hit": (
-            "error.code='requires_disambiguation' with candidates list in "
+            "error_code='requires_disambiguation' with candidates list in "
             "details.candidates. Each candidate: id, spdi, allele_key, "
             "synonym_ids, genome_build, resource_uri. Caller picks one "
             "and re-calls. Server never silently best-guesses to avoid "
             "multi-allelic mis-scoring (Ensembl VEP #989 failure mode)."
         ),
         "resolver_unavailable": (
-            "error.code='external_resolver_unavailable' (retryable=true) "
+            "error_code='external_resolver_unavailable' (retryable=true) "
             "when Ensembl REST times out, rate-limits, or returns 5xx. "
             "Distinguishes transient failure from permanent not_found."
         ),

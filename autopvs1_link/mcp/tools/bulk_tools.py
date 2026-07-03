@@ -12,14 +12,18 @@ from autopvs1_link.mcp.contracts import (
     BulkCNVPVS1InputItem,
     BulkCNVPVS1ResultItem,
     BulkCNVsMCPData,
-    BulkCNVsMCPEnvelope,
     BulkPerItemMeta,
     BulkVariantPVS1InputItem,
     BulkVariantPVS1ResultItem,
     BulkVariantsMCPData,
-    BulkVariantsMCPEnvelope,
 )
-from autopvs1_link.mcp.envelope import MCPWarning, ToolResponse, error_envelope, ok_envelope
+from autopvs1_link.mcp.envelope import (
+    MCPWarning,
+    ToolResponse,
+    error_envelope,
+    ok_envelope,
+    success_output_schema,
+)
 from autopvs1_link.mcp.mode_validation import (
     InvalidMCPModeError,
     MetaMode,
@@ -204,7 +208,7 @@ def register(mcp: FastMCP) -> None:
         name="get_variants_pvs1_data_bulk",
         title="Get Variant PVS1 Data (Bulk)",
         tags={"variant", "classification", "bulk"},
-        output_schema=BulkVariantsMCPEnvelope.model_json_schema(),
+        output_schema=success_output_schema(BulkVariantsMCPData, collection_field="items"),
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def get_variants_pvs1_data_bulk(
@@ -281,26 +285,27 @@ def register(mcp: FastMCP) -> None:
         single item; a resolver outage returns the retryable
         ``external_resolver_unavailable`` code.
 
-        Per-item envelope: each result has ``{ok, input, data, error,
-        meta}`` where ``meta.cache_status`` and ``meta.elapsed_ms`` echo
-        that one upstream call's outcome (absent when the item
-        short-circuited before upstream). Output items preserve input
-        order. ``response_mode`` and ``include_unmet`` apply per item;
-        the outer ``meta_mode`` controls the envelope. Per-item failures
-        do not stop the batch unless ``continue_on_error=false``. Bulk
-        dispatch errors (malformed ``items``) use error code
-        ``invalid_bulk_input``.
+        Per-item envelope: each row in the top-level ``results`` array has
+        ``{ok, input, data, error, meta}`` where ``meta.cache_status`` and
+        ``meta.elapsed_ms`` echo that one upstream call's outcome (absent
+        when the item short-circuited before upstream). This per-item
+        shape predates and is scoped separately from the Response-Envelope
+        Standard v1 outer frame. Output items preserve input order.
+        ``response_mode`` and ``include_unmet`` apply per item; the outer
+        ``meta_mode`` controls the envelope. Per-item failures do not stop
+        the batch unless ``continue_on_error=false``. Bulk dispatch errors
+        (malformed ``items``) use error code ``invalid_bulk_input``.
 
-        Aggregate cache observability: top-level ``meta.cache_status``
+        Aggregate cache observability: top-level ``_meta.cache_status``
         echoes the unanimous status when every item agrees; on a mixed
-        batch it is ``"mixed"`` and ``meta.cached_count`` /
-        ``meta.uncached_count`` split items by warm
+        batch it is ``"mixed"`` and ``_meta.cached_count`` /
+        ``_meta.uncached_count`` split items by warm
         (``hit``+``coalesced``) vs cold (``miss``+``bypass``).
-        ``meta.elapsed_ms`` is the SUM of per-item upstream wall-clocks
+        ``_meta.elapsed_ms`` is the SUM of per-item upstream wall-clocks
         (the honest total for a sequential bulk).
 
         Warning aggregation: per-item warnings are NOT echoed; they are
-        collapsed into ``meta.warnings`` at the top level. A warning code
+        collapsed into ``_meta.warnings`` at the top level. A warning code
         is aggregated only when more than one distinct item emitted it;
         single-item codes appear without ``count`` or ``affected_indices``.
         Aggregated codes carry ``count`` (distinct items) and the sorted
@@ -389,6 +394,7 @@ def register(mcp: FastMCP) -> None:
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_VARIANTS_BULK_TOOL,
+            collection_field="items",
             next_commands=bulk_retry_failed("get_variant_pvs1_data", results, "variant_id"),
             **aggregate_kwargs,
         )
@@ -397,7 +403,7 @@ def register(mcp: FastMCP) -> None:
         name="get_cnvs_pvs1_data_bulk",
         title="Get CNV PVS1 Data (Bulk)",
         tags={"cnv", "copy-number", "classification", "bulk"},
-        output_schema=BulkCNVsMCPEnvelope.model_json_schema(),
+        output_schema=success_output_schema(BulkCNVsMCPData, collection_field="items"),
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def get_cnvs_pvs1_data_bulk(
@@ -468,14 +474,14 @@ def register(mcp: FastMCP) -> None:
         ``meta_mode`` controls the envelope. Per-item failures do not
         stop the batch unless ``continue_on_error=false``.
 
-        Aggregate cache observability: top-level ``meta.cache_status``
+        Aggregate cache observability: top-level ``_meta.cache_status``
         is ``"mixed"`` when items had varied outcomes (with
         ``cached_count`` / ``uncached_count``) or echoes the unanimous
-        status. ``meta.elapsed_ms`` is the SUM of per-item upstream
+        status. ``_meta.elapsed_ms`` is the SUM of per-item upstream
         wall-clocks.
 
         Warning aggregation: per-item warnings collapse into
-        ``meta.warnings``; codes emitted by more than one distinct item
+        ``_meta.warnings``; codes emitted by more than one distinct item
         carry ``count`` and ``affected_indices``; single-item codes do
         not. Order is first-seen-code-first.
         """
@@ -558,6 +564,7 @@ def register(mcp: FastMCP) -> None:
             warnings=_dedupe_warnings(aggregated_warnings),
             meta_mode=normalized_meta_mode,
             tool_name=_CNVS_BULK_TOOL,
+            collection_field="items",
             next_commands=bulk_retry_failed("get_cnv_pvs1_data", results, "cnv_id"),
             **aggregate_kwargs,
         )
