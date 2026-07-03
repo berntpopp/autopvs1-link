@@ -6,6 +6,50 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 2.0.0
+
+**BREAKING.** Adopts the [GeneFoundry Response-Envelope Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/RESPONSE-ENVELOPE-STANDARD-v1.md)
+flat banner. Every MCP tool's `structuredContent` shape changed; there is no
+compatibility shim (pre-alpha fleet standard). Migration: replace `ok` reads
+with `success`; replace `data` reads with `result` (single-item tools:
+`get_variant_pvs1_data`, `get_cnv_pvs1_data`, `get_server_health`,
+`get_server_capabilities`, `clear_cache`) or `results` plus sibling
+top-level keys (collection tools: `search_variants` — `pagination`,
+`total_count`, etc. move to the top level; the bulk tools — `total`,
+`attempted`, `succeeded`, `failed` move to the top level, and the aggregate
+list is renamed `items` -> `results`); replace `error.code` /
+`error.message` / `error.retryable` / `error.suggestions` /
+`error.details` reads with the flat top-level `error_code`, `message`,
+`retryable`, `suggestions`, `details`, plus a new `recovery_action` hint;
+replace `meta` reads with `_meta` (`meta.research_use_only` is now
+`_meta.unsafe_for_clinical_use`; `_meta` gains `tool` and
+`capabilities_version`). Per-item bulk envelopes (`results[i]` ->
+`{ok, input, data, error, meta}`) are unchanged — the standard governs the
+outer MCP result frame only.
+
+### Security
+
+Closes issue #41 — PII / GDPR Art. 9 hardening.
+
+- **Variant IDs never appear in logs.** `_request_log_context` now applies
+  `_sanitize_path` before binding the `path` field: `/variant/{genome}/{id}`
+  and `/cnv/{genome}/{id}` paths are logged as `/variant/<genome>/<redacted>`
+  and `/cnv/<genome>/<redacted>`.  Covers both the INFO (incoming request) and
+  ERROR (request failed) branches.  `error=str(e)` is also omitted from the
+  error event — exception messages can echo patient-derived identifiers;
+  `error_type` + `exc_info=True` provide equivalent debugging signal.
+- **`query_params` never logged** (variant IDs can appear in query strings);
+  `client_ip` and `user_agent` logged only when `log_client_ip=True` opt-in is
+  set (controlled by `settings.debug`; off in production).
+- **`AUTOPVS1_LINK_ENVIRONMENT=production`** set in `docker/docker-compose.prod.yml`
+  so the production logging profile (JSON format, WARNING level) activates
+  without manual override.
+- **Honest `User-Agent`** — the HTTP client no longer spoofs a browser string;
+  outbound requests now identify themselves as `autopvs1-link/<version>`.
+- **`upstream_format_unrecognized` warning code** registered for scraped
+  PVS1 strength values that don't match the known set, plus provenance note
+  on scrape-tier envelopes so callers can assess data freshness.
+
 ### Fixed
 - MCP Streamable-HTTP endpoint now serves `POST /mcp` directly (200) instead of
   issuing a 307 redirect to `/mcp/`. The MCP route is now baked into the ASGI

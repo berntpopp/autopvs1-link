@@ -144,15 +144,18 @@ Prompts (2):
 Cache statistics expose stable method-keyed counters and cache-key-shape
 metadata for the configured service methods.
 
-MCP tool responses use the standard `ok`, `data`, `error`, `meta` envelope.
+MCP tool responses use the GeneFoundry Response-Envelope Standard v1 flat
+banner: `{"success": true, "result"|"results", "_meta"}` on success,
+`{"success": false, "error_code", "message", "retryable", "recovery_action",
+"_meta"}` on failure (with MCP `isError: true`).
 Read tools accept `response_mode` (`summary`, `standard`, `full`) and
 `meta_mode` (`full`, `compact`, `minimal`) so agents can control token cost
 while preserving research-use framing. Variant and CNV tools also accept
 `include_unmet` to filter disease-mechanism rows. Validation and upstream
-failures return stable `error.code` values; CNV colon-form validation errors
-include structured `error.details.corrected_id` when a corrected AutoPVS1 ID
-can be derived. Search pagination uses `limit` plus returned
-`data.next_cursor`; omitting `genome_build` defaults to `hg38` with a warning.
+failures return stable `error_code` values; CNV colon-form validation errors
+include a structured `details.corrected_id` when a corrected AutoPVS1 ID
+can be derived. Search pagination uses `limit` plus the returned
+`pagination.next_cursor`; omitting `genome_build` defaults to `hg38` with a warning.
 Outputs are research-use AutoPVS1 data, not clinical decision support; cite
 AutoPVS1 (`10.1002/humu.24051`) where appropriate.
 

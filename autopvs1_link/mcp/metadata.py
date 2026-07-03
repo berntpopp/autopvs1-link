@@ -7,8 +7,8 @@ from typing import Any
 from fastmcp import FastMCP
 
 from autopvs1_link.mcp.annotations import READ_ONLY_CLOSED_WORLD
-from autopvs1_link.mcp.contracts import CompactCapabilitiesMCPEnvelope
-from autopvs1_link.mcp.envelope import ok_envelope
+from autopvs1_link.mcp.contracts import CompactCapabilitiesData
+from autopvs1_link.mcp.envelope import ok_envelope, success_output_schema
 from autopvs1_link.mcp.presenters.capabilities import (
     detailed_capabilities_resource,
     present_compact_capabilities,
@@ -40,7 +40,7 @@ def register_metadata(mcp: FastMCP) -> None:
         name="get_server_capabilities",
         title="Get AutoPVS1-Link Capabilities",
         tags={"meta", "discovery"},
-        output_schema=CompactCapabilitiesMCPEnvelope.model_json_schema(),
+        output_schema=success_output_schema(CompactCapabilitiesData),
         annotations=READ_ONLY_CLOSED_WORLD,
     )
     async def get_server_capabilities() -> dict[str, Any]:

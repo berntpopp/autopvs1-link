@@ -12,8 +12,13 @@ from autopvs1_link.api.autopvs1_urls import variant_url
 from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from autopvs1_link.mcp.contracts import VariantMCPEnvelope
-from autopvs1_link.mcp.envelope import ToolResponse, error_envelope, ok_envelope
+from autopvs1_link.mcp.contracts import VariantMCPData
+from autopvs1_link.mcp.envelope import (
+    ToolResponse,
+    error_envelope,
+    ok_envelope,
+    success_output_schema,
+)
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import (
     InvalidMCPModeError,
@@ -43,7 +48,7 @@ def register(mcp: FastMCP) -> None:
         name="get_variant_pvs1_data",
         title="Get Variant PVS1 Data",
         tags={"variant", "classification"},
-        output_schema=VariantMCPEnvelope.model_json_schema(),
+        output_schema=success_output_schema(VariantMCPData),
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def get_variant_pvs1_data(

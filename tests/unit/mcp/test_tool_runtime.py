@@ -73,13 +73,14 @@ def _assert_input_mode_error(
     parameter: str,
     supported_values: str,
 ) -> None:
-    assert payload["ok"] is False
-    assert payload["data"] is None
-    assert payload["error"]["code"] == code
-    assert payload["error"]["retryable"] is False
-    assert parameter in payload["error"]["message"]
-    assert supported_values in payload["error"]["message"]
-    assert payload["error"]["suggestions"]
+    assert payload["success"] is False
+    assert "result" not in payload
+    assert "results" not in payload
+    assert payload["error_code"] == code
+    assert payload["retryable"] is False
+    assert parameter in payload["message"]
+    assert supported_values in payload["message"]
+    assert payload["suggestions"]
 
 
 def _variant_result() -> AutoPVS1Data:
@@ -130,8 +131,8 @@ async def test_get_variant_pvs1_data_tool_runtime(mocker) -> None:
         {"genome_build": "hg38", "variant_id": "X-1-A-T"},
     )
     fake.assert_awaited_once_with("hg38", "X-1-A-T")
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["data"]["upstream_service"] == "AutoPVS1"
+    assert result.structured_content["success"] is True
+    assert result.structured_content["result"]["upstream_service"] == "AutoPVS1"
 
 
 @pytest.mark.asyncio
@@ -199,8 +200,8 @@ async def test_get_cnv_pvs1_data_tool_runtime(mocker) -> None:
         {"genome_build": "hg19", "cnv_id": "1-1-2-DEL"},
     )
     fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["data"]["upstream_service"] == "AutoPVS1"
+    assert result.structured_content["success"] is True
+    assert result.structured_content["result"]["upstream_service"] == "AutoPVS1"
 
 
 @pytest.mark.asyncio
@@ -273,8 +274,8 @@ async def test_get_variant_invalid_id_returns_envelope_without_calling_upstream(
     )
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_variant_id"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_variant_id"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -290,8 +291,8 @@ async def test_get_variant_empty_id_returns_envelope_without_calling_upstream(mo
     )
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_variant_id"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_variant_id"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -307,12 +308,10 @@ async def test_get_cnv_colon_format_returns_guidance_without_calling_upstream(mo
     )
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_cnv_id"
-    assert result.structured_content["error"]["suggestions"] == ["Use 17-15000000-20000000-DEL."]
-    assert result.structured_content["error"]["details"] == {
-        "corrected_id": "17-15000000-20000000-DEL"
-    }
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_cnv_id"
+    assert result.structured_content["suggestions"] == ["Use 17-15000000-20000000-DEL."]
+    assert result.structured_content["details"] == {"corrected_id": "17-15000000-20000000-DEL"}
 
 
 @pytest.mark.asyncio
@@ -327,8 +326,8 @@ async def test_get_cnv_empty_id_returns_envelope_without_calling_upstream(mocker
     )
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_cnv_id"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_cnv_id"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -360,8 +359,8 @@ async def test_get_cnv_hyphenated_format_forwards_upstream(mocker) -> None:
     )
 
     fake.assert_awaited_once_with("hg19", "17-15000000-20000000-DEL")
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["data"]["cnv_info"]["gene_symbol"] == "MYO15A"
+    assert result.structured_content["success"] is True
+    assert result.structured_content["result"]["cnv_info"]["gene_symbol"] == "MYO15A"
 
 
 @pytest.mark.asyncio
@@ -377,9 +376,9 @@ async def test_get_variant_connect_error_returns_upstream_unavailable_envelope(m
     )
 
     fake.assert_awaited_once_with("hg38", "X-1-A-T")
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "upstream_unavailable"
-    assert result.structured_content["error"]["retryable"] is True
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "upstream_unavailable"
+    assert result.structured_content["retryable"] is True
     assert "connect failed" not in result.content[0].text
 
 
@@ -396,9 +395,9 @@ async def test_get_cnv_connect_error_returns_upstream_unavailable_envelope(mocke
     )
 
     fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "upstream_unavailable"
-    assert result.structured_content["error"]["retryable"] is True
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "upstream_unavailable"
+    assert result.structured_content["retryable"] is True
     assert "connect failed" not in result.content[0].text
 
 
@@ -419,9 +418,9 @@ async def test_get_variant_429_status_is_retryable_upstream_unavailable(mocker) 
     )
 
     fake.assert_awaited_once_with("hg38", "X-1-A-T")
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "upstream_unavailable"
-    assert result.structured_content["error"]["retryable"] is True
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "upstream_unavailable"
+    assert result.structured_content["retryable"] is True
 
 
 @pytest.mark.asyncio
@@ -447,8 +446,8 @@ async def test_search_whitespace_returns_invalid_search_query(mocker) -> None:
     result = await mcp.call_tool("search_variants", {"query": "   "})
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_search_query"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_search_query"
 
 
 @pytest.mark.asyncio
@@ -461,8 +460,8 @@ async def test_search_default_build_warns_that_hg38_was_assumed(mocker) -> None:
     result = await mcp.call_tool("search_variants", {"query": "MYH9"})
 
     fake.assert_awaited_once_with("MYH9", "hg38")
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["meta"]["warnings"][0]["code"] == "default_genome_build"
+    assert result.structured_content["success"] is True
+    assert result.structured_content["_meta"]["warnings"][0]["code"] == "default_genome_build"
 
 
 @pytest.mark.asyncio
@@ -476,8 +475,8 @@ async def test_search_empty_query_returns_invalid_search_query_without_raw_valid
     result = await mcp.call_tool("search_variants", {"query": ""})
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_search_query"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_search_query"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -501,14 +500,14 @@ async def test_search_no_result_hgvs_like_query_returns_guidance(mocker) -> None
     )
 
     fake.assert_awaited_once_with("BRCA1 c.5266dupC", "hg38")
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["data"]["total_count"] == 0
-    assert result.structured_content["data"]["suggestions"] == [
+    assert result.structured_content["success"] is True
+    assert result.structured_content["total_count"] == 0
+    assert result.structured_content["suggestions"] == [
         "Search for BRCA1 only.",
         "Use a resolved AutoPVS1 variant ID when known.",
         "Confirm genome build before scoring.",
     ]
-    assert result.structured_content["meta"]["warnings"][0]["code"] == (
+    assert result.structured_content["_meta"]["warnings"][0]["code"] == (
         "unsupported_hgvs_like_search"
     )
 
@@ -526,8 +525,8 @@ async def test_search_deprecated_genome_version_alias_still_works(mocker) -> Non
     )
 
     fake.assert_awaited_once_with("MYH9", "hg19")
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["meta"]["warnings"][0]["code"] == "deprecated_genome_version"
+    assert result.structured_content["success"] is True
+    assert result.structured_content["_meta"]["warnings"][0]["code"] == "deprecated_genome_version"
 
 
 @pytest.mark.asyncio
@@ -542,8 +541,8 @@ async def test_search_conflicting_genome_build_alias_returns_error(mocker) -> No
     )
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_genome_build"
 
 
 @pytest.mark.asyncio
@@ -555,8 +554,8 @@ async def test_search_numeric_genome_build_returns_invalid_genome_build_envelope
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": 5})
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_genome_build"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -569,8 +568,8 @@ async def test_search_numeric_genome_version_returns_invalid_genome_build_envelo
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_version": 5})
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_genome_build"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -583,8 +582,8 @@ async def test_search_non_integer_limit_returns_invalid_search_query_envelope(mo
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": "abc"})
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_search_query"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_search_query"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -603,8 +602,8 @@ async def test_error_envelopes_set_is_error_true_on_wire(mocker) -> None:
     # The wire-level CallToolResult.isError is what spec-aware clients read.
     mcp_result = result.to_mcp_result()
     assert getattr(mcp_result, "isError", False) is True
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_genome_build"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_genome_build"
 
 
 @pytest.mark.asyncio
@@ -624,7 +623,7 @@ async def test_success_envelopes_remain_is_error_false(mocker) -> None:
     mcp_result = result.to_mcp_result()
     is_error = getattr(mcp_result, "isError", False) if hasattr(mcp_result, "isError") else False
     assert is_error is False
-    assert result.structured_content["ok"] is True
+    assert result.structured_content["success"] is True
 
 
 @pytest.mark.asyncio
@@ -642,7 +641,7 @@ async def test_variant_summary_mode_drops_null_default_fields(mocker) -> None:
             "response_mode": "summary",
         },
     )
-    variant_info = result.structured_content["data"]["variant_info"]
+    variant_info = result.structured_content["result"]["variant_info"]
     # In summary mode, fields that default to None must NOT serialize.
     assert "chgvs" not in variant_info
     assert "phgvs" not in variant_info
@@ -674,7 +673,7 @@ async def test_variant_ids_only_wire_payload_strips_null_fields(mocker) -> None:
             "response_mode": "ids_only",
         },
     )
-    data = result.structured_content["data"]
+    data = result.structured_content["result"]
     variant_info = data["variant_info"]
     # variant_info on the wire is strictly the identifier — null leaks fail.
     assert set(variant_info) == {"variant_id"}, variant_info
@@ -703,7 +702,7 @@ async def test_cnv_ids_only_wire_payload_strips_null_fields(mocker) -> None:
             "response_mode": "ids_only",
         },
     )
-    data = result.structured_content["data"]
+    data = result.structured_content["result"]
     cnv_info = data["cnv_info"]
     # cnv_info on the wire is strictly the identifier — null leaks fail.
     assert set(cnv_info) == {"cnv_id"}, cnv_info
@@ -741,7 +740,7 @@ async def test_search_ids_only_wire_payload_strips_descriptive_fields(mocker) ->
         "search_variants",
         {"query": "BRCA1", "genome_build": "hg38", "response_mode": "ids_only"},
     )
-    data = result.structured_content["data"]
+    data = result.structured_content
     assert data["returned_count"] == 3
     for row in data["results"]:
         assert set(row) == {"variant_id", "url"}, row
@@ -767,13 +766,6 @@ async def test_every_tool_wire_payload_validates_against_published_schema(mocker
     ``Output validation error: 'previous_cursor' is a required property``.
     """
     import jsonschema
-
-    from autopvs1_link.mcp.contracts import (
-        CNVMCPEnvelope,
-        CompactCapabilitiesMCPEnvelope,
-        SearchMCPEnvelope,
-        VariantMCPEnvelope,
-    )
 
     # Mock all upstream service adapters so the test is fast + deterministic.
     mocker.patch(
@@ -805,29 +797,18 @@ async def test_every_tool_wire_payload_validates_against_published_schema(mocker
     )
 
     mcp = build_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
     cases = [
-        (
-            "get_variant_pvs1_data",
-            {"genome_build": "hg19", "variant_id": "X-1-A-T"},
-            VariantMCPEnvelope,
-        ),
-        (
-            "get_cnv_pvs1_data",
-            {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"},
-            CNVMCPEnvelope,
-        ),
+        ("get_variant_pvs1_data", {"genome_build": "hg19", "variant_id": "X-1-A-T"}),
+        ("get_cnv_pvs1_data", {"genome_build": "hg19", "cnv_id": "11-2797090-2869333-DEL"}),
         # search page 1: previous_cursor is null here — this is the regression.
-        (
-            "search_variants",
-            {"query": "MYH9", "genome_build": "hg38"},
-            SearchMCPEnvelope,
-        ),
-        ("get_server_capabilities", {}, CompactCapabilitiesMCPEnvelope),
+        ("search_variants", {"query": "MYH9", "genome_build": "hg38"}),
+        ("get_server_capabilities", {}),
     ]
-    for tool_name, args, envelope_cls in cases:
+    for tool_name, args in cases:
         result = await mcp.call_tool(tool_name, args)
         structured = result.structured_content
-        schema = envelope_cls.model_json_schema()
+        schema = tools[tool_name].output_schema
         try:
             jsonschema.validate(instance=structured, schema=schema)
         except jsonschema.ValidationError as exc:
@@ -862,7 +843,7 @@ async def test_variant_standard_mode_drops_null_default_fields_from_wire(mocker)
             "response_mode": "standard",
         },
     )
-    data = result.structured_content["data"]
+    data = result.structured_content["result"]
     variant_info = data["variant_info"]
     # Fixture variant has no chgvs/phgvs/exon/intron → must NOT be on the wire.
     assert "chgvs" not in variant_info
@@ -896,8 +877,8 @@ async def test_variant_auto_resolves_rsid_via_recoder_with_warning(mocker) -> No
         {"genome_build": "hg38", "variant_id": "rs80357906"},
     )
     payload = result.structured_content
-    assert payload["ok"] is True, payload
-    by_code = {w["code"]: w for w in payload["meta"]["warnings"]}
+    assert payload["success"] is True, payload
+    by_code = {w["code"]: w for w in payload["_meta"]["warnings"]}
     assert "auto_resolved" in by_code
     assert "ensembl variant recoder" in by_code["auto_resolved"]["message"].lower()
     # Score call uses the resolved canonical id, not the raw rsID.
@@ -934,8 +915,8 @@ async def test_variant_auto_resolves_hgvs_c_via_recoder_with_warning(mocker) -> 
         {"genome_build": "hg38", "variant_id": "NM_007294.4:c.5266dup"},
     )
     payload = result.structured_content
-    assert payload["ok"] is True, payload
-    codes = [w["code"] for w in payload["meta"]["warnings"]]
+    assert payload["success"] is True, payload
+    codes = [w["code"] for w in payload["_meta"]["warnings"]]
     assert "auto_resolved" in codes
     score_fake.assert_awaited_once_with("hg38", "17-43057063-G-GG")
     recoder_fake.assert_awaited_once_with("NM_007294.4:c.5266dup", "hg38")
@@ -977,9 +958,9 @@ async def test_variant_recoder_multi_allele_returns_requires_disambiguation(
         {"genome_build": "hg38", "variant_id": "rs56116432"},
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "requires_disambiguation"
-    candidates_payload = payload["error"]["details"]["candidates"]
+    assert payload["success"] is False
+    assert payload["error_code"] == "requires_disambiguation"
+    candidates_payload = payload["details"]["candidates"]
     assert {c["id"] for c in candidates_payload} == {
         "9-133256042-C-T",
         "9-133256042-C-A",
@@ -1011,9 +992,9 @@ async def test_variant_recoder_not_found_returns_not_found(mocker) -> None:
         {"genome_build": "hg38", "variant_id": "rs99999999999"},
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "not_found"
-    assert "canonical CHROM-POS-REF-ALT" in " ".join(payload["error"]["suggestions"])
+    assert payload["success"] is False
+    assert payload["error_code"] == "not_found"
+    assert "canonical CHROM-POS-REF-ALT" in " ".join(payload["suggestions"])
     score_fake.assert_not_awaited()
 
 
@@ -1042,9 +1023,9 @@ async def test_variant_recoder_unavailable_returns_external_resolver_unavailable
         {"genome_build": "hg38", "variant_id": "rs80357906"},
     )
     payload = result.structured_content
-    assert payload["ok"] is False
-    assert payload["error"]["code"] == "external_resolver_unavailable"
-    assert payload["error"]["retryable"] is True
+    assert payload["success"] is False
+    assert payload["error_code"] == "external_resolver_unavailable"
+    assert payload["retryable"] is True
     score_fake.assert_not_awaited()
 
 
@@ -1066,7 +1047,7 @@ async def test_variant_canonical_id_does_not_call_recoder(mocker) -> None:
         {"genome_build": "hg38", "variant_id": "X-82763936-A-T"},
     )
     payload = result.structured_content
-    assert payload["ok"] is True
+    assert payload["success"] is True
     score_fake.assert_awaited_once_with("hg38", "X-82763936-A-T")
     recoder_fake.assert_not_awaited()
 
@@ -1079,7 +1060,7 @@ async def test_search_clamped_limit_emits_warning(mocker) -> None:
     mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
     mcp = build_mcp_server()
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": 999})
-    codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
+    codes = [w["code"] for w in result.structured_content["_meta"]["warnings"]]
     assert "limit_clamped" in codes
 
 
@@ -1091,7 +1072,7 @@ async def test_search_clamped_zero_limit_emits_warning(mocker) -> None:
     mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
     mcp = build_mcp_server()
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": 0})
-    codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
+    codes = [w["code"] for w in result.structured_content["_meta"]["warnings"]]
     assert "limit_clamped" in codes
 
 
@@ -1103,7 +1084,7 @@ async def test_search_unclamped_limit_no_warning(mocker) -> None:
     mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
     mcp = build_mcp_server()
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "limit": 25})
-    codes = [w["code"] for w in result.structured_content["meta"]["warnings"]]
+    codes = [w["code"] for w in result.structured_content["_meta"]["warnings"]]
     assert "limit_clamped" not in codes
 
 
@@ -1116,8 +1097,8 @@ async def test_search_numeric_cursor_returns_invalid_search_cursor_envelope(mock
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "cursor": 5})
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "invalid_search_cursor"
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "invalid_search_cursor"
     _assert_no_raw_error_leak(result.content[0].text)
 
 
@@ -1131,9 +1112,9 @@ async def test_search_timeout_returns_upstream_timeout_envelope(mocker) -> None:
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
 
     fake.assert_awaited_once_with("MYH9", "hg38")
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "upstream_timeout"
-    assert result.structured_content["error"]["retryable"] is True
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "upstream_timeout"
+    assert result.structured_content["retryable"] is True
 
 
 @pytest.mark.asyncio
@@ -1145,9 +1126,9 @@ async def test_search_status_error_returns_upstream_unavailable_envelope(mocker)
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
 
     fake.assert_awaited_once_with("MYH9", "hg38")
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "upstream_unavailable"
-    assert result.structured_content["error"]["retryable"] is True
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "upstream_unavailable"
+    assert result.structured_content["retryable"] is True
 
 
 @pytest.mark.asyncio
@@ -1159,9 +1140,9 @@ async def test_search_429_status_is_retryable_upstream_unavailable(mocker) -> No
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
 
     fake.assert_awaited_once_with("MYH9", "hg38")
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "upstream_unavailable"
-    assert result.structured_content["error"]["retryable"] is True
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "upstream_unavailable"
+    assert result.structured_content["retryable"] is True
 
 
 @pytest.mark.asyncio
@@ -1208,13 +1189,13 @@ async def test_get_variant_summary_response_and_compact_meta_mode(mocker) -> Non
     )
 
     fake.assert_awaited_once_with("hg38", "X-1-A-T")
-    data = result.structured_content["data"]
-    meta = result.structured_content["meta"]
+    data = result.structured_content["result"]
+    meta = result.structured_content["_meta"]
     assert data["variant_info"]["variant_id"] == "X-1-A-T"
     assert data["pvs1_flowchart"]["final_strength_source"] == "inferred"
     assert data["disease_mechanisms"] == []
     assert {warning["code"] for warning in meta["warnings"]} == set()
-    assert meta["research_use_only"] is True
+    assert meta["unsafe_for_clinical_use"] is True
     assert meta["recommended_citation"] == {
         "doi": "10.1002/humu.24051",
         "pmid": "32442321",
@@ -1263,12 +1244,12 @@ async def test_get_cnv_summary_response_and_minimal_meta_mode(mocker) -> None:
     )
 
     fake.assert_awaited_once_with("hg19", "1-1-2-DEL")
-    data = result.structured_content["data"]
-    meta = result.structured_content["meta"]
+    data = result.structured_content["result"]
+    meta = result.structured_content["_meta"]
     assert data["cnv_info"]["cnv_id"] == "1-1-2-DEL"
     assert data["pvs1_flowchart"]["final_strength_source"] == "asserted"
     assert data["disease_mechanisms"] == []
-    assert meta["research_use_only"] is True
+    assert meta["unsafe_for_clinical_use"] is True
     assert meta["warnings"] == []
     assert "request_id" in meta
     assert "server_version" in meta
@@ -1305,11 +1286,11 @@ async def test_search_variants_summary_response_mode(mocker) -> None:
     )
 
     fake.assert_awaited_once_with("BRCA1", "hg38")
-    assert result.structured_content["data"]["total_count"] == 1
-    assert result.structured_content["data"]["returned_count"] == 1
-    assert result.structured_content["data"]["results"] == []
-    assert result.structured_content["meta"]["research_use_only"] is True
-    assert "recommended_citation" not in result.structured_content["meta"]
+    assert result.structured_content["total_count"] == 1
+    assert result.structured_content["returned_count"] == 1
+    assert result.structured_content["results"] == []
+    assert result.structured_content["_meta"]["unsafe_for_clinical_use"] is True
+    assert "recommended_citation" not in result.structured_content["_meta"]
 
 
 @pytest.mark.asyncio
@@ -1322,9 +1303,9 @@ async def test_search_request_error_returns_upstream_unavailable_envelope(mocker
     result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
 
     fake.assert_awaited_once_with("MYH9", "hg38")
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["error"]["code"] == "upstream_unavailable"
-    assert result.structured_content["error"]["retryable"] is True
+    assert result.structured_content["success"] is False
+    assert result.structured_content["error_code"] == "upstream_unavailable"
+    assert result.structured_content["retryable"] is True
     assert "connect failed" not in result.content[0].text
 
 
@@ -1354,10 +1335,10 @@ async def test_get_server_health_is_local_read_only_and_does_not_call_upstream(m
     result = await mcp.call_tool("get_server_health", {})
 
     fake.assert_not_awaited()
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["data"]["status"] == "ok"
-    assert result.structured_content["data"]["upstream_checked"] is False
-    assert result.structured_content["meta"]["research_use_only"] is True
+    assert result.structured_content["success"] is True
+    assert result.structured_content["result"]["status"] == "ok"
+    assert result.structured_content["result"]["upstream_checked"] is False
+    assert result.structured_content["_meta"]["unsafe_for_clinical_use"] is True
 
 
 @pytest.mark.asyncio
@@ -1395,8 +1376,8 @@ async def test_get_server_health_check_upstream_true_probes_and_reports_reachabl
     mcp = build_mcp_server()
     result = await mcp.call_tool("get_server_health", {"check_upstream": True})
 
-    assert result.structured_content["ok"] is True
-    data = result.structured_content["data"]
+    assert result.structured_content["success"] is True
+    data = result.structured_content["result"]
     assert data["upstream_checked"] is True
     assert data["upstream_reachable"] is True
     assert data["upstream_status"] == "reachable"
@@ -1430,8 +1411,8 @@ async def test_get_server_health_check_upstream_true_reports_unreachable_on_time
     mcp = build_mcp_server()
     result = await mcp.call_tool("get_server_health", {"check_upstream": True})
 
-    assert result.structured_content["ok"] is True
-    data = result.structured_content["data"]
+    assert result.structured_content["success"] is True
+    data = result.structured_content["result"]
     assert data["upstream_checked"] is True
     assert data["upstream_reachable"] is False
     assert data["upstream_status"] == "unreachable"
@@ -1497,8 +1478,8 @@ async def test_clear_cache_enabled_accepts_empty_input(monkeypatch, mocker) -> N
     result = await mcp.call_tool("clear_cache", {})
 
     fake.clear_cache.assert_awaited_once()
-    assert result.structured_content["ok"] is True
-    assert result.structured_content["data"] == {
+    assert result.structured_content["success"] is True
+    assert result.structured_content["result"] == {
         "cleared": True,
         "message": "All service caches and cache statistics cleared.",
     }
@@ -1558,7 +1539,7 @@ async def test_search_variants_wire_returns_pagination_block_with_five_fields(mo
         "search_variants",
         {"query": "POU3F4", "genome_build": "hg38", "limit": 10},
     )
-    data_one = page_one.structured_content["data"]
+    data_one = page_one.structured_content
     pagination_one = data_one["pagination"]
     # Pagination block carries the four populated fields with the right
     # types. ``previous_cursor`` is null on the first page; the wire drops
@@ -1579,7 +1560,7 @@ async def test_search_variants_wire_returns_pagination_block_with_five_fields(mo
             "cursor": pagination_one["next_cursor"],
         },
     )
-    pagination_two = page_two.structured_content["data"]["pagination"]
+    pagination_two = page_two.structured_content["pagination"]
     assert pagination_two["offset"] == 10
     assert pagination_two["has_more"] is True
     assert pagination_two["previous_cursor"] is not None
@@ -1610,14 +1591,15 @@ async def test_variant_success_offers_widen_next_command(mocker) -> None:
         "get_variant_pvs1_data",
         {"genome_build": "hg19", "variant_id": "X-82763936-A-T", "response_mode": "summary"},
     )
-    cmds = result.structured_content["meta"]["next_commands"]
+    cmds = result.structured_content["_meta"]["next_commands"]
     assert cmds[0]["tool"] == "get_variant_pvs1_data"
     assert cmds[0]["arguments"]["response_mode"] == "standard"
 
 
 @pytest.mark.asyncio
 async def test_default_meta_mode_is_compact_and_validates_against_contract(mocker) -> None:
-    from autopvs1_link.mcp.contracts import VariantMCPEnvelope
+    import jsonschema
+
     from autopvs1_link.models.autopvs1_models import (
         AutoPVS1Data,
         FlowchartStep,
@@ -1649,9 +1631,13 @@ async def test_default_meta_mode_is_compact_and_validates_against_contract(mocke
         "get_variant_pvs1_data",
         {"genome_build": "hg19", "variant_id": "X-82763936-A-T"},
     )
-    citation = result.structured_content["meta"]["recommended_citation"]
+    citation = result.structured_content["_meta"]["recommended_citation"]
     assert set(citation.keys()) == {"doi", "pmid"}
 
     # Honor the MEMORY null-strip lesson: the default (compact) output still
     # validates against the published envelope contract after null-stripping.
-    VariantMCPEnvelope.model_validate(result.structured_content)
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+    jsonschema.validate(
+        instance=result.structured_content,
+        schema=tools["get_variant_pvs1_data"].output_schema,
+    )

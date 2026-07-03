@@ -10,8 +10,14 @@ from pydantic import Field, SkipValidation
 
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from autopvs1_link.mcp.contracts import SearchMCPEnvelope
-from autopvs1_link.mcp.envelope import MCPWarning, ToolResponse, error_envelope, ok_envelope
+from autopvs1_link.mcp.contracts import SearchMCPData
+from autopvs1_link.mcp.envelope import (
+    MCPWarning,
+    ToolResponse,
+    error_envelope,
+    ok_envelope,
+    success_output_schema,
+)
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import (
     InvalidMCPModeError,
@@ -53,7 +59,7 @@ def register(mcp: FastMCP) -> None:
         name="search_variants",
         title="Search AutoPVS1 Variants",
         tags={"variant", "discovery"},
-        output_schema=SearchMCPEnvelope.model_json_schema(),
+        output_schema=success_output_schema(SearchMCPData, collection_field="results"),
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def search_variants(
@@ -154,6 +160,7 @@ def register(mcp: FastMCP) -> None:
                 warnings=warnings,
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
+                collection_field="results",
                 next_commands=search_next_page(
                     {
                         "query": normalized_query,

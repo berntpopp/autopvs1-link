@@ -97,21 +97,28 @@ def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> N
 
     assert detailed["accepted_formats"]["cnv_id"] == "{chrom}-{start}-{end}-{TYPE}"
     assert "17-15000000-20000000-DEL" in detailed["examples"]["get_cnv_pvs1_data"]["cnv_id"]
-    assert detailed["error_envelope"]["required_fields"] == [
-        "ok",
-        "data",
-        "error",
-        "meta",
+    assert detailed["response_envelope"]["success_fields"] == [
+        "success",
+        "result | results",
+        "_meta",
+    ]
+    assert detailed["response_envelope"]["error_fields"] == [
+        "success",
+        "error_code",
+        "message",
+        "retryable",
+        "recovery_action",
+        "_meta",
     ]
     assert detailed != compact
-    assert set(detailed["error_envelope"]["stable_error_codes"]) >= {
+    assert set(detailed["response_envelope"]["stable_error_codes"]) >= {
         "invalid_variant_id",
         "invalid_cnv_id",
         "invalid_genome_build",
         "invalid_search_cursor",
         "destructive_disabled",
     }
-    assert set(detailed["error_envelope"]["stable_warning_codes"]) >= {
+    assert set(detailed["response_envelope"]["stable_warning_codes"]) >= {
         "invalid_external_link",
         "pvs1_not_applicable",
         "limit_clamped",
@@ -379,7 +386,7 @@ def test_detailed_capabilities_documents_warning_aggregation_policy() -> None:
     correctly interpret 'one warning' vs 'many items emitted this code'."""
     detailed = detailed_capabilities_resource()
     aggregation = detailed["bulk_behavior"]["warning_aggregation"]
-    assert aggregation["scope"] == "top-level meta.warnings only; per-item warnings are not echoed"
+    assert aggregation["scope"] == "top-level _meta.warnings only; per-item warnings are not echoed"
     assert aggregation["gate"] == "code aggregated only when emitted by more than one distinct item"
     assert (
         aggregation["fields"] == "count and affected_indices populated; absent on single-item codes"

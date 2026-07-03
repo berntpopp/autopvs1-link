@@ -3,7 +3,7 @@
 import json
 from uuid import UUID
 
-from autopvs1_link.mcp.contracts import ClearCacheData, ClearCacheMCPEnvelope
+from autopvs1_link.mcp.contracts import ClearCacheData
 from autopvs1_link.mcp.envelope import MCPWarning, error_envelope, ok_envelope
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.server_info import SERVER_VERSION
@@ -12,13 +12,13 @@ from autopvs1_link.mcp.server_info import SERVER_VERSION
 def test_ok_envelope_contains_required_metadata() -> None:
     envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
 
-    assert envelope["ok"] is True
-    assert envelope["data"] == {"cleared": True, "message": "cleared"}
-    assert envelope["error"] is None
-    assert envelope["meta"]["server_version"] == SERVER_VERSION
-    assert envelope["meta"]["research_use_only"] is True
-    assert envelope["meta"]["recommended_citation"]["doi"] == "10.1002/humu.24051"
-    UUID(envelope["meta"]["request_id"])
+    assert envelope["success"] is True
+    assert envelope["result"] == {"cleared": True, "message": "cleared"}
+    assert "error_code" not in envelope
+    assert envelope["_meta"]["server_version"] == SERVER_VERSION
+    assert envelope["_meta"]["unsafe_for_clinical_use"] is True
+    assert envelope["_meta"]["recommended_citation"]["doi"] == "10.1002/humu.24051"
+    UUID(envelope["_meta"]["request_id"])
 
 
 def test_error_envelope_contains_machine_readable_error() -> None:
@@ -29,15 +29,14 @@ def test_error_envelope_contains_machine_readable_error() -> None:
         suggestions=["Use search_variants with a gene symbol."],
     )
 
-    assert envelope["ok"] is False
-    assert envelope["data"] is None
-    assert envelope["error"] == {
-        "code": "invalid_variant_id",
-        "message": "Variant IDs must use AutoPVS1 format such as X-82763936-A-T.",
-        "retryable": False,
-        "suggestions": ["Use search_variants with a gene symbol."],
-    }
-    assert envelope["meta"]["research_use_only"] is True
+    assert envelope["success"] is False
+    assert "result" not in envelope
+    assert envelope["error_code"] == "invalid_variant_id"
+    assert envelope["message"] == "Variant IDs must use AutoPVS1 format such as X-82763936-A-T."
+    assert envelope["retryable"] is False
+    assert envelope["recovery_action"] == "Use search_variants with a gene symbol."
+    assert envelope["suggestions"] == ["Use search_variants with a gene symbol."]
+    assert envelope["_meta"]["unsafe_for_clinical_use"] is True
 
 
 def test_warning_objects_are_serialized_in_meta() -> None:
@@ -46,7 +45,7 @@ def test_warning_objects_are_serialized_in_meta() -> None:
         warnings=[MCPWarning(code="deprecated_genome_version", message="Use genome_build.")],
     )
 
-    assert envelope["meta"]["warnings"] == [
+    assert envelope["_meta"]["warnings"] == [
         {"code": "deprecated_genome_version", "message": "Use genome_build."}
     ]
 
@@ -60,17 +59,21 @@ def test_mcp_input_error_converts_to_error_envelope() -> None:
 
     envelope = exc.to_envelope()
 
-    assert envelope["ok"] is False
-    assert envelope["error"]["code"] == "invalid_cnv_id"
-    assert envelope["error"]["retryable"] is False
-    assert envelope["error"]["suggestions"] == ["Use 17-15000000-20000000-DEL."]
+    assert envelope["success"] is False
+    assert envelope["error_code"] == "invalid_cnv_id"
+    assert envelope["retryable"] is False
+    assert envelope["suggestions"] == ["Use 17-15000000-20000000-DEL."]
 
 
-def test_concrete_envelope_schema_uses_standard_fields() -> None:
-    schema = ClearCacheMCPEnvelope.model_json_schema()
+def test_success_output_schema_uses_flat_banner_fields() -> None:
+    from autopvs1_link.mcp.envelope import success_output_schema
 
-    assert set(schema["properties"]) == {"ok", "data", "error", "meta"}
-    assert set(schema["required"]) == {"ok", "data", "error", "meta"}
+    schema = success_output_schema(ClearCacheData)
+
+    assert set(schema["required"]) == {"success", "_meta"}
+    assert {"success", "result", "error_code", "message", "retryable", "_meta"} <= set(
+        schema["properties"]
+    )
 
 
 def test_mcp_warning_serializes_without_aggregate_fields_when_unset() -> None:
@@ -92,8 +95,8 @@ def test_ok_envelope_meta_echoes_telemetry_when_upstream_call_happened() -> None
     reset_call_telemetry()
     record_upstream_call(elapsed_ms=42.5, cache_status="hit")
     envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
-    assert envelope["meta"]["elapsed_ms"] == 42.5
-    assert envelope["meta"]["cache_status"] == "hit"
+    assert envelope["_meta"]["elapsed_ms"] == 42.5
+    assert envelope["_meta"]["cache_status"] == "hit"
 
 
 def test_ok_envelope_meta_drops_telemetry_for_no_upstream_call_tools() -> None:
@@ -107,8 +110,8 @@ def test_ok_envelope_meta_drops_telemetry_for_no_upstream_call_tools() -> None:
 
     reset_call_telemetry()
     envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
-    assert "elapsed_ms" not in envelope["meta"]
-    assert "cache_status" not in envelope["meta"]
+    assert "elapsed_ms" not in envelope["_meta"]
+    assert "cache_status" not in envelope["_meta"]
 
 
 def test_ok_envelope_meta_echoes_effective_chars_count() -> None:
@@ -119,9 +122,9 @@ def test_ok_envelope_meta_echoes_effective_chars_count() -> None:
     calibrate after the first call is a peer-server pattern from HNF1B.
     """
     envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
-    chars = envelope["meta"]["effective_chars"]
+    chars = envelope["_meta"]["effective_chars"]
     assert isinstance(chars, int)
-    expected = len(json.dumps(envelope["data"], separators=(",", ":")))
+    expected = len(json.dumps(envelope["result"], separators=(",", ":")))
     assert chars == expected, f"effective_chars {chars} != actual data bytes {expected}"
 
 
@@ -157,11 +160,11 @@ def test_ok_envelope_meta_emits_cost_tier_for_scrape_tools() -> None:
         ClearCacheData(cleared=True, message="cleared"),
         tool_name="get_variant_pvs1_data",
     )
-    assert envelope["meta"]["cost_tier"] == "expensive_cold_cheap_warm"
-    assert envelope["meta"]["rate_limit_floor_ms"] == 1000
+    assert envelope["_meta"]["cost_tier"] == "expensive_cold_cheap_warm"
+    assert envelope["_meta"]["rate_limit_floor_ms"] == 1000
     # cache_status='hit' means the rate-limit clock did NOT reset; we
     # cannot compute next_call_earliest_at honestly.
-    assert "next_call_earliest_at" not in envelope["meta"]
+    assert "next_call_earliest_at" not in envelope["_meta"]
 
 
 def test_ok_envelope_meta_emits_next_call_earliest_at_only_on_real_upstream() -> None:
@@ -174,9 +177,9 @@ def test_ok_envelope_meta_emits_next_call_earliest_at_only_on_real_upstream() ->
         ClearCacheData(cleared=True, message="cleared"),
         tool_name="get_variant_pvs1_data",
     )
-    assert envelope["meta"]["cache_status"] == "miss"
+    assert envelope["_meta"]["cache_status"] == "miss"
     # ISO-8601 string in the future
-    next_at = envelope["meta"]["next_call_earliest_at"]
+    next_at = envelope["_meta"]["next_call_earliest_at"]
     assert isinstance(next_at, str)
     assert next_at.endswith("+00:00"), f"Expected UTC offset, got {next_at!r}"
 
@@ -188,7 +191,7 @@ def test_ok_envelope_meta_emits_next_call_earliest_at_only_on_real_upstream() ->
         ClearCacheData(cleared=True, message="cleared"),
         tool_name="get_variant_pvs1_data",
     )
-    assert isinstance(envelope2["meta"]["next_call_earliest_at"], str)
+    assert isinstance(envelope2["_meta"]["next_call_earliest_at"], str)
 
 
 def test_ok_envelope_meta_emits_cheap_tier_without_rate_limit_floor() -> None:
@@ -200,9 +203,9 @@ def test_ok_envelope_meta_emits_cheap_tier_without_rate_limit_floor() -> None:
         ClearCacheData(cleared=True, message="cleared"),
         tool_name="get_server_health",
     )
-    assert envelope["meta"]["cost_tier"] == "cheap"
-    assert "rate_limit_floor_ms" not in envelope["meta"]
-    assert "next_call_earliest_at" not in envelope["meta"]
+    assert envelope["_meta"]["cost_tier"] == "cheap"
+    assert "rate_limit_floor_ms" not in envelope["_meta"]
+    assert "next_call_earliest_at" not in envelope["_meta"]
 
 
 def test_ok_envelope_meta_drops_cost_tier_when_tool_name_unknown() -> None:
@@ -211,9 +214,9 @@ def test_ok_envelope_meta_drops_cost_tier_when_tool_name_unknown() -> None:
 
     reset_call_telemetry()
     envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
-    assert "cost_tier" not in envelope["meta"]
-    assert "rate_limit_floor_ms" not in envelope["meta"]
-    assert "next_call_earliest_at" not in envelope["meta"]
+    assert "cost_tier" not in envelope["_meta"]
+    assert "rate_limit_floor_ms" not in envelope["_meta"]
+    assert "next_call_earliest_at" not in envelope["_meta"]
 
 
 def test_error_envelope_meta_emits_retry_after_ms_for_transient_codes() -> None:
@@ -229,8 +232,8 @@ def test_error_envelope_meta_emits_retry_after_ms_for_transient_codes() -> None:
         retryable=True,
         tool_name="get_variant_pvs1_data",
     )
-    assert envelope["meta"]["retry_after_ms"] == 1000
-    assert envelope["meta"]["cost_tier"] == "expensive_cold_cheap_warm"
+    assert envelope["_meta"]["retry_after_ms"] == 1000
+    assert envelope["_meta"]["cost_tier"] == "expensive_cold_cheap_warm"
 
 
 def test_error_envelope_meta_no_retry_after_for_input_errors() -> None:
@@ -241,7 +244,7 @@ def test_error_envelope_meta_no_retry_after_for_input_errors() -> None:
         retryable=False,
         tool_name="get_variant_pvs1_data",
     )
-    assert "retry_after_ms" not in envelope["meta"]
+    assert "retry_after_ms" not in envelope["_meta"]
 
 
 def test_error_envelope_retry_after_ms_can_be_overridden_by_caller() -> None:
@@ -253,7 +256,7 @@ def test_error_envelope_retry_after_ms_can_be_overridden_by_caller() -> None:
         tool_name="get_variant_pvs1_data",
         retry_after_ms=5_000,
     )
-    assert envelope["meta"]["retry_after_ms"] == 5_000
+    assert envelope["_meta"]["retry_after_ms"] == 5_000
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +276,7 @@ def test_error_envelope_meta_emits_next_actions_for_known_codes() -> None:
         retryable=False,
         tool_name="get_variant_pvs1_data",
     )
-    actions = envelope["meta"]["next_actions"]
+    actions = envelope["_meta"]["next_actions"]
     assert isinstance(actions, list) and actions
     assert any("CHROM-POS-REF-ALT" in step for step in actions)
 
@@ -286,13 +289,13 @@ def test_error_envelope_meta_drops_next_actions_for_unknown_codes() -> None:
         retryable=False,
         tool_name="get_variant_pvs1_data",
     )
-    assert "next_actions" not in envelope["meta"]
+    assert "next_actions" not in envelope["_meta"]
 
 
 def test_success_envelope_meta_drops_next_actions() -> None:
     """next_actions belongs only on errors; success envelopes drop it."""
     envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
-    assert "next_actions" not in envelope["meta"]
+    assert "next_actions" not in envelope["_meta"]
 
 
 def test_every_known_error_code_has_next_actions_registered() -> None:
@@ -352,8 +355,8 @@ def test_error_envelope_drops_cost_tier_for_input_errors() -> None:
         retryable=False,
         tool_name="get_variant_pvs1_data",
     )
-    assert "cost_tier" not in envelope["meta"]
-    assert "rate_limit_floor_ms" not in envelope["meta"]
+    assert "cost_tier" not in envelope["_meta"]
+    assert "rate_limit_floor_ms" not in envelope["_meta"]
 
 
 def test_error_envelope_drops_cost_tier_for_invalid_variant_id() -> None:
@@ -363,8 +366,8 @@ def test_error_envelope_drops_cost_tier_for_invalid_variant_id() -> None:
         retryable=False,
         tool_name="get_variant_pvs1_data",
     )
-    assert "cost_tier" not in envelope["meta"]
-    assert "rate_limit_floor_ms" not in envelope["meta"]
+    assert "cost_tier" not in envelope["_meta"]
+    assert "rate_limit_floor_ms" not in envelope["_meta"]
 
 
 def test_error_envelope_drops_cost_tier_for_requires_disambiguation() -> None:
@@ -375,8 +378,8 @@ def test_error_envelope_drops_cost_tier_for_requires_disambiguation() -> None:
         retryable=False,
         tool_name="get_variant_pvs1_data",
     )
-    assert "cost_tier" not in envelope["meta"]
-    assert "rate_limit_floor_ms" not in envelope["meta"]
+    assert "cost_tier" not in envelope["_meta"]
+    assert "rate_limit_floor_ms" not in envelope["_meta"]
 
 
 def test_error_envelope_keeps_cost_tier_for_upstream_unavailable() -> None:
@@ -387,9 +390,9 @@ def test_error_envelope_keeps_cost_tier_for_upstream_unavailable() -> None:
         retryable=True,
         tool_name="get_variant_pvs1_data",
     )
-    assert envelope["meta"]["cost_tier"] == "expensive_cold_cheap_warm"
-    assert envelope["meta"]["rate_limit_floor_ms"] == 1000
-    assert envelope["meta"]["retry_after_ms"] == 1000
+    assert envelope["_meta"]["cost_tier"] == "expensive_cold_cheap_warm"
+    assert envelope["_meta"]["rate_limit_floor_ms"] == 1000
+    assert envelope["_meta"]["retry_after_ms"] == 1000
 
 
 def test_error_envelope_keeps_cost_tier_for_external_resolver_unavailable() -> None:
@@ -399,8 +402,8 @@ def test_error_envelope_keeps_cost_tier_for_external_resolver_unavailable() -> N
         retryable=True,
         tool_name="get_variant_pvs1_data",
     )
-    assert envelope["meta"]["cost_tier"] == "expensive_cold_cheap_warm"
-    assert envelope["meta"]["rate_limit_floor_ms"] == 1000
+    assert envelope["_meta"]["cost_tier"] == "expensive_cold_cheap_warm"
+    assert envelope["_meta"]["rate_limit_floor_ms"] == 1000
 
 
 def test_ok_envelope_bulk_mixed_aggregate_overrides_telemetry() -> None:
@@ -424,10 +427,10 @@ def test_ok_envelope_bulk_mixed_aggregate_overrides_telemetry() -> None:
             cached_count=1,
             uncached_count=1,
         )
-        assert envelope["meta"]["cache_status"] == "mixed"
-        assert envelope["meta"]["elapsed_ms"] == 1505.0
-        assert envelope["meta"]["cached_count"] == 1
-        assert envelope["meta"]["uncached_count"] == 1
+        assert envelope["_meta"]["cache_status"] == "mixed"
+        assert envelope["_meta"]["elapsed_ms"] == 1505.0
+        assert envelope["_meta"]["cached_count"] == 1
+        assert envelope["_meta"]["uncached_count"] == 1
     finally:
         reset_call_telemetry()
 
@@ -444,14 +447,14 @@ def test_ok_envelope_carries_next_commands_when_supplied() -> None:
         tool_name="get_variant_pvs1_data",
         next_commands=[{"tool": "get_variant_pvs1_data", "arguments": {"y": 2}, "reason": "r"}],
     )
-    assert out["meta"]["next_commands"] == [
+    assert out["_meta"]["next_commands"] == [
         {"tool": "get_variant_pvs1_data", "arguments": {"y": 2}, "reason": "r"}
     ]
 
 
 def test_ok_envelope_drops_next_commands_when_absent() -> None:
     out = ok_envelope({"x": 1}, meta_mode="full", tool_name="get_variant_pvs1_data")
-    assert "next_commands" not in out["meta"]
+    assert "next_commands" not in out["_meta"]
 
 
 def test_error_envelope_derives_disambiguation_next_commands() -> None:
@@ -462,7 +465,7 @@ def test_error_envelope_derives_disambiguation_next_commands() -> None:
         details={"candidates": [{"id": "17-1-A-G", "genome_build": "hg38"}]},
         tool_name="get_variant_pvs1_data",
     )
-    meta = result.structured_content["meta"]
+    meta = result.structured_content["_meta"]
     assert meta["next_commands"] == [
         {
             "tool": "get_variant_pvs1_data",
@@ -479,7 +482,25 @@ def test_error_envelope_without_candidates_drops_next_commands() -> None:
         retryable=False,
         tool_name="get_variant_pvs1_data",
     )
-    assert "next_commands" not in result.structured_content["meta"]
+    assert "next_commands" not in result.structured_content["_meta"]
+
+
+def test_scrape_envelope_carries_upstream_provenance() -> None:
+    envelope = ok_envelope({"x": 1}, tool_name="get_variant_pvs1_data")
+    prov = envelope["_meta"]["upstream"]
+    assert prov["retrieval"] == "html-scrape"
+    assert "bgi.com" in prov["source"]
+    assert "drift" in prov["note"].lower()
+
+
+def test_cheap_envelope_has_no_upstream_provenance() -> None:
+    envelope = ok_envelope({"x": 1}, tool_name="get_server_capabilities")
+    assert "upstream" not in envelope["_meta"]
+
+
+def test_envelope_without_tool_name_has_no_upstream_provenance() -> None:
+    envelope = ok_envelope({"x": 1})
+    assert "upstream" not in envelope["_meta"]
 
 
 def test_ok_envelope_emits_cold_latency_only_on_cold_call() -> None:
@@ -489,11 +510,11 @@ def test_ok_envelope_emits_cold_latency_only_on_cold_call() -> None:
         tool_name="search_variants",
         cache_status_override="miss",
     )
-    assert cold["meta"]["expected_cold_latency_ms"] == 3000
+    assert cold["_meta"]["expected_cold_latency_ms"] == 3000
     warm = ok_envelope(
         {"x": 1},
         meta_mode="full",
         tool_name="search_variants",
         cache_status_override="hit",
     )
-    assert "expected_cold_latency_ms" not in warm["meta"]
+    assert "expected_cold_latency_ms" not in warm["_meta"]
