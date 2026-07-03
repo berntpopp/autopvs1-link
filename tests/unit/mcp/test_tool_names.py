@@ -16,9 +16,9 @@ Tier-2 (sanctioned domain action/compute verbs):
     submit, export, generate, download
 
 Operational/meta carve-out (by tag, not verb, Standard v1.1 §Q3):
-    Tools tagged ``ops``, ``meta``, or ``admin`` skip the verb rule but
-    still must pass charset/length/no-self-prefix checks. Covers
-    ``clear_cache`` (tags: meta, admin) without needing a per-name exception.
+    Tools tagged ``ops`` or ``meta`` skip the verb rule but still must pass
+    charset/length/no-self-prefix checks. Covers ``clear_cache`` (tags:
+    meta, admin) via its ``meta`` tag, without needing a per-name exception.
     Per-name exceptions (`_VERB_EXCEPTIONS`) are removed; the tag carve-out
     is the fleet-ratified mechanism.
 """
@@ -58,8 +58,9 @@ _ALL_VERBS = _CANONICAL_VERBS | _TIER2_VERBS
 
 # Tags that grant an ops/meta carve-out (Standard v1.1, §Q3 ratification).
 # Tools carrying any of these tags skip the verb rule (but still pass
-# charset/length/no-self-prefix). Covers ``clear_cache`` (meta, admin).
-_OPS_CARVEOUT_TAGS = frozenset({"ops", "meta", "admin"})
+# charset/length/no-self-prefix). Covers ``clear_cache`` (meta, admin) via
+# its ``meta`` tag — the ratified carve-out set is exactly {ops, meta}.
+_OPS_CARVEOUT_TAGS = frozenset({"ops", "meta"})
 
 _NAMESPACE = "autopvs1"
 
@@ -87,7 +88,7 @@ async def test_tool_names_conform_to_standard_v1_1(monkeypatch: Any) -> None:
         assert verb in _ALL_VERBS, (
             f"{name!r} must start with a Tier-1 or Tier-2 verb; "
             f"Tier-1: {sorted(_CANONICAL_VERBS)}, Tier-2: {sorted(_TIER2_VERBS)}; "
-            "or tag the tool ops/meta/admin for the operational carve-out "
+            "or tag the tool ops/meta for the operational carve-out "
             "(Standard v1.1, genefoundry-router/docs/TOOL-NAMING-STANDARD-v1.md)"
         )
 
