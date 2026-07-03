@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
+from autopvs1_link import __version__
+
 # ---------------------------------------------------------------------------
 # Backward-compat shim: copy AUTOPVS1_* env vars to AUTOPVS1_LINK_* when the
 # new-prefixed variable is unset. Emits one DeprecationWarning naming each
@@ -165,7 +167,7 @@ class MCPConfig(BaseSettings):
     model_config = {"env_prefix": "AUTOPVS1_LINK_MCP_", "env_file": ".env"}
 
     name: str = Field(default="AutoPVS1 Link", description="MCP server name")
-    version: str = Field(default="1.2.0", description="MCP server version")
+    version: str = Field(default=__version__, description="MCP server version")
     description: str = Field(
         default="AutoPVS1 genetic variant analysis tools",
         description="MCP server description",
@@ -194,7 +196,7 @@ class Settings(BaseSettings):
         default="development", description="Deployment environment"
     )
     debug: bool = Field(default=True, description="Enable debug mode")
-    version: str = Field(default="1.2.0", description="Application version")
+    version: str = Field(default=__version__, description="Application version")
 
     api: APIConfig = Field(default_factory=APIConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)

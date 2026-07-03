@@ -15,8 +15,10 @@ workflow arrows -> deferred-tool fallback list -> error-code legend
 
 from __future__ import annotations
 
+from autopvs1_link import __version__
+
 SERVER_NAME = "autopvs1-link"
-SERVER_VERSION = "2.0.0"
+SERVER_VERSION = __version__
 SERVER_DESCRIPTION = (
     "AutoPVS1-Link grounds research-use PVS1 variant classification by "
     "scraping the AutoPVS1 web service (https://autopvs1.bgi.com) and "
