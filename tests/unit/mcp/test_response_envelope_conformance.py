@@ -108,6 +108,22 @@ def test_error_envelope_sets_mcp_is_error_true_on_the_wire() -> None:
     assert result.structured_content["success"] is False
 
 
+def test_error_envelope_sets_is_error_on_the_instance() -> None:
+    """Defensive-correctness regression: FastMCP's caching middleware reads
+    ``ToolResult.is_error`` directly (not via ``to_mcp_result()``), so a
+    cached error result must carry ``is_error=True`` on the instance itself
+    or a cache replay would unwrap it as ``is_error=False``.
+    """
+    result = error_envelope(
+        code="invalid_genome_build",
+        message="bad build",
+        retryable=False,
+        tool_name="get_variant_pvs1_data",
+    )
+
+    assert result.is_error is True
+
+
 def test_error_envelope_recovery_action_falls_back_to_registered_next_action() -> None:
     """Without call-specific suggestions, recovery_action uses the registry hint."""
     result = error_envelope(

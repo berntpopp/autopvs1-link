@@ -547,4 +547,5 @@ def error_envelope(
     return ErrorToolResult(
         content=[TextContent(type="text", text=json.dumps(payload, separators=(",", ":")))],
         structured_content=payload,
+        is_error=True,
     )
