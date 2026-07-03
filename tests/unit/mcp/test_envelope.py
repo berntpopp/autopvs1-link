@@ -485,6 +485,24 @@ def test_error_envelope_without_candidates_drops_next_commands() -> None:
     assert "next_commands" not in result.structured_content["_meta"]
 
 
+def test_scrape_envelope_carries_upstream_provenance() -> None:
+    envelope = ok_envelope({"x": 1}, tool_name="get_variant_pvs1_data")
+    prov = envelope["_meta"]["upstream"]
+    assert prov["retrieval"] == "html-scrape"
+    assert "bgi.com" in prov["source"]
+    assert "drift" in prov["note"].lower()
+
+
+def test_cheap_envelope_has_no_upstream_provenance() -> None:
+    envelope = ok_envelope({"x": 1}, tool_name="get_server_capabilities")
+    assert "upstream" not in envelope["_meta"]
+
+
+def test_envelope_without_tool_name_has_no_upstream_provenance() -> None:
+    envelope = ok_envelope({"x": 1})
+    assert "upstream" not in envelope["_meta"]
+
+
 def test_ok_envelope_emits_cold_latency_only_on_cold_call() -> None:
     cold = ok_envelope(
         {"x": 1},

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any, TypeVar
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from asgi_correlation_id.context import correlation_id
@@ -75,6 +76,23 @@ class RecommendedCitation(BaseModel):
     doi: str = "10.1002/humu.24051"
     pmid: str = "32442321"
     url: str = "https://pubmed.ncbi.nlm.nih.gov/32442321/"
+
+
+class UpstreamProvenance(BaseModel):
+    """Provenance note for HTML-scraped AutoPVS1 outputs.
+
+    Surfaced only on scrape-tier envelopes so callers know the data was
+    parsed from upstream HTML (not an official API) and that the format is
+    not contractually pinned and may drift silently.
+    """
+
+    source: str
+    retrieval: str = "html-scrape"
+    note: str = (
+        "Fields are parsed from upstream AutoPVS1 HTML, which has no "
+        "versioned/contractual format; values may drift silently if the "
+        "page changes. Cross-check before any interpretation."
+    )
 
 
 class MCPWarning(BaseModel):
@@ -179,6 +197,7 @@ class MCPMeta(BaseModel):
     next_commands: list[dict[str, Any]] | None = None
     cached_count: int | None = None
     uncached_count: int | None = None
+    upstream: UpstreamProvenance | None = None
 
 
 def _dump_warning(warning: MCPWarning) -> dict[str, Any]:
@@ -311,6 +330,7 @@ def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
             "expected_cold_latency_ms",
             "cached_count",
             "uncached_count",
+            "upstream",
         ):
             if meta.get(key) is None:
                 meta.pop(key, None)
@@ -320,6 +340,12 @@ def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
 def _rate_limit_floor_ms() -> int:
     """Return the configured AutoPVS1 upstream rate-limit floor in ms."""
     return int(settings.api.rate_limit_delay * 1000)
+
+
+def _upstream_provenance() -> UpstreamProvenance:
+    """Build the upstream-provenance note from the configured base URL."""
+    netloc = urlsplit(settings.api.base_url).netloc or settings.api.base_url
+    return UpstreamProvenance(source=netloc)
 
 
 def _cost_hints_for(
@@ -438,6 +464,7 @@ def ok_envelope(
     expected_cold_latency_ms = (
         cold_latency_ms_for(tool_name) if cache_status in ("miss", "coalesced") else None
     )
+    upstream = _upstream_provenance() if cost_tier == SCRAPE_TIER else None
     meta = MCPMeta(
         tool=tool_name,
         capabilities_version=capabilities_version(),
@@ -452,6 +479,7 @@ def ok_envelope(
         cached_count=cached_count,
         uncached_count=uncached_count,
         next_commands=next_commands,
+        upstream=upstream,
     )
     banner: dict[str, Any] = {"success": True}
     if collection_field is None:

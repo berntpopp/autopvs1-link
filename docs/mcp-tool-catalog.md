@@ -290,6 +290,38 @@ not clinical decision support.
           "title": "Unsafe For Clinical Use",
           "type": "boolean"
         },
+        "upstream": {
+          "anyOf": [
+            {
+              "description": "Provenance note for HTML-scraped AutoPVS1 outputs.\n\nSurfaced only on scrape-tier envelopes so callers know the data was\nparsed from upstream HTML (not an official API) and that the format is\nnot contractually pinned and may drift silently.",
+              "properties": {
+                "note": {
+                  "default": "Fields are parsed from upstream AutoPVS1 HTML, which has no versioned/contractual format; values may drift silently if the page changes. Cross-check before any interpretation.",
+                  "title": "Note",
+                  "type": "string"
+                },
+                "retrieval": {
+                  "default": "html-scrape",
+                  "title": "Retrieval",
+                  "type": "string"
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "title": "UpstreamProvenance",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "warnings": {
           "items": {
             "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
@@ -992,6 +1024,38 @@ not. Order is first-seen-code-first.
           "default": true,
           "title": "Unsafe For Clinical Use",
           "type": "boolean"
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "description": "Provenance note for HTML-scraped AutoPVS1 outputs.\n\nSurfaced only on scrape-tier envelopes so callers know the data was\nparsed from upstream HTML (not an official API) and that the format is\nnot contractually pinned and may drift silently.",
+              "properties": {
+                "note": {
+                  "default": "Fields are parsed from upstream AutoPVS1 HTML, which has no versioned/contractual format; values may drift silently if the page changes. Cross-check before any interpretation.",
+                  "title": "Note",
+                  "type": "string"
+                },
+                "retrieval": {
+                  "default": "html-scrape",
+                  "title": "Retrieval",
+                  "type": "string"
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "title": "UpstreamProvenance",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "warnings": {
           "items": {
@@ -1768,6 +1832,38 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "title": "Unsafe For Clinical Use",
           "type": "boolean"
         },
+        "upstream": {
+          "anyOf": [
+            {
+              "description": "Provenance note for HTML-scraped AutoPVS1 outputs.\n\nSurfaced only on scrape-tier envelopes so callers know the data was\nparsed from upstream HTML (not an official API) and that the format is\nnot contractually pinned and may drift silently.",
+              "properties": {
+                "note": {
+                  "default": "Fields are parsed from upstream AutoPVS1 HTML, which has no versioned/contractual format; values may drift silently if the page changes. Cross-check before any interpretation.",
+                  "title": "Note",
+                  "type": "string"
+                },
+                "retrieval": {
+                  "default": "html-scrape",
+                  "title": "Retrieval",
+                  "type": "string"
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "title": "UpstreamProvenance",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "warnings": {
           "items": {
             "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
@@ -2208,6 +2304,38 @@ cold scoring call.
           "title": "Unsafe For Clinical Use",
           "type": "boolean"
         },
+        "upstream": {
+          "anyOf": [
+            {
+              "description": "Provenance note for HTML-scraped AutoPVS1 outputs.\n\nSurfaced only on scrape-tier envelopes so callers know the data was\nparsed from upstream HTML (not an official API) and that the format is\nnot contractually pinned and may drift silently.",
+              "properties": {
+                "note": {
+                  "default": "Fields are parsed from upstream AutoPVS1 HTML, which has no versioned/contractual format; values may drift silently if the page changes. Cross-check before any interpretation.",
+                  "title": "Note",
+                  "type": "string"
+                },
+                "retrieval": {
+                  "default": "html-scrape",
+                  "title": "Retrieval",
+                  "type": "string"
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "title": "UpstreamProvenance",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "warnings": {
           "items": {
             "description": "Structured non-fatal warning for LLM callers.\n\n``count`` and ``affected_indices`` are populated only when this warning\naggregates per-item occurrences in a bulk call. Single-tool warnings\nleave them ``None`` and they drop out of the wire payload via\n``exclude_none`` on the per-item meta serialization path.",
@@ -2627,6 +2755,38 @@ not clinical decision support.
           "default": true,
           "title": "Unsafe For Clinical Use",
           "type": "boolean"
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "description": "Provenance note for HTML-scraped AutoPVS1 outputs.\n\nSurfaced only on scrape-tier envelopes so callers know the data was\nparsed from upstream HTML (not an official API) and that the format is\nnot contractually pinned and may drift silently.",
+              "properties": {
+                "note": {
+                  "default": "Fields are parsed from upstream AutoPVS1 HTML, which has no versioned/contractual format; values may drift silently if the page changes. Cross-check before any interpretation.",
+                  "title": "Note",
+                  "type": "string"
+                },
+                "retrieval": {
+                  "default": "html-scrape",
+                  "title": "Retrieval",
+                  "type": "string"
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "title": "UpstreamProvenance",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "warnings": {
           "items": {
@@ -3479,6 +3639,38 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "default": true,
           "title": "Unsafe For Clinical Use",
           "type": "boolean"
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "description": "Provenance note for HTML-scraped AutoPVS1 outputs.\n\nSurfaced only on scrape-tier envelopes so callers know the data was\nparsed from upstream HTML (not an official API) and that the format is\nnot contractually pinned and may drift silently.",
+              "properties": {
+                "note": {
+                  "default": "Fields are parsed from upstream AutoPVS1 HTML, which has no versioned/contractual format; values may drift silently if the page changes. Cross-check before any interpretation.",
+                  "title": "Note",
+                  "type": "string"
+                },
+                "retrieval": {
+                  "default": "html-scrape",
+                  "title": "Retrieval",
+                  "type": "string"
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "title": "UpstreamProvenance",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "warnings": {
           "items": {
@@ -4467,6 +4659,38 @@ not clinical decision support.
           "default": true,
           "title": "Unsafe For Clinical Use",
           "type": "boolean"
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "description": "Provenance note for HTML-scraped AutoPVS1 outputs.\n\nSurfaced only on scrape-tier envelopes so callers know the data was\nparsed from upstream HTML (not an official API) and that the format is\nnot contractually pinned and may drift silently.",
+              "properties": {
+                "note": {
+                  "default": "Fields are parsed from upstream AutoPVS1 HTML, which has no versioned/contractual format; values may drift silently if the page changes. Cross-check before any interpretation.",
+                  "title": "Note",
+                  "type": "string"
+                },
+                "retrieval": {
+                  "default": "html-scrape",
+                  "title": "Retrieval",
+                  "type": "string"
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "title": "UpstreamProvenance",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "warnings": {
           "items": {
