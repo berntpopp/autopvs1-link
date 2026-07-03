@@ -50,7 +50,7 @@ def create_app() -> FastAPI:
         description="Unified REST + MCP server for AutoPVS1.",
         lifespan=lifespan,
     )
-    app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(RequestLoggingMiddleware, log_client_ip=settings.debug)
     cors_origins = settings.server.cors_origins_list
     # Never pair wildcard origins with credentials: browsers reject that
     # combination and it is a CORS anti-pattern (reflected-origin credential
