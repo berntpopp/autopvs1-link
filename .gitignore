@@ -189,3 +189,7 @@ TODO.md
 
 # Local git worktrees
 .worktrees/
+
+# Local docker env holds production secrets — never commit it
+# (keep .env.docker.example, which is a different, tracked filename)
+.env.docker
