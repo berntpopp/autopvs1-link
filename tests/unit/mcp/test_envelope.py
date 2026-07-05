@@ -489,7 +489,7 @@ def test_scrape_envelope_carries_upstream_provenance() -> None:
     envelope = ok_envelope({"x": 1}, tool_name="get_variant_pvs1_data")
     prov = envelope["_meta"]["upstream"]
     assert prov["retrieval"] == "html-scrape"
-    assert "bgi.com" in prov["source"]
+    assert prov["source"] == "autopvs1.bgi.com"
     assert "drift" in prov["note"].lower()
 
 
