@@ -6,6 +6,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 2.0.1
+
+### Security
+
+- Harden AutoPVS1 upstream-provenance test assertion to exact source match
+  (clears CodeQL `py/incomplete-url-substring-sanitization`).
+
 ## 2.0.0
 
 **BREAKING.** Adopts the [GeneFoundry Response-Envelope Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/RESPONSE-ENVELOPE-STANDARD-v1.md)
