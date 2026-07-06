@@ -44,7 +44,7 @@ dependencies = [
     "rich>=15.0.0,<16.0.0",
     "typer>=0.26.4,<1.0.0",
     "mcp[cli]>=1.27.2,<2.0.0",
-    "fastmcp>=3.4.2,<4.0.0",
+    "fastmcp>=3.4.3,<4.0.0",
 ]
 
 [dependency-groups]
