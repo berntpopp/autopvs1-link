@@ -71,12 +71,14 @@ class AutoPVS1Client:
             )
             soup = BeautifulSoup(response.text, "lxml")
         except Exception as e:
+            # ``error_type`` only: str(e) can embed the variant-bearing upstream
+            # URL (e.g. httpx.HTTPStatusError), which is GDPR Art. 9 data.
             logger.error(
                 "Failed to fetch variant data",
                 url=url,
                 genome_build=genome_build,
                 variant_id=variant_id,
-                error=str(e),
+                error_type=type(e).__name__,
             )
             raise
 
@@ -109,7 +111,7 @@ class AutoPVS1Client:
                 url=url,
                 query=query,
                 genome_version=genome_version,
-                error=str(e),
+                error_type=type(e).__name__,
             )
             raise
 
@@ -169,7 +171,7 @@ class AutoPVS1Client:
                 url=url,
                 query=query,
                 genome_version=genome_version,
-                error=str(e),
+                error_type=type(e).__name__,
             )
             raise
 
@@ -211,7 +213,7 @@ class AutoPVS1Client:
                 url=url,
                 genome_build=genome_build,
                 cnv_id=cnv_id,
-                error=str(e),
+                error_type=type(e).__name__,
             )
             raise
 
