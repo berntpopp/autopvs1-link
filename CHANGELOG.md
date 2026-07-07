@@ -6,6 +6,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 2.0.3
+
+### Changed
+
+- Merge the consolidated Dependabot dependency sweep (#58 — fastapi, uvicorn,
+  typer, mcp, fastmcp) with the security-remediation release (docker loopback
+  bind + variant/query log redaction, finding M2). No behaviour change beyond
+  the merged dependency bumps and security fixes.
+
 ## 2.0.2
 
 ### Security
