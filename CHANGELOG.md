@@ -6,6 +6,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 2.0.2
+
+### Security
+
+- Loopback-bind (`127.0.0.1`) the base `docker-compose.yml` host port so
+  copying it to a server never publishes the unauthenticated backend on the
+  public IP; production reaches it only via the router / reverse proxy.
+- Stop logging variant coordinates, CNV ids, HGVS, and free-text queries via
+  a field-name log redactor (GDPR Art. 9, finding M2).
+- Close the exception-string log leak: an `httpx.HTTPStatusError` stringifies
+  to `... for url '<variant-url>' ...`, so `error=str(exc)` on the upstream
+  fetch paths smuggled the patient variant past the field-name scrub. The
+  redactor now scrubs `error`/`exception`/`exc` values, and the upstream
+  failure log sites emit `error_type` (the exception class) instead.
+
 ## 2.0.1
 
 ### Security
