@@ -25,8 +25,13 @@ services:
       AUTOPVS1_LINK_LOG_LEVEL: INFO
       AUTOPVS1_LINK_METRICS_ENABLED: "true"
 
+    # Dev/local only — loopback-bound (127.0.0.1) so copying this file to a
+    # server never publishes the unauthenticated backend on the public IP
+    # (Docker would otherwise bind 0.0.0.0 and bypass the host firewall).
+    # Production fronts the container with a reverse proxy via the prod/npm
+    # overlays (ports: !reset []). Backends are unauthenticated by design.
     ports:
-      - "${AUTOPVS1_LINK_HOST_PORT:-8012}:8000"
+      - "127.0.0.1:${AUTOPVS1_LINK_HOST_PORT:-8012}:8000"
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
