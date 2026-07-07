@@ -225,11 +225,13 @@ class VariantRecoderClient:
                 f"Variant Recoder timed out resolving {input_id!r} on {genome_build}"
             ) from exc
         except httpx.RequestError as exc:
+            # ``error_type`` only: str(exc) can embed the recoder URL, which
+            # carries the (patient-derived) input id -- GDPR Art. 9 data.
             logger.warning(
                 "Recoder transport error",
                 input_id=input_id,
                 build=genome_build,
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
             raise RecoderUnavailableError(
                 f"Variant Recoder transport error resolving {input_id!r}"

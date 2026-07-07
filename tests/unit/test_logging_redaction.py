@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -23,6 +24,9 @@ from autopvs1_link.logging_config import configure_logging, redact_sensitive_fie
 
 # A recognisable patient-derived HGVS coordinate used as a leak tracer.
 _SENTINEL = "NM_SENTINEL7f3a:c.1A>G"
+# The distinctive prefix has no URL-special characters, so it survives every
+# percent-encoding scheme unchanged -- the most reliable single leak tracer.
+_SENTINEL_STEM = "NM_SENTINEL7f3a"
 
 
 def test_redact_processor_scrubs_every_sensitive_field_by_name() -> None:
@@ -78,13 +82,54 @@ def test_redact_processor_hashes_cache_key() -> None:
     assert out["method"] == "search_variants"
 
 
+def test_redact_processor_scrubs_rendered_exception_strings() -> None:
+    """Rendered exception strings/tracebacks embed the upstream URL -- and that
+    URL carries the patient variant. ``error=str(exc)`` and the ``exception``
+    field produced by ``format_exc_info`` therefore leak GDPR Art. 9 data even
+    though the coordinate never appears under a 'sensitive' key. The redactor
+    MUST scrub these by name; only the safe exception *class* (``error_type``)
+    survives.
+    """
+    url = f"https://autopvs1.example/variant/hg19/{_SENTINEL}"
+    rendered = f"Server error '500 Internal Server Error' for url '{url}'"
+    out = redact_sensitive_fields(
+        None,
+        "error",
+        {
+            "event": "Failed to fetch variant data",
+            "method": "get_variant_data",
+            # Safe class name -- kept for observability.
+            "error_type": "HTTPStatusError",
+            # Every one of these can carry the rendered URL:
+            "error": rendered,
+            "exception": f"Traceback (most recent call last):\n...\nhttpx.HTTPStatusError: {rendered}",
+            "exc": rendered,
+        },
+    )
+
+    assert out["error"] == "<redacted>"
+    assert out["exception"] == "<redacted>"
+    assert out["exc"] == "<redacted>"
+    # The exception class name is safe and MUST survive.
+    assert out["error_type"] == "HTTPStatusError"
+    assert out["method"] == "get_variant_data"
+
+    for field, value in out.items():
+        assert _SENTINEL_STEM not in str(value), f"sentinel leaked via field {field!r}: {value!r}"
+
+
 def test_upstream_failure_never_logs_variant_or_url(
     caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Drive a real failing upstream fetch and assert no rendered record leaks
-    the sentinel -- exercises both the INFO ("Fetching variant data") and the
-    ERROR ("Failed to fetch variant data") paths, which log ``url`` and
-    ``variant_id``.
+    """Drive a real failing upstream fetch whose ``HTTPStatusError`` embeds the
+    variant URL, and assert no rendered record leaks the sentinel -- in raw OR
+    URL-encoded form.
+
+    ``response.raise_for_status()`` stringifies to
+    ``... for url '<variant-url>' ...``; that URL carries the patient variant,
+    so it must never survive into a log value -- neither via ``error=str(exc)``
+    nor via any ``url``/``variant_id`` field. Exercises both the INFO
+    ("Fetching variant data") and ERROR ("Failed to fetch variant data") paths.
     """
     configure_logging()
 
@@ -94,10 +139,16 @@ def test_upstream_failure_never_logs_variant_or_url(
     # Fail fast: one attempt, no backoff sleeps.
     monkeypatch.setattr(settings.api, "max_retries", 1)
 
-    async def _boom(*_args: object, **_kwargs: object) -> httpx.Response:
-        raise httpx.ConnectError("connection refused")
+    async def _http_500(
+        self: object, url: object, *_args: object, **_kwargs: object
+    ) -> httpx.Response:
+        # A real 500 whose request URL carries the sentinel variant; the client's
+        # own ``raise_for_status()`` then builds an HTTPStatusError whose str()
+        # embeds that URL -- the exact leak vector under test.
+        request = httpx.Request("GET", str(url))
+        return httpx.Response(status_code=500, request=request, text="upstream boom")
 
-    monkeypatch.setattr("httpx.AsyncClient.get", _boom)
+    monkeypatch.setattr("httpx.AsyncClient.get", _http_500)
 
     async def _drive() -> None:
         client = AutoPVS1Client()
@@ -106,15 +157,20 @@ def test_upstream_failure_never_logs_variant_or_url(
         finally:
             await client.close()
 
-    with caplog.at_level(logging.DEBUG), pytest.raises(httpx.ConnectError):
+    with caplog.at_level(logging.DEBUG), pytest.raises(httpx.HTTPStatusError):
         asyncio.run(_drive())
 
     assert caplog.records, "expected at least one log record to be emitted"
 
+    # Raw sentinel, its URL-encoded form, and the encoding-invariant stem must
+    # all be absent from every rendered log record.
+    forbidden = (_SENTINEL, quote(_SENTINEL, safe=""), _SENTINEL_STEM)
     for record in caplog.records:
-        assert _SENTINEL not in record.getMessage(), (
-            f"sentinel leaked in rendered log record: {record.getMessage()!r}"
-        )
+        message = record.getMessage()
+        for fragment in forbidden:
+            assert fragment not in message, (
+                f"sentinel fragment {fragment!r} leaked in rendered log record: {message!r}"
+            )
 
     # The prod ERROR path must still have fired (redaction != suppression).
     assert any("Failed to fetch variant data" in r.getMessage() for r in caplog.records), (

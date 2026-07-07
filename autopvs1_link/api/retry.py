@@ -43,13 +43,17 @@ async def async_retry[T](
         except RETRYABLE_EXCEPTIONS as exc:
             last_error = exc
             if attempt == max_attempts:
-                logger.warning("retry.exhausted", attempt=attempt, error=str(exc))
+                # Log the exception *class* only: str(exc) can embed the full
+                # variant-bearing upstream URL (GDPR Art. 9). The redactor
+                # backstops any ``error=`` field, but ``error_type`` keeps a
+                # safe, useful signal on this hot upstream-failure path.
+                logger.warning("retry.exhausted", attempt=attempt, error_type=type(exc).__name__)
                 raise
             logger.info(
                 "retry.transient_error",
                 attempt=attempt,
                 next_delay_seconds=delay,
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
             await asyncio.sleep(delay)
             delay = min(delay * backoff_factor, max_delay)

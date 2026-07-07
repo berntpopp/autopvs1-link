@@ -24,6 +24,15 @@ from autopvs1_link.config import settings
 # derived from the query/variant, so it is equally sensitive, but a stable
 # hash preserves hit/miss correlation for debugging without exposing the
 # plaintext.
+#
+# Rendered exception strings and tracebacks are a *second* leak class: an
+# ``httpx.HTTPStatusError`` stringifies to ``... for url '<upstream-url>' ...``
+# and that URL embeds the variant/CNV/HGVS coordinate.  ``error=str(exc)`` and
+# the ``exception`` field produced by ``format_exc_info`` (``exc_info=True``)
+# therefore smuggle GDPR Art. 9 data past the name-based scrub above even
+# though the coordinate never appears under a "sensitive" key.  They are
+# scrubbed by name too; log ``error_type`` (the exception class) when the
+# signal is needed -- the class name is safe and is intentionally NOT redacted.
 _REDACTED = "<redacted>"
 
 _SENSITIVE_FIELDS: frozenset[str] = frozenset(
@@ -41,18 +50,25 @@ _SENSITIVE_FIELDS: frozenset[str] = frozenset(
     }
 )
 
+# Fields whose values are rendered exception text and can embed the upstream
+# URL (and thus the variant).  ``exception`` is what ``format_exc_info`` emits.
+_EXCEPTION_FIELDS: frozenset[str] = frozenset({"error", "exception", "exc"})
+
 _HASHED_FIELDS: frozenset[str] = frozenset({"key", "cache_key"})
 
 
 def redact_sensitive_fields(logger, method_name, event_dict) -> dict:
     """Scrub patient/free-text fields from every log event by field name.
 
-    Non-``None`` values under a sensitive field name are replaced with
-    ``<redacted>``; cache-key fields are replaced with a truncated SHA-256
-    digest (``sha256:<hex>``).  All other fields -- correlation id, method /
-    operation, status, timing -- are left untouched for observability.
+    Non-``None`` values under a sensitive field name -- including rendered
+    exception strings/tracebacks (``error``/``exception``/``exc``), which can
+    embed the variant-bearing upstream URL -- are replaced with ``<redacted>``;
+    cache-key fields are replaced with a truncated SHA-256 digest
+    (``sha256:<hex>``).  All other fields -- correlation id, method /
+    operation, ``error_type``, status, timing -- are left untouched for
+    observability.
     """
-    for field in _SENSITIVE_FIELDS:
+    for field in (*_SENSITIVE_FIELDS, *_EXCEPTION_FIELDS):
         if event_dict.get(field) is not None:
             event_dict[field] = _REDACTED
 
