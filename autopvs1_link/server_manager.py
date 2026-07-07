@@ -28,10 +28,16 @@ def create_app() -> FastAPI:
     # make Starlette's Mount emit a 307 trailing-slash redirect (/mcp -> /mcp/);
     # baking "/mcp" into the sub-app and mounting at "/" serves /mcp directly,
     # matching the rest of the GeneFoundry fleet (see gtex-link server_manager).
+    # host_origin_protection defaults to True since fastmcp 3.4.3, which 421s
+    # every request whose Host is not localhost -- including legitimate proxied
+    # traffic from the genefoundry-router. The reverse proxy (NPM) already
+    # validates the Host via server_name + TLS SNI, so disable the redundant
+    # app-layer guard here to keep the public /mcp reachable.
     mcp_app = mcp.http_app(
         path="/mcp",
         json_response=True,
         stateless_http=True,
+        host_origin_protection=False,
     )
 
     @asynccontextmanager
