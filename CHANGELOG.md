@@ -6,6 +6,29 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 3.0.0
+
+**BREAKING.** Outbound variant transfer is now disabled by default. Deployments
+that intentionally use the public AutoPVS1 and Ensembl services must set
+`AUTOPVS1_LINK_API_EGRESS_MODE=allowlist` and provide the approved bare HTTPS
+origins in `AUTOPVS1_LINK_API_ALLOWED_UPSTREAM_ORIGINS`. The production Compose
+profile includes the current public-research origins; patient-data deployments
+must keep egress disabled or substitute operator-approved self-hosted services.
+
+### Security
+
+- Enforce a default-deny, exact-origin HTTPS policy before every outbound
+  request and redirect hop, with URL parsing matched to HTTPX and an absolute
+  five-redirect ceiling.
+- Remove client IP addresses and query parameters from the production logging
+  profile and identify outbound requests with an honest project user agent.
+- Fail closed when upstream result strength or response shape drifts, returning
+  stable deployment-policy and upstream-format error envelopes without leaking
+  submitted variants.
+- Declare the public-research AutoPVS1 and build-specific Ensembl origins in
+  production Compose and document the separate network-layer egress control
+  required for regulated deployments.
+
 ## 2.0.3
 
 ### Changed

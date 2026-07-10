@@ -257,7 +257,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -992,7 +992,7 @@ not. Order is first-seen-code-first.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -1799,7 +1799,7 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -2271,7 +2271,7 @@ cold scoring call.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -2438,7 +2438,7 @@ cold scoring call.
           "type": "string"
         },
         "version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Version",
           "type": "string"
         }
@@ -2723,7 +2723,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -3607,7 +3607,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -4627,7 +4627,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "2.0.3",
+          "default": "3.0.0",
           "title": "Server Version",
           "type": "string"
         },
