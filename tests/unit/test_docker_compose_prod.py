@@ -35,3 +35,13 @@ def test_production_preset_disables_debug_and_raises_log_level() -> None:
     settings = Settings(environment="production")
     assert settings.debug is False
     assert settings.logging.level == "WARNING"
+
+
+def test_public_research_compose_explicitly_allows_current_origins() -> None:
+    env = _prod_env()
+    assert env["AUTOPVS1_LINK_API_EGRESS_MODE"] == "allowlist"
+    assert set(env["AUTOPVS1_LINK_API_ALLOWED_UPSTREAM_ORIGINS"].split(",")) == {
+        "https://autopvs1.bgi.com",
+        "https://rest.ensembl.org",
+        "https://grch37.rest.ensembl.org",
+    }

@@ -9,6 +9,11 @@ services:
       AUTOPVS1_LINK_ENVIRONMENT: production
       AUTOPVS1_LINK_LOG_JSON_FORMAT: "true"
       AUTOPVS1_LINK_PORT: 8000
+      # Public research profile only. Patient-data deployments should omit
+      # this backend unless equivalent self-hosted origins are approved.
+      AUTOPVS1_LINK_API_EGRESS_MODE: allowlist
+      AUTOPVS1_LINK_API_ALLOWED_UPSTREAM_ORIGINS: >-
+        https://autopvs1.bgi.com,https://rest.ensembl.org,https://grch37.rest.ensembl.org
     ports: !reset []
     expose:
       - "8000"
