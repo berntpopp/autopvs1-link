@@ -190,7 +190,11 @@ class MCPConfig(BaseSettings):
 class Settings(BaseSettings):
     """Main application settings aggregating all configuration classes."""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_prefix": "AUTOPVS1_LINK_",
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+    }
 
     environment: Literal["development", "staging", "production"] = Field(
         default="development", description="Deployment environment"

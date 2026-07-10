@@ -1,6 +1,9 @@
 """Tests for the AUTOPVS1_LINK_ env-prefix migration."""
 
 import importlib
+import os
+import subprocess
+import sys
 import warnings
 
 
@@ -32,3 +35,20 @@ def test_new_prefix_wins_over_old(monkeypatch) -> None:
 
     importlib.reload(config)
     assert config.settings.cache.size == 222
+
+
+def test_prefixed_production_environment_activates_secure_preset() -> None:
+    code = """
+from autopvs1_link.config import settings
+print(settings.environment, settings.debug, settings.logging.level)
+"""
+    env = os.environ.copy()
+    env["AUTOPVS1_LINK_ENVIRONMENT"] = "production"
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "production False WARNING"

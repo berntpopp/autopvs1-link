@@ -29,6 +29,20 @@ _SENTINEL = "NM_SENTINEL7f3a:c.1A>G"
 _SENTINEL_STEM = "NM_SENTINEL7f3a"
 
 
+def test_redactor_scrubs_client_network_metadata() -> None:
+    result = redact_sensitive_fields(
+        None,
+        "info",
+        {
+            "event": "Incoming request",
+            "client_ip": "203.0.113.7",
+            "user_agent": "patient-workstation/1",
+        },
+    )
+    assert result["client_ip"] == "<redacted>"
+    assert result["user_agent"] == "<redacted>"
+
+
 def test_redact_processor_scrubs_every_sensitive_field_by_name() -> None:
     """The processor drops each patient/free-text field regardless of value."""
     event = {
