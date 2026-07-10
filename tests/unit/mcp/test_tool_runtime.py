@@ -7,11 +7,13 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
+from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.api.variant_recoder import (
     RecoderCandidate,
     RecoderNotFoundError,
     RecoderUnavailableError,
 )
+from autopvs1_link.config import settings
 from autopvs1_link.mcp.facade import build_mcp_server
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1CNVData,
@@ -99,6 +101,22 @@ def _variant_result() -> AutoPVS1Data:
         ),
         disease_mechanisms=[],
     )
+
+
+@pytest.mark.asyncio
+async def test_disabled_egress_returns_structured_error(monkeypatch, mocker) -> None:
+    monkeypatch.setattr(settings.api, "egress_mode", "disabled")
+    fake = AsyncMock(side_effect=EgressDeniedError("outbound origin is not allowlisted"))
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"variant_id": "1-1-A-G", "genome_build": "hg38"},
+    )
+    assert result.structured_content["error_code"] == "external_egress_disabled"
+    assert result.structured_content["retryable"] is False
+    assert "not allowlisted" not in result.content[0].text
 
 
 def _cnv_result() -> AutoPVS1CNVData:
@@ -1343,6 +1361,7 @@ async def test_get_server_health_is_local_read_only_and_does_not_call_upstream(m
 
 @pytest.mark.asyncio
 async def test_get_server_health_check_upstream_true_probes_and_reports_reachable(
+    monkeypatch,
     mocker,
 ) -> None:
     """With ``check_upstream=true`` the tool issues one short HEAD probe.
@@ -1367,10 +1386,16 @@ async def test_get_server_health_check_upstream_true_probes_and_reports_reachabl
         async def __aexit__(self, *args) -> None:
             self.aclose_called = True
 
-        async def head(self, url: str, **kwargs) -> _FakeResp:
+        async def request(self, method: str, url: str, **kwargs) -> _FakeResp:
             self.requested_url = url
             return _FakeResp()
 
+    monkeypatch.setattr(settings.api, "egress_mode", "allowlist")
+    monkeypatch.setattr(
+        settings.api,
+        "allowed_upstream_origins",
+        "https://autopvs1.bgi.com",
+    )
     mocker.patch("autopvs1_link.mcp.tools.health_tool.httpx.AsyncClient", _FakeClient)
 
     mcp = build_mcp_server()
@@ -1385,6 +1410,7 @@ async def test_get_server_health_check_upstream_true_probes_and_reports_reachabl
 
 @pytest.mark.asyncio
 async def test_get_server_health_check_upstream_true_reports_unreachable_on_timeout(
+    monkeypatch,
     mocker,
 ) -> None:
     """Network failure during the probe surfaces as ``unreachable``, NOT an error.
@@ -1403,9 +1429,15 @@ async def test_get_server_health_check_upstream_true_reports_unreachable_on_time
         async def __aexit__(self, *args) -> None:
             return None
 
-        async def head(self, url: str, **kwargs):
+        async def request(self, method: str, url: str, **kwargs):
             raise httpx.TimeoutException("probe timed out")
 
+    monkeypatch.setattr(settings.api, "egress_mode", "allowlist")
+    monkeypatch.setattr(
+        settings.api,
+        "allowed_upstream_origins",
+        "https://autopvs1.bgi.com",
+    )
     mocker.patch("autopvs1_link.mcp.tools.health_tool.httpx.AsyncClient", _FakeClient)
 
     mcp = build_mcp_server()

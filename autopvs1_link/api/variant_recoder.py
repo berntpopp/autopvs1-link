@@ -43,6 +43,9 @@ from urllib.parse import quote
 import httpx
 import structlog
 
+from autopvs1_link.api.egress import guarded_request
+from autopvs1_link.config import settings
+
 logger = structlog.get_logger()
 
 # Ensembl REST hosts. The build is encoded by host: there is no
@@ -218,7 +221,13 @@ class VariantRecoderClient:
         )
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.get(url, headers={"Accept": "application/json"})
+                response = await guarded_request(
+                    client,
+                    settings.api.egress_policy,
+                    "GET",
+                    url,
+                    headers={"Accept": "application/json"},
+                )
         except httpx.TimeoutException as exc:
             logger.warning("Recoder timeout", input_id=input_id, build=genome_build)
             raise RecoderUnavailableError(

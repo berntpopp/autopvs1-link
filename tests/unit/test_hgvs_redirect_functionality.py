@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from autopvs1_link.api.autopvs1_client import HGVS_PATTERNS, AutoPVS1Client
+from autopvs1_link.config import settings
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1Data,
     AutoPVS1SearchResults,
@@ -127,6 +128,15 @@ class TestURLParsing:
 class TestRedirectDetection:
     """Test redirect detection in search responses."""
 
+    @pytest.fixture(autouse=True)
+    def _allow_bgi_origin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(settings.api, "egress_mode", "allowlist")
+        monkeypatch.setattr(
+            settings.api,
+            "allowed_upstream_origins",
+            "https://autopvs1.bgi.com",
+        )
+
     @pytest.mark.asyncio
     async def test_search_with_redirect_detection_hgvs(self):
         """Test enhanced search with HGVS notation that redirects."""
@@ -140,7 +150,7 @@ class TestRedirectDetection:
 
         try:
             with patch(
-                "httpx.AsyncClient.get",
+                "autopvs1_link.api.autopvs1_client.guarded_request",
                 return_value=mock_response,
             ):
                 result = await client.search_with_redirect_detection(
@@ -180,7 +190,7 @@ class TestRedirectDetection:
 
         try:
             with patch(
-                "httpx.AsyncClient.get",
+                "autopvs1_link.api.autopvs1_client.guarded_request",
                 return_value=mock_response,
             ):
                 result = await client.search_with_redirect_detection("BRCA1", "hg19")
@@ -213,7 +223,7 @@ class TestRedirectDetection:
 
         try:
             with patch(
-                "httpx.AsyncClient.get",
+                "autopvs1_link.api.autopvs1_client.guarded_request",
                 return_value=mock_response,
             ):
                 result = await client.resolve_hgvs_notation("NM_000128.3:c.1716+1G>A", "hg19")
@@ -241,7 +251,7 @@ class TestRedirectDetection:
         try:
             with (
                 patch(
-                    "httpx.AsyncClient.get",
+                    "autopvs1_link.api.autopvs1_client.guarded_request",
                     return_value=mock_response,
                 ),
                 pytest.raises(ValueError, match="did not resolve to a single variant"),

@@ -72,6 +72,7 @@ async def guarded_request(
 
     current = url
     request_kwargs = dict(kwargs)
+    history: list[httpx.Response] = []
     for hop in range(max_redirects + 1):
         policy.require_allowed(current)
         response = await client.request(
@@ -81,6 +82,7 @@ async def guarded_request(
             **request_kwargs,
         )
         if response.status_code not in _REDIRECTS:
+            response.history = history
             return response
         if hop == max_redirects:
             await response.aclose()
@@ -95,6 +97,7 @@ async def guarded_request(
         except EgressDeniedError:
             await response.aclose()
             raise
+        history.append(response)
         await response.aclose()
         current = next_url
         request_kwargs.pop("params", None)

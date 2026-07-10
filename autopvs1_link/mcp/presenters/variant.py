@@ -80,6 +80,10 @@ _KNOWN_FINAL_STRENGTHS = frozenset(
 )
 
 
+class UpstreamFormatError(ValueError):
+    """Scraped HTML does not satisfy the reviewed AutoPVS1 result contract."""
+
+
 def _terminal_note(
     *,
     presented_steps: list[dict[str, Any]],
@@ -118,17 +122,7 @@ def _present_flowchart(
 
     final_strength = str(raw.get("final_strength") or "")
     if final_strength not in _KNOWN_FINAL_STRENGTHS:
-        warnings.append(
-            MCPWarning(
-                code="upstream_format_unrecognized",
-                message=(
-                    "AutoPVS1 returned a final PVS1 strength "
-                    f"{final_strength!r} that is not in the recognized set; "
-                    "the scraped upstream HTML format may have changed. "
-                    "Treat this result as unverified pending a parser review."
-                ),
-            )
-        )
+        raise UpstreamFormatError(f"unrecognized final strength from AutoPVS1: {final_strength!r}")
     if final_strength in {"PVS1_Not_Applicable", "PVS1_Not_Determined"}:
         warnings.append(
             MCPWarning(

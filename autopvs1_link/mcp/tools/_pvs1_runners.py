@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from autopvs1_link.api.autopvs1_urls import cnv_url, variant_url
+from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.contracts import CNVMCPData, VariantMCPData
@@ -95,6 +96,20 @@ async def run_variant_pvs1(
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
             ),
         )
+    except EgressDeniedError:
+        return (
+            None,
+            [],
+            _err(
+                "external_egress_disabled",
+                "External variant transfer is disabled by deployment policy.",
+                False,
+                [
+                    "Use a deployment with an explicitly approved AutoPVS1 upstream.",
+                    "Do not submit patient-derived variants to a public research instance.",
+                ],
+            ),
+        )
     except httpx.HTTPStatusError as exc:
         code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
         return (
@@ -162,6 +177,20 @@ async def run_cnv_pvs1(
                 "AutoPVS1 upstream timed out while fetching CNV data.",
                 True,
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
+            ),
+        )
+    except EgressDeniedError:
+        return (
+            None,
+            [],
+            _err(
+                "external_egress_disabled",
+                "External variant transfer is disabled by deployment policy.",
+                False,
+                [
+                    "Use a deployment with an explicitly approved AutoPVS1 upstream.",
+                    "Do not submit patient-derived variants to a public research instance.",
+                ],
             ),
         )
     except httpx.HTTPStatusError as exc:

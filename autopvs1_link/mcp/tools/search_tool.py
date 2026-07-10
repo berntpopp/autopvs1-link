@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 from pydantic import Field, SkipValidation
 
+from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from autopvs1_link.mcp.contracts import SearchMCPData
@@ -27,7 +28,10 @@ from autopvs1_link.mcp.mode_validation import (
 )
 from autopvs1_link.mcp.next_commands import search_next_page
 from autopvs1_link.mcp.presenters.search import present_search
-from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
+from autopvs1_link.mcp.tools.mode_errors import (
+    external_egress_disabled_envelope,
+    invalid_mode_envelope,
+)
 from autopvs1_link.mcp.validation import (
     normalize_genome_builds,
     normalize_limit_cursor,
@@ -179,6 +183,11 @@ def register(mcp: FastMCP) -> None:
                 retryable=exc.retryable,
                 suggestions=exc.suggestions,
                 details=exc.details or None,
+                meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
+            )
+        except EgressDeniedError:
+            return external_egress_disabled_envelope(
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )

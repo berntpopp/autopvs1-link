@@ -7,6 +7,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from autopvs1_link.api.autopvs1_client import AutoPVS1Client
+from autopvs1_link.config import settings
 from autopvs1_link.models.autopvs1_models import AutoPVS1Data
 
 
@@ -19,8 +20,14 @@ def load_fixture(name: str) -> str:
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch: pytest.MonkeyPatch):
     """Create AutoPVS1Client instance."""
+    monkeypatch.setattr(settings.api, "egress_mode", "allowlist")
+    monkeypatch.setattr(
+        settings.api,
+        "allowed_upstream_origins",
+        "https://autopvs1.bgi.com",
+    )
     return AutoPVS1Client()
 
 
@@ -269,7 +276,7 @@ class TestDiseaseMechanismParsing:
 class TestClientIntegration:
     """Test full client integration."""
 
-    @patch("httpx.AsyncClient.get")
+    @patch("autopvs1_link.api.autopvs1_client.guarded_request")
     async def test_get_variant_data_integration(self, mock_get, client, variant_html):
         """Test full variant data retrieval."""
         # Mock HTTP response
@@ -286,7 +293,7 @@ class TestClientIntegration:
         assert result.pvs1_flowchart.final_strength == "Strong"
         assert len(result.disease_mechanisms) == 1
 
-    @patch("httpx.AsyncClient.get")
+    @patch("autopvs1_link.api.autopvs1_client.guarded_request")
     async def test_get_variant_data_http_error(self, mock_get, client):
         """Test handling of HTTP errors."""
         mock_get.side_effect = Exception("Network error")

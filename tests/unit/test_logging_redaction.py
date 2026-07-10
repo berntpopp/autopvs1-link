@@ -152,9 +152,15 @@ def test_upstream_failure_never_logs_variant_or_url(
     monkeypatch.setattr(client_mod, "logger", structlog.get_logger("test.redaction"))
     # Fail fast: one attempt, no backoff sleeps.
     monkeypatch.setattr(settings.api, "max_retries", 1)
+    monkeypatch.setattr(settings.api, "egress_mode", "allowlist")
+    monkeypatch.setattr(
+        settings.api,
+        "allowed_upstream_origins",
+        "https://autopvs1.bgi.com",
+    )
 
     async def _http_500(
-        self: object, url: object, *_args: object, **_kwargs: object
+        self: object, method: str, url: object, *_args: object, **_kwargs: object
     ) -> httpx.Response:
         # A real 500 whose request URL carries the sentinel variant; the client's
         # own ``raise_for_status()`` then builds an HTTPStatusError whose str()
@@ -162,7 +168,7 @@ def test_upstream_failure_never_logs_variant_or_url(
         request = httpx.Request("GET", str(url))
         return httpx.Response(status_code=500, request=request, text="upstream boom")
 
-    monkeypatch.setattr("httpx.AsyncClient.get", _http_500)
+    monkeypatch.setattr("httpx.AsyncClient.request", _http_500)
 
     async def _drive() -> None:
         client = AutoPVS1Client()

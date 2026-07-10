@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from autopvs1_link.api.autopvs1_urls import variant_url
+from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
@@ -29,7 +30,10 @@ from autopvs1_link.mcp.mode_validation import (
 from autopvs1_link.mcp.next_commands import widen_response_mode
 from autopvs1_link.mcp.presenters.variant import present_variant
 from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
-from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
+from autopvs1_link.mcp.tools.mode_errors import (
+    external_egress_disabled_envelope,
+    invalid_mode_envelope,
+)
 from autopvs1_link.mcp.validation import normalize_genome_build
 
 RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
@@ -167,6 +171,11 @@ def register(mcp: FastMCP) -> None:
                 retryable=exc.retryable,
                 suggestions=exc.suggestions,
                 details=exc.details or None,
+                meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
+            )
+        except EgressDeniedError:
+            return external_egress_disabled_envelope(
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )

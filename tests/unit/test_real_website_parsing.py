@@ -7,6 +7,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from autopvs1_link.api.autopvs1_client import AutoPVS1Client
+from autopvs1_link.config import settings
 from autopvs1_link.models.autopvs1_models import AutoPVS1Data
 
 
@@ -18,6 +19,15 @@ def load_fixture(name: str) -> str:
 
 class TestRealWebsiteParsing:
     """Test parsing with real website HTML data."""
+
+    @pytest.fixture(autouse=True)
+    def _allow_bgi_origin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(settings.api, "egress_mode", "allowlist")
+        monkeypatch.setattr(
+            settings.api,
+            "allowed_upstream_origins",
+            "https://autopvs1.bgi.com",
+        )
 
     @pytest.mark.asyncio
     async def test_parse_msh6_variant_with_unmet_strength(self):
@@ -32,7 +42,7 @@ class TestRealWebsiteParsing:
 
         try:
             with patch(
-                "httpx.AsyncClient.get",
+                "autopvs1_link.api.autopvs1_client.guarded_request",
                 return_value=mock_response,
             ):
                 result = await client.get_variant_data("hg19", "2-48033984-G-GGATT")
@@ -127,7 +137,7 @@ class TestRealWebsiteParsing:
 
         try:
             with patch(
-                "httpx.AsyncClient.get",
+                "autopvs1_link.api.autopvs1_client.guarded_request",
                 return_value=mock_response,
             ):
                 result = await client.get_variant_data("hg19", "X-82763936-A-T")
@@ -189,7 +199,10 @@ class TestRealWebsiteParsing:
         client = AutoPVS1Client()
 
         try:
-            with patch("httpx.AsyncClient.get", return_value=mock_response):
+            with patch(
+                "autopvs1_link.api.autopvs1_client.guarded_request",
+                return_value=mock_response,
+            ):
                 result = await client.get_variant_data("hg19", "17-41276045-ACT-A")
         finally:
             await client.close()
@@ -209,7 +222,10 @@ class TestRealWebsiteParsing:
         client = AutoPVS1Client()
 
         try:
-            with patch("httpx.AsyncClient.get", return_value=mock_response):
+            with patch(
+                "autopvs1_link.api.autopvs1_client.guarded_request",
+                return_value=mock_response,
+            ):
                 result = await client.get_cnv_data("hg19", "17-15000000-20000000-DEL")
         finally:
             await client.close()

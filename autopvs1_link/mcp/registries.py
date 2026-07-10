@@ -50,6 +50,10 @@ KNOWN_ERROR_CODES: dict[str, str] = {
         "callers can re-issue or supply a pre-resolved canonical "
         "CHROM-POS-REF-ALT variant_id."
     ),
+    "external_egress_disabled": (
+        "Deployment policy disabled external BGI and Ensembl transfers; "
+        "the request was rejected before network I/O."
+    ),
 }
 
 ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
@@ -90,6 +94,10 @@ ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
     "external_resolver_unavailable": [
         "Retry after meta.retry_after_ms; Ensembl Variant Recoder may be transiently unreachable.",
         "Bypass the resolver by passing a canonical CHROM-POS-REF-ALT variant_id.",
+    ],
+    "external_egress_disabled": [
+        "Use a deployment with an explicitly approved AutoPVS1 upstream.",
+        "Do not submit patient-derived variants to a public research instance.",
     ],
     "upstream_timeout": [
         "Retry after meta.retry_after_ms; AutoPVS1 cold calls can take ~3-4s.",

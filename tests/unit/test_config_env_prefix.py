@@ -44,7 +44,7 @@ print(settings.environment, settings.debug, settings.logging.level)
 """
     env = os.environ.copy()
     env["AUTOPVS1_LINK_ENVIRONMENT"] = "production"
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - fixed interpreter and inline test code
         [sys.executable, "-c", code],
         env=env,
         text=True,
