@@ -14,6 +14,7 @@ from autopvs1_link.api.autopvs1_validation import (
     detect_hgvs_pattern,
     extract_variant_from_redirect_url,
 )
+from autopvs1_link.api.egress import guarded_request
 from autopvs1_link.api.retry import async_retry
 from autopvs1_link.config import settings
 from autopvs1_link.models.autopvs1_models import (
@@ -39,11 +40,12 @@ class AutoPVS1Client:
 
     def __init__(self) -> None:
         self.base_url = settings.api.base_url
+        self.policy = settings.api.egress_policy
         headers = {"User-Agent": settings.api.user_agent}
         self.client = httpx.AsyncClient(
             timeout=settings.api.request_timeout,
             headers=headers,
-            follow_redirects=True,
+            follow_redirects=False,
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
 
@@ -60,7 +62,7 @@ class AutoPVS1Client:
         try:
 
             async def _fetch_variant() -> httpx.Response:
-                resp = await self.client.get(url)
+                resp = await guarded_request(self.client, self.policy, "GET", url)
                 resp.raise_for_status()
                 return resp
 
@@ -95,7 +97,7 @@ class AutoPVS1Client:
         try:
 
             async def _search_request() -> httpx.Response:
-                resp = await self.client.get(url, params=params)
+                resp = await guarded_request(self.client, self.policy, "GET", url, params=params)
                 resp.raise_for_status()
                 return resp
 
@@ -137,7 +139,7 @@ class AutoPVS1Client:
         try:
 
             async def _enhanced_search_request() -> httpx.Response:
-                resp = await self.client.get(url, params=params)
+                resp = await guarded_request(self.client, self.policy, "GET", url, params=params)
                 resp.raise_for_status()
                 return resp
 
@@ -197,7 +199,7 @@ class AutoPVS1Client:
         try:
 
             async def _fetch_cnv() -> httpx.Response:
-                resp = await self.client.get(url)
+                resp = await guarded_request(self.client, self.policy, "GET", url)
                 resp.raise_for_status()
                 return resp
 

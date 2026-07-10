@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
+from autopvs1_link.api.egress import EgressDeniedError, guarded_request
 from autopvs1_link.config import settings
 from autopvs1_link.mcp.annotations import READ_ONLY_CLOSED_WORLD
 from autopvs1_link.mcp.envelope import ok_envelope, success_output_schema
@@ -51,8 +52,13 @@ async def _probe_upstream() -> tuple[bool, UpstreamStatus]:
     url = settings.api.base_url
     try:
         async with httpx.AsyncClient(timeout=_UPSTREAM_PROBE_TIMEOUT_SECONDS) as client:
-            response = await client.head(url, follow_redirects=True)
-    except (httpx.TimeoutException, httpx.RequestError, httpx.HTTPError):
+            response = await guarded_request(
+                client,
+                settings.api.egress_policy,
+                "HEAD",
+                url,
+            )
+    except (EgressDeniedError, httpx.TimeoutException, httpx.RequestError, httpx.HTTPError):
         return False, "unreachable"
     # Any HTTP response code proves the host is up; 5xx still means we
     # reached the server but it's degraded — surface as reachable so the

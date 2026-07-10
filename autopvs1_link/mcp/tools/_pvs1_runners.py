@@ -7,13 +7,18 @@ from typing import Any
 import httpx
 
 from autopvs1_link.api.autopvs1_urls import cnv_url, variant_url
+from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.contracts import CNVMCPData, VariantMCPData
 from autopvs1_link.mcp.envelope import MCPError, MCPWarning
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import ResponseMode
-from autopvs1_link.mcp.presenters.variant import present_cnv, present_variant
+from autopvs1_link.mcp.presenters.variant import (
+    UpstreamFormatError,
+    present_cnv,
+    present_variant,
+)
 from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
@@ -95,6 +100,20 @@ async def run_variant_pvs1(
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
             ),
         )
+    except EgressDeniedError:
+        return (
+            None,
+            [],
+            _err(
+                "external_egress_disabled",
+                "External variant transfer is disabled by deployment policy.",
+                False,
+                [
+                    "Use a deployment with an explicitly approved AutoPVS1 upstream.",
+                    "Do not submit patient-derived variants to a public research instance.",
+                ],
+            ),
+        )
     except httpx.HTTPStatusError as exc:
         code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
         return (
@@ -116,6 +135,17 @@ async def run_variant_pvs1(
                 "AutoPVS1 upstream was unreachable while fetching variant data.",
                 True,
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
+            ),
+        )
+    except UpstreamFormatError:
+        return (
+            None,
+            [],
+            _err(
+                "parse_error",
+                "AutoPVS1 variant HTML could not be parsed into the expected fields.",
+                False,
+                ["Retry after confirming the variant exists in AutoPVS1."],
             ),
         )
     except ValueError:
@@ -164,6 +194,20 @@ async def run_cnv_pvs1(
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
             ),
         )
+    except EgressDeniedError:
+        return (
+            None,
+            [],
+            _err(
+                "external_egress_disabled",
+                "External variant transfer is disabled by deployment policy.",
+                False,
+                [
+                    "Use a deployment with an explicitly approved AutoPVS1 upstream.",
+                    "Do not submit patient-derived variants to a public research instance.",
+                ],
+            ),
+        )
     except httpx.HTTPStatusError as exc:
         code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
         return (
@@ -185,6 +229,17 @@ async def run_cnv_pvs1(
                 "AutoPVS1 upstream was unreachable while fetching CNV data.",
                 True,
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
+            ),
+        )
+    except UpstreamFormatError:
+        return (
+            None,
+            [],
+            _err(
+                "parse_error",
+                "AutoPVS1 CNV HTML could not be parsed into the expected fields.",
+                False,
+                ["Retry after confirming the CNV exists in AutoPVS1."],
             ),
         )
     except ValueError:

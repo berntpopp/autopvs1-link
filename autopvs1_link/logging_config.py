@@ -47,6 +47,8 @@ _SENSITIVE_FIELDS: frozenset[str] = frozenset(
         "url",
         "original_url",
         "final_url",
+        "client_ip",
+        "user_agent",
     }
 )
 

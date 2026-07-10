@@ -24,7 +24,31 @@ AUTOPVS1_LINK_API_BASE_URL=https://autopvs1.bgi.com
 AUTOPVS1_LINK_API_REQUEST_TIMEOUT=30
 AUTOPVS1_LINK_API_MAX_RETRIES=3
 AUTOPVS1_LINK_API_RATE_LIMIT_DELAY=1.0
+AUTOPVS1_LINK_API_EGRESS_MODE=disabled
+AUTOPVS1_LINK_API_ALLOWED_UPSTREAM_ORIGINS=
 ```
+
+Outbound requests are denied by default. `AUTOPVS1_LINK_API_EGRESS_MODE`
+accepts `disabled` or `allowlist`. Allowlist mode requires a comma-separated
+set of exact, bare HTTPS origins: no paths, queries, fragments, userinfo, HTTP
+downgrades, subdomain wildcards, or lookalike suffixes are accepted. Every
+redirect hop is checked before the next request and the redirect count is
+bounded.
+
+The supplied production Compose overlay is a public research profile and
+explicitly permits the current AutoPVS1 and build-specific Ensembl services:
+
+```bash
+AUTOPVS1_LINK_API_EGRESS_MODE=allowlist
+AUTOPVS1_LINK_API_ALLOWED_UPSTREAM_ORIGINS=https://autopvs1.bgi.com,https://rest.ensembl.org,https://grch37.rest.ensembl.org
+```
+
+Those public services receive submitted variant identifiers. Do not use this
+profile for patient-derived data or clinical decision support. A controlled
+deployment must either keep egress disabled or replace both the API base URL
+and allowed origins with operator-approved self-hosted services. Docker
+networking is not an egress firewall; regulated environments also require a
+host or network-layer default-deny egress policy.
 
 ### Caching
 

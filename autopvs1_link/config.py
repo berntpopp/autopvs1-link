@@ -8,6 +8,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 from autopvs1_link import __version__
+from autopvs1_link.api.egress import EgressPolicy, normalize_origin
 
 # ---------------------------------------------------------------------------
 # Backward-compat shim: copy AUTOPVS1_* env vars to AUTOPVS1_LINK_* when the
@@ -86,6 +87,26 @@ class APIConfig(BaseSettings):
         default_factory=_default_user_agent,
         description="Honest outbound User-Agent (tool/version + project URL).",
     )
+    egress_mode: Literal["disabled", "allowlist"] = Field(
+        default="disabled",
+        description="Outbound network policy mode.",
+    )
+    allowed_upstream_origins: str = Field(
+        default="",
+        description="Comma-separated bare HTTPS origins approved for outbound requests.",
+    )
+
+    @property
+    def egress_policy(self) -> EgressPolicy:
+        """Build the effective exact-origin outbound policy."""
+        origins = frozenset(
+            normalize_origin(item.strip())
+            for item in self.allowed_upstream_origins.split(",")
+            if item.strip()
+        )
+        if self.egress_mode == "allowlist" and not origins:
+            raise ValueError("allowlist egress mode requires at least one exact origin")
+        return EgressPolicy(mode=self.egress_mode, allowed_origins=origins)
 
 
 class CacheConfig(BaseSettings):
@@ -190,7 +211,11 @@ class MCPConfig(BaseSettings):
 class Settings(BaseSettings):
     """Main application settings aggregating all configuration classes."""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_prefix": "AUTOPVS1_LINK_",
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+    }
 
     environment: Literal["development", "staging", "production"] = Field(
         default="development", description="Deployment environment"

@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from autopvs1_link.api.autopvs1_urls import cnv_url
+from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
@@ -27,8 +28,11 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_response_mode,
 )
 from autopvs1_link.mcp.next_commands import widen_response_mode
-from autopvs1_link.mcp.presenters.variant import present_cnv
-from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
+from autopvs1_link.mcp.presenters.variant import UpstreamFormatError, present_cnv
+from autopvs1_link.mcp.tools.mode_errors import (
+    external_egress_disabled_envelope,
+    invalid_mode_envelope,
+)
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
 RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
@@ -148,6 +152,11 @@ def register(mcp: FastMCP) -> None:
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )
+        except EgressDeniedError:
+            return external_egress_disabled_envelope(
+                meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
+            )
         except httpx.TimeoutException:
             return error_envelope(
                 code="upstream_timeout",
@@ -173,6 +182,15 @@ def register(mcp: FastMCP) -> None:
                 message="AutoPVS1 upstream was unreachable while fetching CNV data.",
                 retryable=True,
                 suggestions=["Retry later or confirm the AutoPVS1 service is reachable."],
+                meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
+            )
+        except UpstreamFormatError:
+            return error_envelope(
+                code="parse_error",
+                message="AutoPVS1 CNV HTML could not be parsed into the expected fields.",
+                retryable=False,
+                suggestions=["Retry after confirming the CNV exists in AutoPVS1."],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )

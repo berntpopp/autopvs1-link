@@ -1,6 +1,8 @@
 """Parsed-shape validation for scraped PVS1 final_strength."""
 
-from autopvs1_link.mcp.presenters.variant import present_variant
+import pytest
+
+from autopvs1_link.mcp.presenters.variant import UpstreamFormatError, present_variant
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1Data,
     PVS1Flowchart,
@@ -24,14 +26,14 @@ def _variant(final_strength: str) -> AutoPVS1Data:
     )
 
 
-def test_empty_final_strength_emits_drift_warning() -> None:
-    _data, warnings = present_variant(_variant(""), source_url=None)
-    assert any(w.code == "upstream_format_unrecognized" for w in warnings)
+def test_empty_final_strength_fails_closed() -> None:
+    with pytest.raises(UpstreamFormatError, match="unrecognized final strength"):
+        present_variant(_variant(""), source_url=None)
 
 
-def test_unrecognized_final_strength_emits_drift_warning() -> None:
-    _data, warnings = present_variant(_variant("Bananas"), source_url=None)
-    assert any(w.code == "upstream_format_unrecognized" for w in warnings)
+def test_unrecognized_final_strength_fails_closed() -> None:
+    with pytest.raises(UpstreamFormatError, match="unrecognized final strength"):
+        present_variant(_variant("Bananas"), source_url=None)
 
 
 def test_recognized_final_strength_emits_no_drift_warning() -> None:
