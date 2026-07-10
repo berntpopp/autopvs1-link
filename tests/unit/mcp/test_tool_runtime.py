@@ -119,6 +119,23 @@ async def test_disabled_egress_returns_structured_error(monkeypatch, mocker) -> 
     assert "not allowlisted" not in result.content[0].text
 
 
+@pytest.mark.asyncio
+async def test_unrecognized_scraped_strength_returns_parse_error(mocker) -> None:
+    parsed = _variant_result()
+    parsed.pvs1_flowchart.final_strength = "Bananas"
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"variant_id": "1-1-A-G", "genome_build": "hg38"},
+    )
+    assert result.structured_content["error_code"] == "parse_error"
+    assert result.structured_content["retryable"] is False
+    assert "Bananas" not in result.content[0].text
+
+
 def _cnv_result() -> AutoPVS1CNVData:
     return AutoPVS1CNVData(
         genome_build="hg19",

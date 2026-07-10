@@ -28,7 +28,7 @@ from autopvs1_link.mcp.mode_validation import (
     normalize_response_mode,
 )
 from autopvs1_link.mcp.next_commands import widen_response_mode
-from autopvs1_link.mcp.presenters.variant import present_variant
+from autopvs1_link.mcp.presenters.variant import UpstreamFormatError, present_variant
 from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
 from autopvs1_link.mcp.tools.mode_errors import (
     external_egress_disabled_envelope,
@@ -204,6 +204,15 @@ def register(mcp: FastMCP) -> None:
                 message="AutoPVS1 upstream was unreachable while fetching variant data.",
                 retryable=True,
                 suggestions=["Retry later or confirm the AutoPVS1 service is reachable."],
+                meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
+            )
+        except UpstreamFormatError:
+            return error_envelope(
+                code="parse_error",
+                message="AutoPVS1 variant HTML could not be parsed into the expected fields.",
+                retryable=False,
+                suggestions=["Retry after confirming the variant exists in AutoPVS1."],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )

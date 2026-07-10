@@ -14,7 +14,11 @@ from autopvs1_link.mcp.contracts import CNVMCPData, VariantMCPData
 from autopvs1_link.mcp.envelope import MCPError, MCPWarning
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import ResponseMode
-from autopvs1_link.mcp.presenters.variant import present_cnv, present_variant
+from autopvs1_link.mcp.presenters.variant import (
+    UpstreamFormatError,
+    present_cnv,
+    present_variant,
+)
 from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
@@ -133,6 +137,17 @@ async def run_variant_pvs1(
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
             ),
         )
+    except UpstreamFormatError:
+        return (
+            None,
+            [],
+            _err(
+                "parse_error",
+                "AutoPVS1 variant HTML could not be parsed into the expected fields.",
+                False,
+                ["Retry after confirming the variant exists in AutoPVS1."],
+            ),
+        )
     except ValueError:
         return (
             None,
@@ -214,6 +229,17 @@ async def run_cnv_pvs1(
                 "AutoPVS1 upstream was unreachable while fetching CNV data.",
                 True,
                 ["Retry later or confirm the AutoPVS1 service is reachable."],
+            ),
+        )
+    except UpstreamFormatError:
+        return (
+            None,
+            [],
+            _err(
+                "parse_error",
+                "AutoPVS1 CNV HTML could not be parsed into the expected fields.",
+                False,
+                ["Retry after confirming the CNV exists in AutoPVS1."],
             ),
         )
     except ValueError:

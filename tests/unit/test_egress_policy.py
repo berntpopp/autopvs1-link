@@ -3,7 +3,18 @@
 import httpx
 import pytest
 
-from autopvs1_link.api.egress import EgressDeniedError, EgressPolicy, guarded_request
+from autopvs1_link.api.egress import (
+    EgressDeniedError,
+    EgressPolicy,
+    guarded_request,
+    normalize_origin,
+)
+
+
+def test_origin_validation_uses_httpx_url_semantics() -> None:
+    with pytest.raises(ValueError, match="bare HTTPS origin"):
+        normalize_origin(" https://autopvs1.bgi.com")
+    assert normalize_origin("https://bücher.example") == "https://xn--bcher-kva.example"
 
 
 def test_policy_denies_by_default_and_matches_exact_origin() -> None:
@@ -72,3 +83,28 @@ async def test_redirect_limit_is_bounded() -> None:
                 max_redirects=2,
             )
     assert requests == 3
+
+
+@pytest.mark.asyncio
+async def test_redirect_limit_cannot_exceed_policy_ceiling() -> None:
+    requests = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(200)
+
+    policy = EgressPolicy(
+        mode="allowlist",
+        allowed_origins=frozenset({"https://autopvs1.bgi.com"}),
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(ValueError, match="cannot exceed 5"):
+            await guarded_request(
+                client,
+                policy,
+                "GET",
+                "https://autopvs1.bgi.com/search",
+                max_redirects=6,
+            )
+    assert requests == 0

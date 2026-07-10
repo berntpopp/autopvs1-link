@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Literal
-from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -18,19 +17,20 @@ class EgressDeniedError(RuntimeError):
 
 def normalize_origin(value: str) -> str:
     """Return a canonical bare HTTPS origin or reject the value."""
-    parsed = urlsplit(value)
+    try:
+        parsed = httpx.URL(value)
+    except httpx.InvalidURL as exc:
+        raise ValueError("allowed upstream origin must be a bare HTTPS origin") from exc
     if (
         parsed.scheme != "https"
-        or not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
+        or not parsed.host
+        or parsed.userinfo
         or parsed.query
         or parsed.fragment
         or parsed.path not in ("", "/")
     ):
         raise ValueError("allowed upstream origin must be a bare HTTPS origin")
-    port = f":{parsed.port}" if parsed.port not in (None, 443) else ""
-    return f"https://{parsed.hostname.lower()}{port}"
+    return str(parsed.copy_with(path="", query=None, fragment=None))
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,16 +41,14 @@ class EgressPolicy:
     allowed_origins: frozenset[str]
 
     def require_allowed(self, url: str) -> None:
-        parsed = urlsplit(url)
-        if (
-            parsed.scheme != "https"
-            or not parsed.hostname
-            or parsed.username is not None
-            or parsed.password is not None
-        ):
+        try:
+            parsed = httpx.URL(url)
+        except httpx.InvalidURL as exc:
+            raise EgressDeniedError("outbound URL has an invalid origin") from exc
+        if parsed.scheme != "https" or not parsed.host or parsed.userinfo:
             raise EgressDeniedError("outbound URL is not an authenticated HTTPS destination")
         try:
-            origin = normalize_origin(f"{parsed.scheme}://{parsed.netloc}")
+            origin = normalize_origin(str(parsed.copy_with(path="", query=None, fragment=None)))
         except ValueError as exc:
             raise EgressDeniedError("outbound URL has an invalid origin") from exc
         if self.mode != "allowlist" or origin not in self.allowed_origins:
@@ -69,6 +67,8 @@ async def guarded_request(
     """Send one request while validating every redirect before network I/O."""
     if max_redirects < 0:
         raise ValueError("max_redirects must be non-negative")
+    if max_redirects > 5:
+        raise ValueError("max_redirects cannot exceed 5")
 
     current = url
     request_kwargs = dict(kwargs)
@@ -91,7 +91,11 @@ async def guarded_request(
         if not location:
             await response.aclose()
             raise EgressDeniedError("redirect response omitted Location")
-        next_url = urljoin(str(response.url), location)
+        try:
+            next_url = str(response.url.join(location))
+        except httpx.InvalidURL as exc:
+            await response.aclose()
+            raise EgressDeniedError("redirect Location is not a valid URL") from exc
         try:
             policy.require_allowed(next_url)
         except EgressDeniedError:
