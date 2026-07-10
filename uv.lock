@@ -137,7 +137,7 @@ wheels = [
 
 [[package]]
 name = "autopvs1-link"
-version = "2.0.3"
+version = "3.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "asgi-correlation-id" },
