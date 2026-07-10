@@ -7,6 +7,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastmcp.server.http import HostOriginGuardMiddleware
 
 from autopvs1_link import __version__
 from autopvs1_link.api.client_manager import shutdown_clients
@@ -28,16 +29,18 @@ def create_app() -> FastAPI:
     # make Starlette's Mount emit a 307 trailing-slash redirect (/mcp -> /mcp/);
     # baking "/mcp" into the sub-app and mounting at "/" serves /mcp directly,
     # matching the rest of the GeneFoundry fleet (see gtex-link server_manager).
-    # host_origin_protection defaults to True since fastmcp 3.4.3, which 421s
-    # every request whose Host is not localhost -- including legitimate proxied
-    # traffic from the genefoundry-router. The reverse proxy (NPM) already
-    # validates the Host via server_name + TLS SNI, so disable the redundant
-    # app-layer guard here to keep the public /mcp reachable.
+    # fastmcp >=3.4.4 supports strict DNS-rebinding protection with an explicit
+    # allowlist. Enable it natively on the /mcp sub-app and pin the exact Host
+    # and Origin values (default loopback; the proxied public host is added via
+    # AUTOPVS1_LINK_SERVER_ALLOWED_HOSTS in production). The outer guard below
+    # extends the same policy to /health, /api/... and /metrics.
     mcp_app = mcp.http_app(
         path="/mcp",
         json_response=True,
         stateless_http=True,
-        host_origin_protection=False,
+        host_origin_protection=True,
+        allowed_hosts=settings.server.allowed_hosts,
+        allowed_origins=settings.server.allowed_origins,
     )
 
     @asynccontextmanager
@@ -69,9 +72,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     install_metrics(app)
-    # Correlation middleware added LAST so it runs FIRST on requests, binding
-    # the X-Request-ID before downstream middleware logs the request.
+    # Correlation middleware binds the X-Request-ID before downstream middleware
+    # logs the request.
     install_correlation(app)
+    # DNS-rebinding guard added LAST so it runs FIRST (outermost): an untrusted
+    # Host (421) or Origin (403) is rejected before any other route -- FastAPI
+    # native handlers and the mounted /mcp sub-app -- processes the request.
+    app.add_middleware(
+        HostOriginGuardMiddleware,
+        allowed_hosts=settings.server.allowed_hosts,
+        allowed_origins=settings.server.allowed_origins,
+        mode="strict",
+    )
     app.include_router(variant.router)
     app.include_router(cnv.router)
     app.include_router(gene.router)

@@ -141,6 +141,23 @@ class ServerConfig(BaseSettings):
     reload: bool = Field(default=False, description="Enable auto-reload in development")
     cors_origins: str = Field(default="*", description="CORS allowed origins (comma-separated)")
     workers: int = Field(default=1, ge=1, le=32, description="Number of worker processes")
+    allowed_hosts: list[str] = Field(
+        default=["localhost", "127.0.0.1", "::1"],
+        description="Exact HTTP Host allowlist for the DNS-rebinding guard "
+        "(add the reverse-proxy public host in production)",
+    )
+    allowed_origins: list[str] = Field(
+        default=[],
+        description="Exact HTTP Origin allowlist for the DNS-rebinding guard",
+    )
+
+    @field_validator("allowed_hosts", "allowed_origins")
+    @classmethod
+    def _reject_allowlist_wildcards(cls, values: list[str]) -> list[str]:
+        """Require exact entries; pattern syntax makes the boundary ambiguous."""
+        if any(character in entry for entry in values for character in "*?[]"):
+            raise ValueError("wildcard entries are not permitted in HTTP allowlists")
+        return values
 
     @field_validator("cors_origins")
     @classmethod
