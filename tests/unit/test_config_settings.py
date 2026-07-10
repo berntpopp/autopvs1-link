@@ -1,5 +1,8 @@
 """Tests for the Settings class branches not covered by env-prefix tests."""
 
+import pytest
+from pydantic import ValidationError
+
 from autopvs1_link.config import (
     APIConfig,
     CacheConfig,
@@ -22,9 +25,6 @@ def test_cache_config_ttl_seconds() -> None:
 
 
 def test_server_config_cors_validator_rejects_bad_origin() -> None:
-    import pytest
-    from pydantic import ValidationError
-
     with pytest.raises(ValidationError):
         ServerConfig(cors_origins="not-a-url,https://ok.example.com")
 
@@ -60,3 +60,25 @@ def test_settings_production_overrides() -> None:
     assert s.is_production
     assert s.debug is False
     assert s.logging.json_format is True
+
+
+def test_api_config_defaults_to_disabled_egress() -> None:
+    cfg = APIConfig()
+    assert cfg.egress_policy.mode == "disabled"
+    assert cfg.egress_policy.allowed_origins == frozenset()
+
+
+def test_api_config_requires_origins_in_allowlist_mode() -> None:
+    cfg = APIConfig(egress_mode="allowlist", allowed_upstream_origins="")
+    with pytest.raises(ValueError, match="requires at least one exact origin"):
+        _ = cfg.egress_policy
+
+
+def test_api_config_normalizes_allowed_origins() -> None:
+    cfg = APIConfig(
+        egress_mode="allowlist",
+        allowed_upstream_origins="https://AUTOPVS1.BGI.COM/, https://rest.ensembl.org",
+    )
+    assert cfg.egress_policy.allowed_origins == frozenset(
+        {"https://autopvs1.bgi.com", "https://rest.ensembl.org"}
+    )
