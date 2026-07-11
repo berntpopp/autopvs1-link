@@ -62,6 +62,16 @@ _RECODER_TIMEOUT_SECONDS = 30.0
 # alternative-assembly anchors that AutoPVS1 will not accept.
 _CANONICAL_CHROM_RE = re.compile(r"^(?:[1-9]|1[0-9]|2[0-2]|X|Y|MT)$")
 
+# Strict structural grammars for EVERY candidate field surfaced to the caller
+# (via details.candidates / disambiguation suggestions). The recoder response is
+# untrusted external text: a field that does not conform to its exact identifier
+# grammar is DROPPED, never passed through — code-point stripping alone cannot
+# neutralise instruction-shaped prose that conforms to no forbidden code point.
+_VCF_STRING_RE = re.compile(r"^(?:[1-9]|1[0-9]|2[0-2]|X|Y|MT)-[1-9][0-9]*-[ACGTN]+-[ACGTN]+$")
+_ALLELE_KEY_RE = re.compile(r"^(?:[ACGTN]+|-)$")
+_SPDI_RE = re.compile(r"^NC_[0-9]+\.[0-9]+:[0-9]+:[ACGTN]*:[ACGTN]*$")
+_SYNONYM_RE = re.compile(r"^(?:rs[0-9]+|COS[VM][0-9]+|C[MIRD][0-9]+)$", re.IGNORECASE)
+
 
 @dataclass(frozen=True, slots=True)
 class RecoderCandidate:
@@ -134,26 +144,24 @@ def _is_not_found_message(message: str) -> bool:
 
 
 def _extract_canonical_vcf_string(vcf_strings: list[Any]) -> str | None:
-    """Pick the first canonical-chrom-anchored entry from a vcf_string list.
+    """Pick the first entry fully matching the strict CHROM-POS-REF-ALT grammar.
 
     Ensembl returns parallel entries on LRG_* and HG*_PATCH/NW_* contigs
-    alongside the canonical chromosome representation. AutoPVS1 only
-    accepts plain chromosome ids, so we filter to those.
+    alongside the canonical chromosome representation. AutoPVS1 only accepts
+    plain chromosome ids, and this value is surfaced to the caller, so we require
+    a FULL structural match (not just a canonical-chrom prefix) and drop anything
+    else — an unvalidated tail is untrusted upstream text.
     """
     for raw in vcf_strings:
-        if not isinstance(raw, str):
-            continue
-        parts = raw.split("-", 1)
-        if not parts or not _CANONICAL_CHROM_RE.fullmatch(parts[0]):
-            continue
-        return raw
+        if isinstance(raw, str) and _VCF_STRING_RE.fullmatch(raw):
+            return raw
     return None
 
 
 def _extract_canonical_spdi(spdi_strings: list[Any]) -> str | None:
-    """Pick the first NC_*-anchored entry from an spdi list."""
+    """Pick the first entry fully matching the strict SPDI grammar."""
     for raw in spdi_strings:
-        if isinstance(raw, str) and raw.startswith("NC_"):
+        if isinstance(raw, str) and _SPDI_RE.fullmatch(raw):
             return raw
     return None
 
@@ -175,19 +183,27 @@ def _parse_recoder_response(payload: Any) -> list[RecoderCandidate]:
         for allele_key, allele_data in element.items():
             if not isinstance(allele_data, dict):
                 continue
-            vcf_strings = allele_data.get("vcf_string") or []
-            spdi_strings = allele_data.get("spdi") or []
-            synonym_ids = allele_data.get("id") or []
-            vcf_string = _extract_canonical_vcf_string(vcf_strings)
+            # Drop the whole candidate when its two load-bearing, caller-visible
+            # identifiers (the AutoPVS1 variant_id and the allele key echoed in
+            # disambiguation suggestions) do not conform to their exact grammar.
+            key = str(allele_key)
+            if not _ALLELE_KEY_RE.fullmatch(key):
+                continue
+            vcf_string = _extract_canonical_vcf_string(allele_data.get("vcf_string") or [])
             if vcf_string is None:
                 continue
-            spdi = _extract_canonical_spdi(spdi_strings) or ""
+            spdi = _extract_canonical_spdi(allele_data.get("spdi") or []) or ""
+            synonym_ids = allele_data.get("id") or []
             candidates.append(
                 RecoderCandidate(
                     variant_id=vcf_string,
-                    allele_key=str(allele_key),
+                    allele_key=key,
                     spdi=spdi,
-                    synonym_ids=tuple(s for s in synonym_ids if isinstance(s, str)),
+                    # Keep only entries matching a known variant-id grammar
+                    # (dbSNP rs / COSMIC); drop any free-form synonym string.
+                    synonym_ids=tuple(
+                        s for s in synonym_ids if isinstance(s, str) and _SYNONYM_RE.fullmatch(s)
+                    ),
                 )
             )
     return candidates

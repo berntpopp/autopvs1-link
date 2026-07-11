@@ -43,19 +43,33 @@ _CANONICAL_SPDI_LOOSE_RE = re.compile(
     re.IGNORECASE,
 )
 _RSID_RE = re.compile(r"^rs\d{1,12}$")  # lowercase 'rs' required per dbSNP FAQ
+# Strict variant-description tails: no arbitrary ``\S+`` (which would accept
+# instruction-shaped prose). c./n./g. descriptions begin with a numeric position
+# token (optionally ``*``/``-`` for UTR anchors) and are confined to the HGVS
+# variant alphabet; p. descriptions begin with a 1-3 letter amino-acid code
+# immediately followed by a position number (or a bare ``=``). This rejects
+# free-form tails such as ``c.IGNORE_ALL_PREVIOUS_INSTRUCTIONS`` at validation.
+_HGVS_VARIANT_CHARS = r"[A-Za-z0-9>_.()+*=?-]*"
+# The leading token must be a real HGVS position (optionally paren-wrapped for
+# uncertain ranges): a numeric coordinate for c./n./g., or a 1-3 letter
+# amino-acid code + coordinate for p. Instruction prose (no leading position)
+# never matches.
+_HGVS_CN_TAIL = rf"\(?[*-]?\d{_HGVS_VARIANT_CHARS}"
+_HGVS_P_TAIL = rf"(?:=|\(?[A-Za-z*]{{1,3}}\d+{_HGVS_VARIANT_CHARS}\)?)"
+_HGVS_G_TAIL = rf"\(?\d{_HGVS_VARIANT_CHARS}"
 _HGVS_C_RE = re.compile(
     # NM/NR/LRG use ``_`` separator (NM_000059); Ensembl uses no separator
     # (ENST00000357654). Gene parenthetical is optional. Cover ``n.`` too —
     # noncoding RNA HGVS uses NR_ + n.* on the same shape.
-    r"^(?:(?:NM|NR|LRG)_|ENST)\d+(?:\.\d+)?(?:\([A-Z0-9-]+\))?:[cn]\.\S+$",
+    rf"^(?:(?:NM|NR|LRG)_|ENST)\d+(?:\.\d+)?(?:\([A-Z0-9-]+\))?:[cn]\.{_HGVS_CN_TAIL}$",
     re.IGNORECASE,
 )
 _HGVS_P_RE = re.compile(
-    r"^(?:NP_|ENSP)\d+(?:\.\d+)?(?:\([A-Z0-9-]+\))?:p\.\S+$",
+    rf"^(?:NP_|ENSP)\d+(?:\.\d+)?(?:\([A-Z0-9-]+\))?:p\.{_HGVS_P_TAIL}$",
     re.IGNORECASE,
 )
 _HGVS_G_RE = re.compile(
-    r"^(?:GRCh3[78]\()?NC_\d+(?:\.\d+)?\)?:g\.\S+$",
+    rf"^(?:GRCh3[78]\()?NC_\d+(?:\.\d+)?\)?:g\.{_HGVS_G_TAIL}$",
     re.IGNORECASE,
 )
 

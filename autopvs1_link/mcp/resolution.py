@@ -79,12 +79,17 @@ async def resolve_or_normalize_variant_id(
     try:
         candidates = await service_adapters.recode_variant(raw_query, genome_build)
     except RecoderNotFoundError as exc:
+        # Never echo raw free-form input (raw_query) into a caller-visible
+        # message or ``details.original_input``: an instruction-shaped
+        # identifier carries no forbidden code points, so sanitize cannot help —
+        # the only safe move is to not reflect it at all. Only the strictly
+        # classified ``form`` (an enum) and the enum ``genome_build`` are echoed.
         raise MCPInputError(
             code="not_found",
             message=(
-                f"Ensembl Variant Recoder did not recognize {raw_query!r} "
-                f"on genome_build={genome_build}. Confirm the identifier "
-                f"or supply a canonical CHROM-POS-REF-ALT variant_id."
+                "Ensembl Variant Recoder did not recognize the supplied "
+                f"identifier on genome_build={genome_build}. Confirm the "
+                "identifier or supply a canonical CHROM-POS-REF-ALT variant_id."
             ),
             suggestions=[
                 "Confirm the rsID/HGVS exists in current dbSNP / RefSeq.",
@@ -92,15 +97,10 @@ async def resolve_or_normalize_variant_id(
                 "Supply a canonical CHROM-POS-REF-ALT variant_id directly.",
             ],
             details={
-                "original_input": raw_query,
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
-                # FIXED classified string only: never serialize str(exc), which
-                # can carry hostile upstream/exception PROSE (not just code
-                # points). The upstream body is already severed at the recoder
-                # client (Surface A); this keeps the caller-visible detail
-                # body-free too.
+                # FIXED classified string only: never serialize str(exc).
                 "resolver_message": "Ensembl Variant Recoder did not recognize the identifier.",
             },
         ) from exc
@@ -109,8 +109,8 @@ async def resolve_or_normalize_variant_id(
             code="external_resolver_unavailable",
             message=(
                 "Ensembl Variant Recoder is currently unreachable while "
-                f"resolving {raw_query!r}. The rest of AutoPVS1-Link is "
-                "unaffected — retry shortly or supply a canonical "
+                "resolving the supplied identifier. The rest of AutoPVS1-Link "
+                "is unaffected — retry shortly or supply a canonical "
                 "CHROM-POS-REF-ALT variant_id to skip resolution."
             ),
             retryable=True,
@@ -119,7 +119,6 @@ async def resolve_or_normalize_variant_id(
                 "Supply a canonical CHROM-POS-REF-ALT variant_id (no resolver hop needed).",
             ],
             details={
-                "original_input": raw_query,
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
@@ -132,15 +131,14 @@ async def resolve_or_normalize_variant_id(
         raise MCPInputError(
             code="not_found",
             message=(
-                f"Ensembl Variant Recoder returned no canonical-chrom "
-                f"candidates for {raw_query!r} on genome_build={genome_build}."
+                "Ensembl Variant Recoder returned no canonical-chrom "
+                f"candidates for the supplied identifier on genome_build={genome_build}."
             ),
             suggestions=[
                 "Confirm the rsID/HGVS resolves to a primary-assembly chromosome.",
                 "Supply a canonical CHROM-POS-REF-ALT variant_id directly.",
             ],
             details={
-                "original_input": raw_query,
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
@@ -148,6 +146,10 @@ async def resolve_or_normalize_variant_id(
         )
 
     if len(candidates) > 1:
+        # Every candidate field is strictly structurally validated at the recoder
+        # client (variant_id/allele_key/spdi/synonym_ids conform to their
+        # identifier grammar or the entry is dropped), so echoing them here is
+        # safe; raw caller input is never reflected.
         candidate_rows = [
             {
                 "id": c.variant_id,
@@ -162,9 +164,8 @@ async def resolve_or_normalize_variant_id(
         raise MCPInputError(
             code="requires_disambiguation",
             message=(
-                f"Auto-resolution of {raw_query!r} returned "
-                f"{len(candidates)} canonical candidates; caller must "
-                f"pick one and re-call with that variant_id."
+                f"Auto-resolution returned {len(candidates)} canonical "
+                "candidates; caller must pick one and re-call with that variant_id."
             ),
             suggestions=[
                 f"Re-call with variant_id={c['id']!r} (allele={c['allele_key']})."
@@ -172,7 +173,6 @@ async def resolve_or_normalize_variant_id(
             ],
             details={
                 "candidates": candidate_rows,
-                "original_input": raw_query,
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
@@ -184,9 +184,9 @@ async def resolve_or_normalize_variant_id(
         MCPWarning(
             code="auto_resolved",
             message=(
-                f"Resolved {raw_query!r} -> {sole.variant_id} via "
-                f"Ensembl Variant Recoder (form={form}, "
-                f"genome_build={genome_build}, allele={sole.allele_key})."
+                f"Auto-resolved a {form} identifier to {sole.variant_id} via "
+                f"Ensembl Variant Recoder (genome_build={genome_build}, "
+                f"allele={sole.allele_key})."
             ),
         )
     ]
