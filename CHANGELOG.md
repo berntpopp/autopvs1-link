@@ -6,6 +6,49 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-07-11
+
+### Security
+
+**BREAKING.** All AutoPVS1 scraped free-text surfaces on `get_variant_pvs1_data`
+and `get_cnv_pvs1_data` (and the bulk variants of both) now ship as the
+Response-Envelope v1.1 typed `untrusted_text` object (`kind`/`text`/
+`provenance`/`raw_sha256`) instead of a bare string, so a downstream MCP
+client can never mistake AutoPVS1-sourced HTML for first-party instructions.
+Defense in depth; research use only.
+
+- New `autopvs1_link/mcp/untrusted_content.py`: the fleet's structural fence
+  primitive (`fence_untrusted_text`, `UntrustedText`), copied verbatim from
+  the released PubTator reference, plus the Decision-D7 size/object-count
+  limits helper (`enforce_untrusted_text_limits`, `UntrustedTextLimitError`).
+- Fenced surfaces on `pvs1_flowchart`: `decision_tree[*].code` (the PVS1
+  criterion description itself), `decision_tree[*].note_text`,
+  `decision_tree_raw[*].code`/`description` (full-mode audit copy),
+  `notes` legend values (full mode), `terminal_note` (summary mode,
+  ambiguous verdicts), and `path_gloss` (every mode, including the
+  default `summary` hot path).
+- Fenced surface found during the fleet-wide "hunt for missed surfaces"
+  sweep: `disease_mechanisms[*].disease` (the scraped ClinGen disease
+  name) — not in the original tracking-issue surface list. `gene`,
+  `inheritance`, `clinical_validity`, `consideration`, and
+  `adjusted_strength` stay bare strings; they are short controlled
+  vocabulary (HGNC symbol, ClinGen categories), not free prose.
+- `decision_tree_raw` is now typed `list[FlowchartStepMCP]` (was
+  `list[dict[str, Any]]`) so its published output-schema array ITEM
+  declares the `untrusted_text` object with a real `kind` const, not a
+  bare permissive object.
+- Every `untrusted_text` object one response emits (flowchart prose plus
+  every `disease_mechanisms` row, across both `get_variant_pvs1_data` and
+  `get_cnv_pvs1_data`) is checked in one combined
+  `enforce_untrusted_text_limits` call, not per-record. A breach maps to
+  the new typed `untrusted_text_limit_exceeded` error code (registered in
+  `KNOWN_ERROR_CODES`), never the generic `parse_error`/`internal_error`.
+- `record_id` provenance: AutoPVS1's own cHGVS notation
+  (`NM_000307.5:c.604A>T`, i.e. already `{transcript}:{variant}`) when the
+  page exposed one, else `{genome_build}:{variant_id}`
+  (`{genome_build}:{cnv_id}` for CNVs); disease-mechanism rows append
+  `#disease:{index}`.
+
 ## [3.1.0] - 2026-07-11
 
 ### Security
