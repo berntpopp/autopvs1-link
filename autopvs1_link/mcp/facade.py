@@ -42,12 +42,30 @@ def build_mcp_server() -> FastMCP:
         tools_changed=False,
     )
 
+    # Guard the FastMCP-core not-found reflection surface: core echoes the
+    # caller's OWN requested tool name / resource URI / prompt name (with any
+    # control/zero-width/bidi/NUL code points) to the caller and to logs BEFORE
+    # backend middleware runs. NotFoundGuard preflights the tool NAME (unknown ->
+    # fixed name-free envelope) and fixes the on_read_resource boundary; it is
+    # added FIRST so it is the OUTERMOST middleware. See notfound_guard.py.
+    from autopvs1_link.mcp.notfound_guard import (
+        NotFoundGuard,
+        install_protocol_error_handler,
+        install_validation_log_filter,
+    )
+
+    mcp.add_middleware(NotFoundGuard())
+
     # Fence the arg-validation boundary: FastMCP raises ValidationError (echoing
     # a hostile top-level argument name + control code points) BEFORE its masked
     # generic path. This middleware returns our fixed invalid_input envelope.
     from autopvs1_link.mcp.error_guard import ArgumentValidationGuard
 
     mcp.add_middleware(ArgumentValidationGuard())
+
+    # Layer 5: scrub FastMCP-core / MCP-SDK validation logs that would echo the
+    # caller-supplied name/URI (idempotent; process-global).
+    install_validation_log_filter()
 
     from autopvs1_link.mcp import prompts, resources
     from autopvs1_link.mcp.tools import (
@@ -68,4 +86,11 @@ def build_mcp_server() -> FastMCP:
     cache_tools.register(mcp)
     prompts.register(mcp)
     resources.register(mcp)
+
+    # Layer 3: install the protocol-handler backstop AFTER every tool/resource/
+    # prompt is registered (so the request handlers exist). Outermost wrapper on
+    # the raw CallTool/ReadResource/GetPrompt handlers — catches the unknown-tool
+    # *return* path and any resource/prompt dispatch error that would echo the
+    # requested name/URI (the only layer covering the unknown-prompt surface).
+    install_protocol_error_handler(mcp)
     return mcp
