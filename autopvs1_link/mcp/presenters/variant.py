@@ -11,7 +11,14 @@ from autopvs1_link.mcp.contracts import CNVMCPData, VariantMCPData
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.mode_validation import ResponseMode, normalize_response_mode
 from autopvs1_link.mcp.pvs1_glossary import synthesize_path_gloss
+from autopvs1_link.mcp.untrusted_content import (
+    UntrustedText,
+    enforce_untrusted_text_limits,
+    fence_untrusted_text,
+)
 from autopvs1_link.models.autopvs1_models import AutoPVS1CNVData, AutoPVS1Data
+
+_UNTRUSTED_SOURCE = "autopvs1"
 
 CNV_ID_RE = re.compile(
     r"^(?P<chrom>[1-9]|1[0-9]|2[0-2]|X|Y|MT)-(?P<start>[1-9][0-9]*)-"
@@ -109,11 +116,73 @@ def _terminal_note(
     return None
 
 
+def _fence_prose(raw_text: str, *, record_id: str, fenced: list[UntrustedText]) -> dict[str, Any]:
+    """Fence one upstream scraped-prose leaf and record it for limit enforcement."""
+    obj = fence_untrusted_text(raw_text, source=_UNTRUSTED_SOURCE, record_id=record_id)
+    fenced.append(obj)
+    return obj.model_dump(mode="json")
+
+
+def _fence_step(
+    step: dict[str, Any], *, record_id: str, fenced: list[UntrustedText]
+) -> dict[str, Any]:
+    """Fence a decision-tree step's upstream prose leaves (``code`` is the
+    PVS1 criterion description itself; ``description``/``note_text`` are
+    optional companion prose). ``note_id`` is a short marker, not prose."""
+    out = dict(step)
+    code = out.get("code")
+    if isinstance(code, str):
+        out["code"] = _fence_prose(code, record_id=record_id, fenced=fenced)
+    description = out.get("description")
+    if isinstance(description, str) and description:
+        out["description"] = _fence_prose(description, record_id=record_id, fenced=fenced)
+    note_text = out.get("note_text")
+    if isinstance(note_text, str) and note_text:
+        out["note_text"] = _fence_prose(note_text, record_id=record_id, fenced=fenced)
+    return out
+
+
+def _fence_flowchart_output(
+    raw: dict[str, Any], *, record_id: str
+) -> tuple[dict[str, Any], list[UntrustedText]]:
+    """Fence every AutoPVS1 scraped-prose leaf in the shaped flowchart dict.
+
+    Runs once, after the existing mode-branching has settled on the final
+    wire shape (summary/standard/full each expose a different subset of
+    ``decision_tree`` / ``decision_tree_raw`` / ``notes`` / ``terminal_note``
+    / ``path_gloss``), so every scraped surface is fenced regardless of
+    which fields a given response_mode happens to populate.
+    """
+    fenced: list[UntrustedText] = []
+    if "decision_tree" in raw:
+        raw["decision_tree"] = [
+            _fence_step(step, record_id=record_id, fenced=fenced) for step in raw["decision_tree"]
+        ]
+    if raw.get("decision_tree_raw"):
+        raw["decision_tree_raw"] = [
+            _fence_step(step, record_id=record_id, fenced=fenced)
+            for step in raw["decision_tree_raw"]
+        ]
+    if raw.get("notes"):
+        raw["notes"] = {
+            note_id: _fence_prose(text, record_id=record_id, fenced=fenced)
+            for note_id, text in raw["notes"].items()
+        }
+    if raw.get("terminal_note"):
+        raw["terminal_note"] = _fence_prose(
+            raw["terminal_note"], record_id=record_id, fenced=fenced
+        )
+    if raw.get("path_gloss"):
+        raw["path_gloss"] = _fence_prose(raw["path_gloss"], record_id=record_id, fenced=fenced)
+    return raw, fenced
+
+
 def _present_flowchart(
     flowchart: BaseModel | dict[str, Any],
     *,
     response_mode: ResponseMode,
-) -> tuple[dict[str, Any], list[MCPWarning]]:
+    record_id: str,
+) -> tuple[dict[str, Any], list[MCPWarning], list[UntrustedText]]:
     raw = _dump(flowchart)
     warnings: list[MCPWarning] = []
     notes = raw.get("notes") or {}
@@ -194,7 +263,8 @@ def _present_flowchart(
         raw.pop("notes", None)
         if path_gloss is not None:
             raw["path_gloss"] = path_gloss
-    return raw, warnings
+    raw, fenced = _fence_flowchart_output(raw, record_id=record_id)
+    return raw, warnings, fenced
 
 
 def _present_external_links(
@@ -252,6 +322,24 @@ def _enrich_cnv_info(cnv_info: dict[str, Any]) -> dict[str, Any]:
     return cnv_info
 
 
+def _fence_disease_mechanisms(
+    rows: list[dict[str, Any]], *, record_id: str, fenced: list[UntrustedText]
+) -> list[dict[str, Any]]:
+    """Fence each row's scraped ``disease`` name; ``gene``/inheritance/validity
+    /consideration/adjusted_strength stay bare — they are short controlled
+    vocabulary (HGNC symbol, ClinGen categories), not free prose."""
+    out: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        row = dict(row)
+        disease = row.get("disease")
+        if isinstance(disease, str):
+            row["disease"] = _fence_prose(
+                disease, record_id=f"{record_id}#disease:{index}", fenced=fenced
+            )
+        out.append(row)
+    return out
+
+
 def present_variant(
     parsed: AutoPVS1Data | dict[str, Any],
     *,
@@ -262,6 +350,13 @@ def present_variant(
     """Shape parsed variant data for MCP callers."""
     raw = _dump(parsed)
     mode = _normalize_response_mode(response_mode)
+    # cHGVS is upstream's own "{transcript}:{variant}" notation (e.g.
+    # "NM_000307.5:c.604A>T") when AutoPVS1 extracted one; fall back to
+    # "{genome_build}:{variant_id}" (always present) otherwise.
+    raw_variant_info = raw.get("variant_info") or {}
+    record_id = str(raw_variant_info.get("chgvs") or "").strip() or (
+        f"{raw['genome_build']}:{raw_variant_info.get('variant_id', '')}"
+    )
 
     if mode == "ids_only":
         return (
@@ -301,7 +396,9 @@ def present_variant(
         # see warnings about suppressed fields.
         warnings = [w for w in warnings if w.code != "invalid_external_link"]
 
-    flowchart, flowchart_warnings = _present_flowchart(raw["pvs1_flowchart"], response_mode=mode)
+    flowchart, flowchart_warnings, fenced_objects = _present_flowchart(
+        raw["pvs1_flowchart"], response_mode=mode, record_id=record_id
+    )
     warnings.extend(flowchart_warnings)
     disease_mechanisms = list(raw.get("disease_mechanisms") or [])
     if mode == "summary":
@@ -312,6 +409,13 @@ def present_variant(
             for row in disease_mechanisms
             if str(row.get("adjusted_strength", "")).strip().lower() != "unmet"
         ]
+    disease_mechanisms = _fence_disease_mechanisms(
+        disease_mechanisms, record_id=record_id, fenced=fenced_objects
+    )
+    # One limits call over every untrusted_text object this response emits
+    # (flowchart prose + disease-mechanism names combined), not per-record —
+    # the 128-object / 8 MiB-total ceilings must bound the whole payload.
+    enforce_untrusted_text_limits(fenced_objects)
 
     data = VariantMCPData(
         genome_build=raw["genome_build"],
@@ -333,6 +437,8 @@ def present_cnv(
     """Shape parsed CNV data for MCP callers."""
     raw = _dump(parsed)
     mode = _normalize_response_mode(response_mode)
+    raw_cnv_info = raw.get("cnv_info") or {}
+    record_id = f"{raw['genome_build']}:{raw_cnv_info.get('cnv_id', '')}"
 
     if mode == "ids_only":
         return (
@@ -346,7 +452,9 @@ def present_cnv(
             [],
         )
 
-    flowchart, warnings = _present_flowchart(raw["pvs1_flowchart"], response_mode=mode)
+    flowchart, warnings, fenced_objects = _present_flowchart(
+        raw["pvs1_flowchart"], response_mode=mode, record_id=record_id
+    )
     disease_mechanisms = list(raw.get("disease_mechanisms") or [])
     if mode == "summary":
         disease_mechanisms = []
@@ -356,6 +464,11 @@ def present_cnv(
             for row in disease_mechanisms
             if str(row.get("adjusted_strength", "")).strip().lower() != "unmet"
         ]
+    disease_mechanisms = _fence_disease_mechanisms(
+        disease_mechanisms, record_id=record_id, fenced=fenced_objects
+    )
+    # One limits call over every untrusted_text object this response emits.
+    enforce_untrusted_text_limits(fenced_objects)
     cnv_info = _enrich_cnv_info(dict(raw["cnv_info"]))
     if mode == "summary":
         cnv_info = {

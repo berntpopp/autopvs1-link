@@ -88,7 +88,7 @@ def test_present_variant_adds_note_text_and_invalid_link_warning() -> None:
     assert data.variant_info["pli_score"] == 3.29e-20
     assert data.variant_info["pli_score_display"] == "3.29e-20"
     assert data.variant_info["external_links"]["ClinVar"] is None
-    assert data.pvs1_flowchart["decision_tree"][0]["note_text"] == "Resolved note text."
+    assert data.pvs1_flowchart["decision_tree"][0]["note_text"].text == "Resolved note text."
     assert data.pvs1_flowchart["final_strength_source"] == "inferred"
     assert {warning.code for warning in warnings} == {"invalid_external_link"}
 
@@ -290,8 +290,11 @@ def test_present_variant_full_preserves_rich_fields_and_unmet_by_default() -> No
     assert payload["variant_info"]["gene_url"] == "https://example.test/gene"
     assert payload["variant_info"]["chgvs"] == "c.1A>T"
     assert payload["variant_info"]["external_links"]["gnomAD"] == "https://example.test/variant"
-    assert payload["pvs1_flowchart"]["notes"] == {"#1": "Resolved note text."}
-    assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"] == "Resolved note text."
+    assert payload["pvs1_flowchart"]["notes"]["#1"]["kind"] == "untrusted_text"
+    assert payload["pvs1_flowchart"]["notes"]["#1"]["text"] == "Resolved note text."
+    assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"]["text"] == (
+        "Resolved note text."
+    )
     assert [row["adjusted_strength"] for row in payload["disease_mechanisms"]] == [
         "Strong",
         "Unmet",
@@ -433,8 +436,10 @@ def test_present_cnv_full_preserves_rich_fields_and_unmet_by_default() -> None:
     payload = data.model_dump(mode="json")
     assert payload["cnv_info"]["cnv_type"] == "DEL"
     assert payload["cnv_info"]["size"] == 5000000
-    assert payload["pvs1_flowchart"]["notes"] == {"#1": "Resolved CNV note text."}
-    assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"] == "Resolved CNV note text."
+    assert payload["pvs1_flowchart"]["notes"]["#1"]["text"] == "Resolved CNV note text."
+    assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"]["text"] == (
+        "Resolved CNV note text."
+    )
     assert [row["adjusted_strength"] for row in payload["disease_mechanisms"]] == [
         "VeryStrong",
         "Unmet",
@@ -502,9 +507,14 @@ def test_present_variant_full_exposes_raw_fields_for_audit() -> None:
     }
     raw_tree = payload["pvs1_flowchart"]["decision_tree_raw"]
     assert raw_tree is not None
-    assert [step["code"] for step in raw_tree] == ["NF1", "NF5"]
-    # raw tree has NO injected note_text (audit before notes inlining)
-    assert all("note_text" not in step for step in raw_tree)
+    assert [step["code"]["text"] for step in raw_tree] == ["NF1", "NF5"]
+    assert all(step["code"]["kind"] == "untrusted_text" for step in raw_tree)
+    # raw tree has NO injected note_text (audit before notes inlining). It is
+    # now a typed FlowchartStepMCP (for the list-item schema requirement), so
+    # an un-hoisted note_text dumps as an explicit null rather than an
+    # absent key; the OK-envelope wire path still strips it (see
+    # test_ok_envelope_full_mode_data_has_no_null_fields).
+    assert all(step.get("note_text") is None for step in raw_tree)
 
 
 def test_present_variant_standard_omits_raw_fields() -> None:
@@ -537,8 +547,8 @@ def test_present_variant_standard_drops_notes_dict_because_steps_carry_text() ->
     assert "notes" not in payload["pvs1_flowchart"], (
         "standard mode must drop notes dict (steps carry note_text)"
     )
-    # The resolved note text still has to ride along on each step.
-    note_texts = [step.get("note_text") for step in payload["pvs1_flowchart"]["decision_tree"]]
+    # The resolved note text still has to ride along on each step, fenced.
+    note_texts = [step["note_text"]["text"] for step in payload["pvs1_flowchart"]["decision_tree"]]
     assert "Note one." in note_texts
     assert "Note two." in note_texts
 
@@ -660,10 +670,12 @@ def test_present_variant_full_keeps_notes_dict_for_audit() -> None:
         response_mode="full",
     )
     payload = data.model_dump(mode="json", exclude_none=True)
-    assert payload["pvs1_flowchart"]["notes"] == {
+    notes = payload["pvs1_flowchart"]["notes"]
+    assert {note_id: obj["text"] for note_id, obj in notes.items()} == {
         "#1": "Note one.",
         "#2": "Note two.",
     }
+    assert all(obj["kind"] == "untrusted_text" for obj in notes.values())
 
 
 def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:
@@ -828,7 +840,9 @@ def test_present_variant_summary_emits_terminal_note_for_moderate_verdict() -> N
 
     payload = data.model_dump(mode="json", exclude_none=True)
     assert payload["pvs1_flowchart"]["final_strength"] == "Moderate"
-    assert payload["pvs1_flowchart"]["terminal_note"].startswith("Truncated > 10%")
+    terminal_note = payload["pvs1_flowchart"]["terminal_note"]
+    assert terminal_note["kind"] == "untrusted_text"
+    assert terminal_note["text"].startswith("Truncated > 10%")
 
 
 def test_present_variant_summary_omits_terminal_note_for_strong_verdict() -> None:
@@ -890,7 +904,7 @@ def test_present_variant_summary_terminal_note_falls_back_to_notes_legend() -> N
     )
 
     payload = data.model_dump(mode="json", exclude_none=True)
-    assert payload["pvs1_flowchart"]["terminal_note"].startswith("PVS1 does not apply")
+    assert payload["pvs1_flowchart"]["terminal_note"]["text"].startswith("PVS1 does not apply")
 
 
 # ---------------------------------------------------------------------------
@@ -923,7 +937,7 @@ def test_path_gloss_present_in_summary_for_strong_verdict() -> None:
     )
     data, _ = present_variant(parsed, source_url=None, response_mode="summary")
     payload = data.model_dump(mode="json", exclude_none=True)
-    assert payload["pvs1_flowchart"]["path_gloss"] == (
+    assert payload["pvs1_flowchart"]["path_gloss"]["text"] == (
         "Nonsense or Frameshift -> Not predicted to undergo NMD -> Strong"
     )
 
@@ -932,7 +946,7 @@ def test_path_gloss_present_in_standard_mode() -> None:
     parsed = _variant_with_path("Unmet", [FlowchartStep(code="Nonsense or Frameshift")])
     data, _ = present_variant(parsed, source_url=None, response_mode="standard")
     payload = data.model_dump(mode="json", exclude_none=True)
-    assert payload["pvs1_flowchart"]["path_gloss"] == "Nonsense or Frameshift -> Unmet"
+    assert payload["pvs1_flowchart"]["path_gloss"]["text"] == "Nonsense or Frameshift -> Unmet"
 
 
 def test_path_gloss_absent_in_ids_only_mode() -> None:

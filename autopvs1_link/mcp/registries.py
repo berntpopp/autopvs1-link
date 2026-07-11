@@ -54,6 +54,10 @@ KNOWN_ERROR_CODES: dict[str, str] = {
         "Deployment policy disabled external BGI and Ensembl transfers; "
         "the request was rejected before network I/O."
     ),
+    "untrusted_text_limit_exceeded": (
+        "AutoPVS1 scraped content exceeded a Response-Envelope v1.1 "
+        "untrusted-text ceiling (per-object, object-count, or total-bytes)."
+    ),
 }
 
 ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
@@ -116,6 +120,10 @@ ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
     ],
     "internal_error": [
         "Retry once with backoff; report a reproducer if the error persists.",
+    ],
+    "untrusted_text_limit_exceeded": [
+        "Retry with a narrower response_mode, e.g. 'summary'.",
+        "This guards against oversized scraped content; it is not a caller input error.",
     ],
 }
 

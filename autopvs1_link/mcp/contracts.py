@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from autopvs1_link.mcp.envelope import MCPError
+from autopvs1_link.mcp.untrusted_content import UntrustedText
 
 GenomeBuild = Literal["hg19", "hg38"]
 ExampleValue = Any
@@ -83,12 +84,18 @@ class CNVInfoMCP(MCPContractModel):
 
 
 class FlowchartStepMCP(MCPContractModel):
-    """One typed step in the PVS1 decision flowchart."""
+    """One typed step in the PVS1 decision flowchart.
 
-    code: str
-    description: str | None = None
+    ``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped
+    HTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the
+    Response-Envelope v1.1 ``untrusted_text`` object, never a bare string.
+    ``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.
+    """
+
+    code: UntrustedText
+    description: UntrustedText | None = None
     note_id: str | None = None
-    note_text: str | None = None
+    note_text: UntrustedText | None = None
 
 
 class PVS1FlowchartMCP(MCPContractModel):
@@ -115,24 +122,43 @@ class PVS1FlowchartMCP(MCPContractModel):
     ambiguous verdicts), so a summary-mode caller can always state why a
     verdict landed without widening to standard. Built only from upstream
     scraped node text — no hand-authored clinical mappings.
+
+    ``notes``, ``decision_tree_raw`` entries' ``code``/``description``,
+    ``terminal_note``, and ``path_gloss`` all carry AutoPVS1 scraped prose
+    and therefore ship as ``untrusted_text`` objects (Response-Envelope
+    v1.1), the same as each ``decision_tree`` step.
     """
 
     preliminary_decision_path: str
     final_strength: str
     final_strength_source: Literal["asserted", "inferred"] = "asserted"
     decision_tree: list[FlowchartStepMCP] = Field(default_factory=list)
-    notes: dict[str, str] | None = None
-    decision_tree_raw: list[dict[str, Any]] | None = None
-    terminal_note: str | None = None
-    path_gloss: str | None = None
+    notes: dict[str, UntrustedText] | None = None
+    # Typed (not ``list[dict[str, Any]]``) so the array ITEM schema declares
+    # the ``untrusted_text`` object with its ``kind`` const on ``code`` /
+    # ``description`` too — a bare permissive array would hide that literal
+    # from the published output schema even though the runtime data is
+    # fenced (Response-Envelope v1.1 list-item schema requirement).
+    decision_tree_raw: list[FlowchartStepMCP] | None = None
+    terminal_note: UntrustedText | None = None
+    path_gloss: UntrustedText | None = None
 
 
 class DiseaseMechanismMCP(MCPContractModel):
-    """Typed disease mechanism row from AutoPVS1."""
+    """Typed disease mechanism row from AutoPVS1.
+
+    ``disease`` is a scraped free-text disease name (from AutoPVS1's
+    ClinGen-sourced gene-disease table) — the same class of surface as
+    clingen-link's ``get_gene_validity /assertions/*/disease_name`` — so it
+    ships as ``untrusted_text``. ``gene``/``inheritance``/``clinical_validity``
+    /``consideration``/``adjusted_strength`` are short controlled-vocabulary
+    values (HGNC symbol; ClinGen validity/inheritance/PVS1-adjustment
+    categories), not free prose.
+    """
 
     gene: str
     gene_url: str | None = None
-    disease: str
+    disease: UntrustedText
     disease_url: str | None = None
     inheritance: str
     clinical_validity: str

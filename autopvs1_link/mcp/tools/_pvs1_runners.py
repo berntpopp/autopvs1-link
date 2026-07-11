@@ -20,6 +20,7 @@ from autopvs1_link.mcp.presenters.variant import (
     present_variant,
 )
 from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
+from autopvs1_link.mcp.untrusted_content import UntrustedTextLimitError
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
 
@@ -148,6 +149,18 @@ async def run_variant_pvs1(
                 ["Retry after confirming the variant exists in AutoPVS1."],
             ),
         )
+    except UntrustedTextLimitError:
+        return (
+            None,
+            [],
+            _err(
+                "untrusted_text_limit_exceeded",
+                "AutoPVS1 scraped content exceeded the Response-Envelope v1.1 "
+                "untrusted-text size ceiling.",
+                False,
+                ["Retry with a narrower response_mode, e.g. 'summary'."],
+            ),
+        )
     except ValueError:
         return (
             None,
@@ -240,6 +253,18 @@ async def run_cnv_pvs1(
                 "AutoPVS1 CNV HTML could not be parsed into the expected fields.",
                 False,
                 ["Retry after confirming the CNV exists in AutoPVS1."],
+            ),
+        )
+    except UntrustedTextLimitError:
+        return (
+            None,
+            [],
+            _err(
+                "untrusted_text_limit_exceeded",
+                "AutoPVS1 scraped content exceeded the Response-Envelope v1.1 "
+                "untrusted-text size ceiling.",
+                False,
+                ["Retry with a narrower response_mode, e.g. 'summary'."],
             ),
         )
     except ValueError:

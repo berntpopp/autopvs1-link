@@ -33,6 +33,7 @@ from autopvs1_link.mcp.tools.mode_errors import (
     external_egress_disabled_envelope,
     invalid_mode_envelope,
 )
+from autopvs1_link.mcp.untrusted_content import UntrustedTextLimitError
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
 RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
@@ -191,6 +192,18 @@ def register(mcp: FastMCP) -> None:
                 message="AutoPVS1 CNV HTML could not be parsed into the expected fields.",
                 retryable=False,
                 suggestions=["Retry after confirming the CNV exists in AutoPVS1."],
+                meta_mode=normalized_meta_mode,
+                tool_name=_TOOL_NAME,
+            )
+        except UntrustedTextLimitError:
+            return error_envelope(
+                code="untrusted_text_limit_exceeded",
+                message=(
+                    "AutoPVS1 scraped content exceeded the Response-Envelope v1.1 "
+                    "untrusted-text size ceiling."
+                ),
+                retryable=False,
+                suggestions=["Retry with a narrower response_mode, e.g. 'summary'."],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )

@@ -257,7 +257,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -451,7 +451,7 @@ not clinical decision support.
         },
         "disease_mechanisms": {
           "items": {
-            "description": "Typed disease mechanism row from AutoPVS1.",
+            "description": "Typed disease mechanism row from AutoPVS1.\n\n``disease`` is a scraped free-text disease name (from AutoPVS1's\nClinGen-sourced gene-disease table) \u2014 the same class of surface as\nclingen-link's ``get_gene_validity /assertions/*/disease_name`` \u2014 so it\nships as ``untrusted_text``. ``gene``/``inheritance``/``clinical_validity``\n/``consideration``/``adjusted_strength`` are short controlled-vocabulary\nvalues (HGNC symbol; ClinGen validity/inheritance/PVS1-adjustment\ncategories), not free prose.",
             "properties": {
               "adjusted_strength": {
                 "title": "Adjusted Strength",
@@ -466,8 +466,56 @@ not clinical decision support.
                 "type": "string"
               },
               "disease": {
-                "title": "Disease",
-                "type": "string"
+                "description": "External prose represented as typed data with digest and provenance.",
+                "properties": {
+                  "kind": {
+                    "const": "untrusted_text",
+                    "default": "untrusted_text",
+                    "title": "Kind",
+                    "type": "string"
+                  },
+                  "provenance": {
+                    "description": "Source identity for one fenced external text object.",
+                    "properties": {
+                      "record_id": {
+                        "title": "Record Id",
+                        "type": "string"
+                      },
+                      "retrieved_at": {
+                        "format": "date-time",
+                        "title": "Retrieved At",
+                        "type": "string"
+                      },
+                      "source": {
+                        "title": "Source",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "record_id",
+                      "retrieved_at"
+                    ],
+                    "title": "UntrustedTextProvenance",
+                    "type": "object"
+                  },
+                  "raw_sha256": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "title": "Raw Sha256",
+                    "type": "string"
+                  },
+                  "text": {
+                    "title": "Text",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text",
+                  "provenance",
+                  "raw_sha256"
+                ],
+                "title": "UntrustedText",
+                "type": "object"
               },
               "disease_url": {
                 "anyOf": [
@@ -523,27 +571,123 @@ not clinical decision support.
         "pvs1_flowchart": {
           "anyOf": [
             {
-              "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+              "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.\n\n``notes``, ``decision_tree_raw`` entries' ``code``/``description``,\n``terminal_note``, and ``path_gloss`` all carry AutoPVS1 scraped prose\nand therefore ship as ``untrusted_text`` objects (Response-Envelope\nv1.1), the same as each ``decision_tree`` step.",
               "properties": {
                 "decision_tree": {
                   "items": {
-                    "description": "One typed step in the PVS1 decision flowchart.",
+                    "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
                     "properties": {
                       "code": {
-                        "title": "Code",
-                        "type": "string"
+                        "description": "External prose represented as typed data with digest and provenance.",
+                        "properties": {
+                          "kind": {
+                            "const": "untrusted_text",
+                            "default": "untrusted_text",
+                            "title": "Kind",
+                            "type": "string"
+                          },
+                          "provenance": {
+                            "description": "Source identity for one fenced external text object.",
+                            "properties": {
+                              "record_id": {
+                                "title": "Record Id",
+                                "type": "string"
+                              },
+                              "retrieved_at": {
+                                "format": "date-time",
+                                "title": "Retrieved At",
+                                "type": "string"
+                              },
+                              "source": {
+                                "title": "Source",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "record_id",
+                              "retrieved_at"
+                            ],
+                            "title": "UntrustedTextProvenance",
+                            "type": "object"
+                          },
+                          "raw_sha256": {
+                            "pattern": "^[0-9a-f]{64}$",
+                            "title": "Raw Sha256",
+                            "type": "string"
+                          },
+                          "text": {
+                            "title": "Text",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "text",
+                          "provenance",
+                          "raw_sha256"
+                        ],
+                        "title": "UntrustedText",
+                        "type": "object"
                       },
                       "description": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "description": "External prose represented as typed data with digest and provenance.",
+                            "properties": {
+                              "kind": {
+                                "const": "untrusted_text",
+                                "default": "untrusted_text",
+                                "title": "Kind",
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "description": "Source identity for one fenced external text object.",
+                                "properties": {
+                                  "record_id": {
+                                    "title": "Record Id",
+                                    "type": "string"
+                                  },
+                                  "retrieved_at": {
+                                    "format": "date-time",
+                                    "title": "Retrieved At",
+                                    "type": "string"
+                                  },
+                                  "source": {
+                                    "title": "Source",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "record_id",
+                                  "retrieved_at"
+                                ],
+                                "title": "UntrustedTextProvenance",
+                                "type": "object"
+                              },
+                              "raw_sha256": {
+                                "pattern": "^[0-9a-f]{64}$",
+                                "title": "Raw Sha256",
+                                "type": "string"
+                              },
+                              "text": {
+                                "title": "Text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "provenance",
+                              "raw_sha256"
+                            ],
+                            "title": "UntrustedText",
+                            "type": "object"
                           },
                           {
                             "type": "null"
                           }
                         ],
-                        "default": null,
-                        "title": "Description"
+                        "default": null
                       },
                       "note_id": {
                         "anyOf": [
@@ -560,14 +704,62 @@ not clinical decision support.
                       "note_text": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "description": "External prose represented as typed data with digest and provenance.",
+                            "properties": {
+                              "kind": {
+                                "const": "untrusted_text",
+                                "default": "untrusted_text",
+                                "title": "Kind",
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "description": "Source identity for one fenced external text object.",
+                                "properties": {
+                                  "record_id": {
+                                    "title": "Record Id",
+                                    "type": "string"
+                                  },
+                                  "retrieved_at": {
+                                    "format": "date-time",
+                                    "title": "Retrieved At",
+                                    "type": "string"
+                                  },
+                                  "source": {
+                                    "title": "Source",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "record_id",
+                                  "retrieved_at"
+                                ],
+                                "title": "UntrustedTextProvenance",
+                                "type": "object"
+                              },
+                              "raw_sha256": {
+                                "pattern": "^[0-9a-f]{64}$",
+                                "title": "Raw Sha256",
+                                "type": "string"
+                              },
+                              "text": {
+                                "title": "Text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "provenance",
+                              "raw_sha256"
+                            ],
+                            "title": "UntrustedText",
+                            "type": "object"
                           },
                           {
                             "type": "null"
                           }
                         ],
-                        "default": null,
-                        "title": "Note Text"
+                        "default": null
                       }
                     },
                     "required": [
@@ -583,7 +775,197 @@ not clinical decision support.
                   "anyOf": [
                     {
                       "items": {
-                        "additionalProperties": true,
+                        "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
+                        "properties": {
+                          "code": {
+                            "description": "External prose represented as typed data with digest and provenance.",
+                            "properties": {
+                              "kind": {
+                                "const": "untrusted_text",
+                                "default": "untrusted_text",
+                                "title": "Kind",
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "description": "Source identity for one fenced external text object.",
+                                "properties": {
+                                  "record_id": {
+                                    "title": "Record Id",
+                                    "type": "string"
+                                  },
+                                  "retrieved_at": {
+                                    "format": "date-time",
+                                    "title": "Retrieved At",
+                                    "type": "string"
+                                  },
+                                  "source": {
+                                    "title": "Source",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "record_id",
+                                  "retrieved_at"
+                                ],
+                                "title": "UntrustedTextProvenance",
+                                "type": "object"
+                              },
+                              "raw_sha256": {
+                                "pattern": "^[0-9a-f]{64}$",
+                                "title": "Raw Sha256",
+                                "type": "string"
+                              },
+                              "text": {
+                                "title": "Text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "provenance",
+                              "raw_sha256"
+                            ],
+                            "title": "UntrustedText",
+                            "type": "object"
+                          },
+                          "description": {
+                            "anyOf": [
+                              {
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null
+                          },
+                          "note_id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Note Id"
+                          },
+                          "note_text": {
+                            "anyOf": [
+                              {
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null
+                          }
+                        },
+                        "required": [
+                          "code"
+                        ],
+                        "title": "FlowchartStepMCP",
                         "type": "object"
                       },
                       "type": "array"
@@ -612,7 +994,56 @@ not clinical decision support.
                   "anyOf": [
                     {
                       "additionalProperties": {
-                        "type": "string"
+                        "description": "External prose represented as typed data with digest and provenance.",
+                        "properties": {
+                          "kind": {
+                            "const": "untrusted_text",
+                            "default": "untrusted_text",
+                            "title": "Kind",
+                            "type": "string"
+                          },
+                          "provenance": {
+                            "description": "Source identity for one fenced external text object.",
+                            "properties": {
+                              "record_id": {
+                                "title": "Record Id",
+                                "type": "string"
+                              },
+                              "retrieved_at": {
+                                "format": "date-time",
+                                "title": "Retrieved At",
+                                "type": "string"
+                              },
+                              "source": {
+                                "title": "Source",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "record_id",
+                              "retrieved_at"
+                            ],
+                            "title": "UntrustedTextProvenance",
+                            "type": "object"
+                          },
+                          "raw_sha256": {
+                            "pattern": "^[0-9a-f]{64}$",
+                            "title": "Raw Sha256",
+                            "type": "string"
+                          },
+                          "text": {
+                            "title": "Text",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "text",
+                          "provenance",
+                          "raw_sha256"
+                        ],
+                        "title": "UntrustedText",
+                        "type": "object"
                       },
                       "type": "object"
                     },
@@ -626,14 +1057,62 @@ not clinical decision support.
                 "path_gloss": {
                   "anyOf": [
                     {
-                      "type": "string"
+                      "description": "External prose represented as typed data with digest and provenance.",
+                      "properties": {
+                        "kind": {
+                          "const": "untrusted_text",
+                          "default": "untrusted_text",
+                          "title": "Kind",
+                          "type": "string"
+                        },
+                        "provenance": {
+                          "description": "Source identity for one fenced external text object.",
+                          "properties": {
+                            "record_id": {
+                              "title": "Record Id",
+                              "type": "string"
+                            },
+                            "retrieved_at": {
+                              "format": "date-time",
+                              "title": "Retrieved At",
+                              "type": "string"
+                            },
+                            "source": {
+                              "title": "Source",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "record_id",
+                            "retrieved_at"
+                          ],
+                          "title": "UntrustedTextProvenance",
+                          "type": "object"
+                        },
+                        "raw_sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "title": "Raw Sha256",
+                          "type": "string"
+                        },
+                        "text": {
+                          "title": "Text",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "provenance",
+                        "raw_sha256"
+                      ],
+                      "title": "UntrustedText",
+                      "type": "object"
                     },
                     {
                       "type": "null"
                     }
                   ],
-                  "default": null,
-                  "title": "Path Gloss"
+                  "default": null
                 },
                 "preliminary_decision_path": {
                   "title": "Preliminary Decision Path",
@@ -642,14 +1121,62 @@ not clinical decision support.
                 "terminal_note": {
                   "anyOf": [
                     {
-                      "type": "string"
+                      "description": "External prose represented as typed data with digest and provenance.",
+                      "properties": {
+                        "kind": {
+                          "const": "untrusted_text",
+                          "default": "untrusted_text",
+                          "title": "Kind",
+                          "type": "string"
+                        },
+                        "provenance": {
+                          "description": "Source identity for one fenced external text object.",
+                          "properties": {
+                            "record_id": {
+                              "title": "Record Id",
+                              "type": "string"
+                            },
+                            "retrieved_at": {
+                              "format": "date-time",
+                              "title": "Retrieved At",
+                              "type": "string"
+                            },
+                            "source": {
+                              "title": "Source",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "record_id",
+                            "retrieved_at"
+                          ],
+                          "title": "UntrustedTextProvenance",
+                          "type": "object"
+                        },
+                        "raw_sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "title": "Raw Sha256",
+                          "type": "string"
+                        },
+                        "text": {
+                          "title": "Text",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "provenance",
+                        "raw_sha256"
+                      ],
+                      "title": "UntrustedText",
+                      "type": "object"
                     },
                     {
                       "type": "null"
                     }
                   ],
-                  "default": null,
-                  "title": "Terminal Note"
+                  "default": null
                 }
               },
               "required": [
@@ -992,7 +1519,7 @@ not. Order is first-seen-code-first.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -1200,7 +1727,7 @@ not. Order is first-seen-code-first.
                   },
                   "disease_mechanisms": {
                     "items": {
-                      "description": "Typed disease mechanism row from AutoPVS1.",
+                      "description": "Typed disease mechanism row from AutoPVS1.\n\n``disease`` is a scraped free-text disease name (from AutoPVS1's\nClinGen-sourced gene-disease table) \u2014 the same class of surface as\nclingen-link's ``get_gene_validity /assertions/*/disease_name`` \u2014 so it\nships as ``untrusted_text``. ``gene``/``inheritance``/``clinical_validity``\n/``consideration``/``adjusted_strength`` are short controlled-vocabulary\nvalues (HGNC symbol; ClinGen validity/inheritance/PVS1-adjustment\ncategories), not free prose.",
                       "properties": {
                         "adjusted_strength": {
                           "title": "Adjusted Strength",
@@ -1215,8 +1742,56 @@ not. Order is first-seen-code-first.
                           "type": "string"
                         },
                         "disease": {
-                          "title": "Disease",
-                          "type": "string"
+                          "description": "External prose represented as typed data with digest and provenance.",
+                          "properties": {
+                            "kind": {
+                              "const": "untrusted_text",
+                              "default": "untrusted_text",
+                              "title": "Kind",
+                              "type": "string"
+                            },
+                            "provenance": {
+                              "description": "Source identity for one fenced external text object.",
+                              "properties": {
+                                "record_id": {
+                                  "title": "Record Id",
+                                  "type": "string"
+                                },
+                                "retrieved_at": {
+                                  "format": "date-time",
+                                  "title": "Retrieved At",
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "title": "Source",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "record_id",
+                                "retrieved_at"
+                              ],
+                              "title": "UntrustedTextProvenance",
+                              "type": "object"
+                            },
+                            "raw_sha256": {
+                              "pattern": "^[0-9a-f]{64}$",
+                              "title": "Raw Sha256",
+                              "type": "string"
+                            },
+                            "text": {
+                              "title": "Text",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "provenance",
+                            "raw_sha256"
+                          ],
+                          "title": "UntrustedText",
+                          "type": "object"
                         },
                         "disease_url": {
                           "anyOf": [
@@ -1272,27 +1847,123 @@ not. Order is first-seen-code-first.
                   "pvs1_flowchart": {
                     "anyOf": [
                       {
-                        "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+                        "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.\n\n``notes``, ``decision_tree_raw`` entries' ``code``/``description``,\n``terminal_note``, and ``path_gloss`` all carry AutoPVS1 scraped prose\nand therefore ship as ``untrusted_text`` objects (Response-Envelope\nv1.1), the same as each ``decision_tree`` step.",
                         "properties": {
                           "decision_tree": {
                             "items": {
-                              "description": "One typed step in the PVS1 decision flowchart.",
+                              "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
                               "properties": {
                                 "code": {
-                                  "title": "Code",
-                                  "type": "string"
+                                  "description": "External prose represented as typed data with digest and provenance.",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "untrusted_text",
+                                      "default": "untrusted_text",
+                                      "title": "Kind",
+                                      "type": "string"
+                                    },
+                                    "provenance": {
+                                      "description": "Source identity for one fenced external text object.",
+                                      "properties": {
+                                        "record_id": {
+                                          "title": "Record Id",
+                                          "type": "string"
+                                        },
+                                        "retrieved_at": {
+                                          "format": "date-time",
+                                          "title": "Retrieved At",
+                                          "type": "string"
+                                        },
+                                        "source": {
+                                          "title": "Source",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "record_id",
+                                        "retrieved_at"
+                                      ],
+                                      "title": "UntrustedTextProvenance",
+                                      "type": "object"
+                                    },
+                                    "raw_sha256": {
+                                      "pattern": "^[0-9a-f]{64}$",
+                                      "title": "Raw Sha256",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "title": "Text",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "text",
+                                    "provenance",
+                                    "raw_sha256"
+                                  ],
+                                  "title": "UntrustedText",
+                                  "type": "object"
                                 },
                                 "description": {
                                   "anyOf": [
                                     {
-                                      "type": "string"
+                                      "description": "External prose represented as typed data with digest and provenance.",
+                                      "properties": {
+                                        "kind": {
+                                          "const": "untrusted_text",
+                                          "default": "untrusted_text",
+                                          "title": "Kind",
+                                          "type": "string"
+                                        },
+                                        "provenance": {
+                                          "description": "Source identity for one fenced external text object.",
+                                          "properties": {
+                                            "record_id": {
+                                              "title": "Record Id",
+                                              "type": "string"
+                                            },
+                                            "retrieved_at": {
+                                              "format": "date-time",
+                                              "title": "Retrieved At",
+                                              "type": "string"
+                                            },
+                                            "source": {
+                                              "title": "Source",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "source",
+                                            "record_id",
+                                            "retrieved_at"
+                                          ],
+                                          "title": "UntrustedTextProvenance",
+                                          "type": "object"
+                                        },
+                                        "raw_sha256": {
+                                          "pattern": "^[0-9a-f]{64}$",
+                                          "title": "Raw Sha256",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "title": "Text",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "text",
+                                        "provenance",
+                                        "raw_sha256"
+                                      ],
+                                      "title": "UntrustedText",
+                                      "type": "object"
                                     },
                                     {
                                       "type": "null"
                                     }
                                   ],
-                                  "default": null,
-                                  "title": "Description"
+                                  "default": null
                                 },
                                 "note_id": {
                                   "anyOf": [
@@ -1309,14 +1980,62 @@ not. Order is first-seen-code-first.
                                 "note_text": {
                                   "anyOf": [
                                     {
-                                      "type": "string"
+                                      "description": "External prose represented as typed data with digest and provenance.",
+                                      "properties": {
+                                        "kind": {
+                                          "const": "untrusted_text",
+                                          "default": "untrusted_text",
+                                          "title": "Kind",
+                                          "type": "string"
+                                        },
+                                        "provenance": {
+                                          "description": "Source identity for one fenced external text object.",
+                                          "properties": {
+                                            "record_id": {
+                                              "title": "Record Id",
+                                              "type": "string"
+                                            },
+                                            "retrieved_at": {
+                                              "format": "date-time",
+                                              "title": "Retrieved At",
+                                              "type": "string"
+                                            },
+                                            "source": {
+                                              "title": "Source",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "source",
+                                            "record_id",
+                                            "retrieved_at"
+                                          ],
+                                          "title": "UntrustedTextProvenance",
+                                          "type": "object"
+                                        },
+                                        "raw_sha256": {
+                                          "pattern": "^[0-9a-f]{64}$",
+                                          "title": "Raw Sha256",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "title": "Text",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "text",
+                                        "provenance",
+                                        "raw_sha256"
+                                      ],
+                                      "title": "UntrustedText",
+                                      "type": "object"
                                     },
                                     {
                                       "type": "null"
                                     }
                                   ],
-                                  "default": null,
-                                  "title": "Note Text"
+                                  "default": null
                                 }
                               },
                               "required": [
@@ -1332,7 +2051,197 @@ not. Order is first-seen-code-first.
                             "anyOf": [
                               {
                                 "items": {
-                                  "additionalProperties": true,
+                                  "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
+                                  "properties": {
+                                    "code": {
+                                      "description": "External prose represented as typed data with digest and provenance.",
+                                      "properties": {
+                                        "kind": {
+                                          "const": "untrusted_text",
+                                          "default": "untrusted_text",
+                                          "title": "Kind",
+                                          "type": "string"
+                                        },
+                                        "provenance": {
+                                          "description": "Source identity for one fenced external text object.",
+                                          "properties": {
+                                            "record_id": {
+                                              "title": "Record Id",
+                                              "type": "string"
+                                            },
+                                            "retrieved_at": {
+                                              "format": "date-time",
+                                              "title": "Retrieved At",
+                                              "type": "string"
+                                            },
+                                            "source": {
+                                              "title": "Source",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "source",
+                                            "record_id",
+                                            "retrieved_at"
+                                          ],
+                                          "title": "UntrustedTextProvenance",
+                                          "type": "object"
+                                        },
+                                        "raw_sha256": {
+                                          "pattern": "^[0-9a-f]{64}$",
+                                          "title": "Raw Sha256",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "title": "Text",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "text",
+                                        "provenance",
+                                        "raw_sha256"
+                                      ],
+                                      "title": "UntrustedText",
+                                      "type": "object"
+                                    },
+                                    "description": {
+                                      "anyOf": [
+                                        {
+                                          "description": "External prose represented as typed data with digest and provenance.",
+                                          "properties": {
+                                            "kind": {
+                                              "const": "untrusted_text",
+                                              "default": "untrusted_text",
+                                              "title": "Kind",
+                                              "type": "string"
+                                            },
+                                            "provenance": {
+                                              "description": "Source identity for one fenced external text object.",
+                                              "properties": {
+                                                "record_id": {
+                                                  "title": "Record Id",
+                                                  "type": "string"
+                                                },
+                                                "retrieved_at": {
+                                                  "format": "date-time",
+                                                  "title": "Retrieved At",
+                                                  "type": "string"
+                                                },
+                                                "source": {
+                                                  "title": "Source",
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "source",
+                                                "record_id",
+                                                "retrieved_at"
+                                              ],
+                                              "title": "UntrustedTextProvenance",
+                                              "type": "object"
+                                            },
+                                            "raw_sha256": {
+                                              "pattern": "^[0-9a-f]{64}$",
+                                              "title": "Raw Sha256",
+                                              "type": "string"
+                                            },
+                                            "text": {
+                                              "title": "Text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "text",
+                                            "provenance",
+                                            "raw_sha256"
+                                          ],
+                                          "title": "UntrustedText",
+                                          "type": "object"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "default": null
+                                    },
+                                    "note_id": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "default": null,
+                                      "title": "Note Id"
+                                    },
+                                    "note_text": {
+                                      "anyOf": [
+                                        {
+                                          "description": "External prose represented as typed data with digest and provenance.",
+                                          "properties": {
+                                            "kind": {
+                                              "const": "untrusted_text",
+                                              "default": "untrusted_text",
+                                              "title": "Kind",
+                                              "type": "string"
+                                            },
+                                            "provenance": {
+                                              "description": "Source identity for one fenced external text object.",
+                                              "properties": {
+                                                "record_id": {
+                                                  "title": "Record Id",
+                                                  "type": "string"
+                                                },
+                                                "retrieved_at": {
+                                                  "format": "date-time",
+                                                  "title": "Retrieved At",
+                                                  "type": "string"
+                                                },
+                                                "source": {
+                                                  "title": "Source",
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "source",
+                                                "record_id",
+                                                "retrieved_at"
+                                              ],
+                                              "title": "UntrustedTextProvenance",
+                                              "type": "object"
+                                            },
+                                            "raw_sha256": {
+                                              "pattern": "^[0-9a-f]{64}$",
+                                              "title": "Raw Sha256",
+                                              "type": "string"
+                                            },
+                                            "text": {
+                                              "title": "Text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "text",
+                                            "provenance",
+                                            "raw_sha256"
+                                          ],
+                                          "title": "UntrustedText",
+                                          "type": "object"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "default": null
+                                    }
+                                  },
+                                  "required": [
+                                    "code"
+                                  ],
+                                  "title": "FlowchartStepMCP",
                                   "type": "object"
                                 },
                                 "type": "array"
@@ -1361,7 +2270,56 @@ not. Order is first-seen-code-first.
                             "anyOf": [
                               {
                                 "additionalProperties": {
-                                  "type": "string"
+                                  "description": "External prose represented as typed data with digest and provenance.",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "untrusted_text",
+                                      "default": "untrusted_text",
+                                      "title": "Kind",
+                                      "type": "string"
+                                    },
+                                    "provenance": {
+                                      "description": "Source identity for one fenced external text object.",
+                                      "properties": {
+                                        "record_id": {
+                                          "title": "Record Id",
+                                          "type": "string"
+                                        },
+                                        "retrieved_at": {
+                                          "format": "date-time",
+                                          "title": "Retrieved At",
+                                          "type": "string"
+                                        },
+                                        "source": {
+                                          "title": "Source",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "record_id",
+                                        "retrieved_at"
+                                      ],
+                                      "title": "UntrustedTextProvenance",
+                                      "type": "object"
+                                    },
+                                    "raw_sha256": {
+                                      "pattern": "^[0-9a-f]{64}$",
+                                      "title": "Raw Sha256",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "title": "Text",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "text",
+                                    "provenance",
+                                    "raw_sha256"
+                                  ],
+                                  "title": "UntrustedText",
+                                  "type": "object"
                                 },
                                 "type": "object"
                               },
@@ -1375,14 +2333,62 @@ not. Order is first-seen-code-first.
                           "path_gloss": {
                             "anyOf": [
                               {
-                                "type": "string"
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
                               },
                               {
                                 "type": "null"
                               }
                             ],
-                            "default": null,
-                            "title": "Path Gloss"
+                            "default": null
                           },
                           "preliminary_decision_path": {
                             "title": "Preliminary Decision Path",
@@ -1391,14 +2397,62 @@ not. Order is first-seen-code-first.
                           "terminal_note": {
                             "anyOf": [
                               {
-                                "type": "string"
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
                               },
                               {
                                 "type": "null"
                               }
                             ],
-                            "default": null,
-                            "title": "Terminal Note"
+                            "default": null
                           }
                         },
                         "required": [
@@ -1799,7 +2853,7 @@ Use this to discover AutoPVS1-Link MCP tools, inputs, limitations, and workflow.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -2271,7 +3325,7 @@ cold scoring call.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -2438,7 +3492,7 @@ cold scoring call.
           "type": "string"
         },
         "version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Version",
           "type": "string"
         }
@@ -2723,7 +3777,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -2855,7 +3909,7 @@ not clinical decision support.
       "properties": {
         "disease_mechanisms": {
           "items": {
-            "description": "Typed disease mechanism row from AutoPVS1.",
+            "description": "Typed disease mechanism row from AutoPVS1.\n\n``disease`` is a scraped free-text disease name (from AutoPVS1's\nClinGen-sourced gene-disease table) \u2014 the same class of surface as\nclingen-link's ``get_gene_validity /assertions/*/disease_name`` \u2014 so it\nships as ``untrusted_text``. ``gene``/``inheritance``/``clinical_validity``\n/``consideration``/``adjusted_strength`` are short controlled-vocabulary\nvalues (HGNC symbol; ClinGen validity/inheritance/PVS1-adjustment\ncategories), not free prose.",
             "properties": {
               "adjusted_strength": {
                 "title": "Adjusted Strength",
@@ -2870,8 +3924,56 @@ not clinical decision support.
                 "type": "string"
               },
               "disease": {
-                "title": "Disease",
-                "type": "string"
+                "description": "External prose represented as typed data with digest and provenance.",
+                "properties": {
+                  "kind": {
+                    "const": "untrusted_text",
+                    "default": "untrusted_text",
+                    "title": "Kind",
+                    "type": "string"
+                  },
+                  "provenance": {
+                    "description": "Source identity for one fenced external text object.",
+                    "properties": {
+                      "record_id": {
+                        "title": "Record Id",
+                        "type": "string"
+                      },
+                      "retrieved_at": {
+                        "format": "date-time",
+                        "title": "Retrieved At",
+                        "type": "string"
+                      },
+                      "source": {
+                        "title": "Source",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "record_id",
+                      "retrieved_at"
+                    ],
+                    "title": "UntrustedTextProvenance",
+                    "type": "object"
+                  },
+                  "raw_sha256": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "title": "Raw Sha256",
+                    "type": "string"
+                  },
+                  "text": {
+                    "title": "Text",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text",
+                  "provenance",
+                  "raw_sha256"
+                ],
+                "title": "UntrustedText",
+                "type": "object"
               },
               "disease_url": {
                 "anyOf": [
@@ -2927,27 +4029,123 @@ not clinical decision support.
         "pvs1_flowchart": {
           "anyOf": [
             {
-              "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+              "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.\n\n``notes``, ``decision_tree_raw`` entries' ``code``/``description``,\n``terminal_note``, and ``path_gloss`` all carry AutoPVS1 scraped prose\nand therefore ship as ``untrusted_text`` objects (Response-Envelope\nv1.1), the same as each ``decision_tree`` step.",
               "properties": {
                 "decision_tree": {
                   "items": {
-                    "description": "One typed step in the PVS1 decision flowchart.",
+                    "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
                     "properties": {
                       "code": {
-                        "title": "Code",
-                        "type": "string"
+                        "description": "External prose represented as typed data with digest and provenance.",
+                        "properties": {
+                          "kind": {
+                            "const": "untrusted_text",
+                            "default": "untrusted_text",
+                            "title": "Kind",
+                            "type": "string"
+                          },
+                          "provenance": {
+                            "description": "Source identity for one fenced external text object.",
+                            "properties": {
+                              "record_id": {
+                                "title": "Record Id",
+                                "type": "string"
+                              },
+                              "retrieved_at": {
+                                "format": "date-time",
+                                "title": "Retrieved At",
+                                "type": "string"
+                              },
+                              "source": {
+                                "title": "Source",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "record_id",
+                              "retrieved_at"
+                            ],
+                            "title": "UntrustedTextProvenance",
+                            "type": "object"
+                          },
+                          "raw_sha256": {
+                            "pattern": "^[0-9a-f]{64}$",
+                            "title": "Raw Sha256",
+                            "type": "string"
+                          },
+                          "text": {
+                            "title": "Text",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "text",
+                          "provenance",
+                          "raw_sha256"
+                        ],
+                        "title": "UntrustedText",
+                        "type": "object"
                       },
                       "description": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "description": "External prose represented as typed data with digest and provenance.",
+                            "properties": {
+                              "kind": {
+                                "const": "untrusted_text",
+                                "default": "untrusted_text",
+                                "title": "Kind",
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "description": "Source identity for one fenced external text object.",
+                                "properties": {
+                                  "record_id": {
+                                    "title": "Record Id",
+                                    "type": "string"
+                                  },
+                                  "retrieved_at": {
+                                    "format": "date-time",
+                                    "title": "Retrieved At",
+                                    "type": "string"
+                                  },
+                                  "source": {
+                                    "title": "Source",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "record_id",
+                                  "retrieved_at"
+                                ],
+                                "title": "UntrustedTextProvenance",
+                                "type": "object"
+                              },
+                              "raw_sha256": {
+                                "pattern": "^[0-9a-f]{64}$",
+                                "title": "Raw Sha256",
+                                "type": "string"
+                              },
+                              "text": {
+                                "title": "Text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "provenance",
+                              "raw_sha256"
+                            ],
+                            "title": "UntrustedText",
+                            "type": "object"
                           },
                           {
                             "type": "null"
                           }
                         ],
-                        "default": null,
-                        "title": "Description"
+                        "default": null
                       },
                       "note_id": {
                         "anyOf": [
@@ -2964,14 +4162,62 @@ not clinical decision support.
                       "note_text": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "description": "External prose represented as typed data with digest and provenance.",
+                            "properties": {
+                              "kind": {
+                                "const": "untrusted_text",
+                                "default": "untrusted_text",
+                                "title": "Kind",
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "description": "Source identity for one fenced external text object.",
+                                "properties": {
+                                  "record_id": {
+                                    "title": "Record Id",
+                                    "type": "string"
+                                  },
+                                  "retrieved_at": {
+                                    "format": "date-time",
+                                    "title": "Retrieved At",
+                                    "type": "string"
+                                  },
+                                  "source": {
+                                    "title": "Source",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "record_id",
+                                  "retrieved_at"
+                                ],
+                                "title": "UntrustedTextProvenance",
+                                "type": "object"
+                              },
+                              "raw_sha256": {
+                                "pattern": "^[0-9a-f]{64}$",
+                                "title": "Raw Sha256",
+                                "type": "string"
+                              },
+                              "text": {
+                                "title": "Text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "provenance",
+                              "raw_sha256"
+                            ],
+                            "title": "UntrustedText",
+                            "type": "object"
                           },
                           {
                             "type": "null"
                           }
                         ],
-                        "default": null,
-                        "title": "Note Text"
+                        "default": null
                       }
                     },
                     "required": [
@@ -2987,7 +4233,197 @@ not clinical decision support.
                   "anyOf": [
                     {
                       "items": {
-                        "additionalProperties": true,
+                        "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
+                        "properties": {
+                          "code": {
+                            "description": "External prose represented as typed data with digest and provenance.",
+                            "properties": {
+                              "kind": {
+                                "const": "untrusted_text",
+                                "default": "untrusted_text",
+                                "title": "Kind",
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "description": "Source identity for one fenced external text object.",
+                                "properties": {
+                                  "record_id": {
+                                    "title": "Record Id",
+                                    "type": "string"
+                                  },
+                                  "retrieved_at": {
+                                    "format": "date-time",
+                                    "title": "Retrieved At",
+                                    "type": "string"
+                                  },
+                                  "source": {
+                                    "title": "Source",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "record_id",
+                                  "retrieved_at"
+                                ],
+                                "title": "UntrustedTextProvenance",
+                                "type": "object"
+                              },
+                              "raw_sha256": {
+                                "pattern": "^[0-9a-f]{64}$",
+                                "title": "Raw Sha256",
+                                "type": "string"
+                              },
+                              "text": {
+                                "title": "Text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "provenance",
+                              "raw_sha256"
+                            ],
+                            "title": "UntrustedText",
+                            "type": "object"
+                          },
+                          "description": {
+                            "anyOf": [
+                              {
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null
+                          },
+                          "note_id": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null,
+                            "title": "Note Id"
+                          },
+                          "note_text": {
+                            "anyOf": [
+                              {
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "default": null
+                          }
+                        },
+                        "required": [
+                          "code"
+                        ],
+                        "title": "FlowchartStepMCP",
                         "type": "object"
                       },
                       "type": "array"
@@ -3016,7 +4452,56 @@ not clinical decision support.
                   "anyOf": [
                     {
                       "additionalProperties": {
-                        "type": "string"
+                        "description": "External prose represented as typed data with digest and provenance.",
+                        "properties": {
+                          "kind": {
+                            "const": "untrusted_text",
+                            "default": "untrusted_text",
+                            "title": "Kind",
+                            "type": "string"
+                          },
+                          "provenance": {
+                            "description": "Source identity for one fenced external text object.",
+                            "properties": {
+                              "record_id": {
+                                "title": "Record Id",
+                                "type": "string"
+                              },
+                              "retrieved_at": {
+                                "format": "date-time",
+                                "title": "Retrieved At",
+                                "type": "string"
+                              },
+                              "source": {
+                                "title": "Source",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "record_id",
+                              "retrieved_at"
+                            ],
+                            "title": "UntrustedTextProvenance",
+                            "type": "object"
+                          },
+                          "raw_sha256": {
+                            "pattern": "^[0-9a-f]{64}$",
+                            "title": "Raw Sha256",
+                            "type": "string"
+                          },
+                          "text": {
+                            "title": "Text",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "text",
+                          "provenance",
+                          "raw_sha256"
+                        ],
+                        "title": "UntrustedText",
+                        "type": "object"
                       },
                       "type": "object"
                     },
@@ -3030,14 +4515,62 @@ not clinical decision support.
                 "path_gloss": {
                   "anyOf": [
                     {
-                      "type": "string"
+                      "description": "External prose represented as typed data with digest and provenance.",
+                      "properties": {
+                        "kind": {
+                          "const": "untrusted_text",
+                          "default": "untrusted_text",
+                          "title": "Kind",
+                          "type": "string"
+                        },
+                        "provenance": {
+                          "description": "Source identity for one fenced external text object.",
+                          "properties": {
+                            "record_id": {
+                              "title": "Record Id",
+                              "type": "string"
+                            },
+                            "retrieved_at": {
+                              "format": "date-time",
+                              "title": "Retrieved At",
+                              "type": "string"
+                            },
+                            "source": {
+                              "title": "Source",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "record_id",
+                            "retrieved_at"
+                          ],
+                          "title": "UntrustedTextProvenance",
+                          "type": "object"
+                        },
+                        "raw_sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "title": "Raw Sha256",
+                          "type": "string"
+                        },
+                        "text": {
+                          "title": "Text",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "provenance",
+                        "raw_sha256"
+                      ],
+                      "title": "UntrustedText",
+                      "type": "object"
                     },
                     {
                       "type": "null"
                     }
                   ],
-                  "default": null,
-                  "title": "Path Gloss"
+                  "default": null
                 },
                 "preliminary_decision_path": {
                   "title": "Preliminary Decision Path",
@@ -3046,14 +4579,62 @@ not clinical decision support.
                 "terminal_note": {
                   "anyOf": [
                     {
-                      "type": "string"
+                      "description": "External prose represented as typed data with digest and provenance.",
+                      "properties": {
+                        "kind": {
+                          "const": "untrusted_text",
+                          "default": "untrusted_text",
+                          "title": "Kind",
+                          "type": "string"
+                        },
+                        "provenance": {
+                          "description": "Source identity for one fenced external text object.",
+                          "properties": {
+                            "record_id": {
+                              "title": "Record Id",
+                              "type": "string"
+                            },
+                            "retrieved_at": {
+                              "format": "date-time",
+                              "title": "Retrieved At",
+                              "type": "string"
+                            },
+                            "source": {
+                              "title": "Source",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "record_id",
+                            "retrieved_at"
+                          ],
+                          "title": "UntrustedTextProvenance",
+                          "type": "object"
+                        },
+                        "raw_sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "title": "Raw Sha256",
+                          "type": "string"
+                        },
+                        "text": {
+                          "title": "Text",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "provenance",
+                        "raw_sha256"
+                      ],
+                      "title": "UntrustedText",
+                      "type": "object"
                     },
                     {
                       "type": "null"
                     }
                   ],
-                  "default": null,
-                  "title": "Terminal Note"
+                  "default": null
                 }
               },
               "required": [
@@ -3607,7 +5188,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Server Version",
           "type": "string"
         },
@@ -3753,7 +5334,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                 "properties": {
                   "disease_mechanisms": {
                     "items": {
-                      "description": "Typed disease mechanism row from AutoPVS1.",
+                      "description": "Typed disease mechanism row from AutoPVS1.\n\n``disease`` is a scraped free-text disease name (from AutoPVS1's\nClinGen-sourced gene-disease table) \u2014 the same class of surface as\nclingen-link's ``get_gene_validity /assertions/*/disease_name`` \u2014 so it\nships as ``untrusted_text``. ``gene``/``inheritance``/``clinical_validity``\n/``consideration``/``adjusted_strength`` are short controlled-vocabulary\nvalues (HGNC symbol; ClinGen validity/inheritance/PVS1-adjustment\ncategories), not free prose.",
                       "properties": {
                         "adjusted_strength": {
                           "title": "Adjusted Strength",
@@ -3768,8 +5349,56 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                           "type": "string"
                         },
                         "disease": {
-                          "title": "Disease",
-                          "type": "string"
+                          "description": "External prose represented as typed data with digest and provenance.",
+                          "properties": {
+                            "kind": {
+                              "const": "untrusted_text",
+                              "default": "untrusted_text",
+                              "title": "Kind",
+                              "type": "string"
+                            },
+                            "provenance": {
+                              "description": "Source identity for one fenced external text object.",
+                              "properties": {
+                                "record_id": {
+                                  "title": "Record Id",
+                                  "type": "string"
+                                },
+                                "retrieved_at": {
+                                  "format": "date-time",
+                                  "title": "Retrieved At",
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "title": "Source",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "record_id",
+                                "retrieved_at"
+                              ],
+                              "title": "UntrustedTextProvenance",
+                              "type": "object"
+                            },
+                            "raw_sha256": {
+                              "pattern": "^[0-9a-f]{64}$",
+                              "title": "Raw Sha256",
+                              "type": "string"
+                            },
+                            "text": {
+                              "title": "Text",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "provenance",
+                            "raw_sha256"
+                          ],
+                          "title": "UntrustedText",
+                          "type": "object"
                         },
                         "disease_url": {
                           "anyOf": [
@@ -3825,27 +5454,123 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                   "pvs1_flowchart": {
                     "anyOf": [
                       {
-                        "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.",
+                        "description": "Typed PVS1 flowchart decision path and outcome.\n\n``notes`` is the legend dict ``#1 -> prose`` and is duplicative in\nstandard mode because ``decision_tree[*].note_text`` is the already-\nhoisted form. It is therefore ``None`` (and dropped on the wire) in\n``summary``/``standard`` modes and only present in ``full`` mode for\nauditors who want the canonical legend alongside the decision tree.\n\n``terminal_note`` is the one-line rationale for the verdict, hoisted\nfrom the leaf step's note_text (or ``notes[preliminary_decision_path]``\nwhen the decision tree is empty). Populated in summary mode for\ncallers that need to explain non-Strong / non-Very-Strong outcomes\nwithout re-fetching the full decision tree. Absent when the upstream\nnote is empty or the verdict is unambiguous (PVS1_Strong /\nPVS1_Very_Strong) and the rationale adds no new signal.\n\n``path_gloss`` is a one-line, deterministic compression of the\ndecision-tree branch the variant traversed plus the terminal\nstrength (ASCII ``->`` separated). Unlike ``terminal_note`` it is\nemitted for EVERY path in summary/standard/full modes (not just\nambiguous verdicts), so a summary-mode caller can always state why a\nverdict landed without widening to standard. Built only from upstream\nscraped node text \u2014 no hand-authored clinical mappings.\n\n``notes``, ``decision_tree_raw`` entries' ``code``/``description``,\n``terminal_note``, and ``path_gloss`` all carry AutoPVS1 scraped prose\nand therefore ship as ``untrusted_text`` objects (Response-Envelope\nv1.1), the same as each ``decision_tree`` step.",
                         "properties": {
                           "decision_tree": {
                             "items": {
-                              "description": "One typed step in the PVS1 decision flowchart.",
+                              "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
                               "properties": {
                                 "code": {
-                                  "title": "Code",
-                                  "type": "string"
+                                  "description": "External prose represented as typed data with digest and provenance.",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "untrusted_text",
+                                      "default": "untrusted_text",
+                                      "title": "Kind",
+                                      "type": "string"
+                                    },
+                                    "provenance": {
+                                      "description": "Source identity for one fenced external text object.",
+                                      "properties": {
+                                        "record_id": {
+                                          "title": "Record Id",
+                                          "type": "string"
+                                        },
+                                        "retrieved_at": {
+                                          "format": "date-time",
+                                          "title": "Retrieved At",
+                                          "type": "string"
+                                        },
+                                        "source": {
+                                          "title": "Source",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "record_id",
+                                        "retrieved_at"
+                                      ],
+                                      "title": "UntrustedTextProvenance",
+                                      "type": "object"
+                                    },
+                                    "raw_sha256": {
+                                      "pattern": "^[0-9a-f]{64}$",
+                                      "title": "Raw Sha256",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "title": "Text",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "text",
+                                    "provenance",
+                                    "raw_sha256"
+                                  ],
+                                  "title": "UntrustedText",
+                                  "type": "object"
                                 },
                                 "description": {
                                   "anyOf": [
                                     {
-                                      "type": "string"
+                                      "description": "External prose represented as typed data with digest and provenance.",
+                                      "properties": {
+                                        "kind": {
+                                          "const": "untrusted_text",
+                                          "default": "untrusted_text",
+                                          "title": "Kind",
+                                          "type": "string"
+                                        },
+                                        "provenance": {
+                                          "description": "Source identity for one fenced external text object.",
+                                          "properties": {
+                                            "record_id": {
+                                              "title": "Record Id",
+                                              "type": "string"
+                                            },
+                                            "retrieved_at": {
+                                              "format": "date-time",
+                                              "title": "Retrieved At",
+                                              "type": "string"
+                                            },
+                                            "source": {
+                                              "title": "Source",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "source",
+                                            "record_id",
+                                            "retrieved_at"
+                                          ],
+                                          "title": "UntrustedTextProvenance",
+                                          "type": "object"
+                                        },
+                                        "raw_sha256": {
+                                          "pattern": "^[0-9a-f]{64}$",
+                                          "title": "Raw Sha256",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "title": "Text",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "text",
+                                        "provenance",
+                                        "raw_sha256"
+                                      ],
+                                      "title": "UntrustedText",
+                                      "type": "object"
                                     },
                                     {
                                       "type": "null"
                                     }
                                   ],
-                                  "default": null,
-                                  "title": "Description"
+                                  "default": null
                                 },
                                 "note_id": {
                                   "anyOf": [
@@ -3862,14 +5587,62 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                                 "note_text": {
                                   "anyOf": [
                                     {
-                                      "type": "string"
+                                      "description": "External prose represented as typed data with digest and provenance.",
+                                      "properties": {
+                                        "kind": {
+                                          "const": "untrusted_text",
+                                          "default": "untrusted_text",
+                                          "title": "Kind",
+                                          "type": "string"
+                                        },
+                                        "provenance": {
+                                          "description": "Source identity for one fenced external text object.",
+                                          "properties": {
+                                            "record_id": {
+                                              "title": "Record Id",
+                                              "type": "string"
+                                            },
+                                            "retrieved_at": {
+                                              "format": "date-time",
+                                              "title": "Retrieved At",
+                                              "type": "string"
+                                            },
+                                            "source": {
+                                              "title": "Source",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "source",
+                                            "record_id",
+                                            "retrieved_at"
+                                          ],
+                                          "title": "UntrustedTextProvenance",
+                                          "type": "object"
+                                        },
+                                        "raw_sha256": {
+                                          "pattern": "^[0-9a-f]{64}$",
+                                          "title": "Raw Sha256",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "title": "Text",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "text",
+                                        "provenance",
+                                        "raw_sha256"
+                                      ],
+                                      "title": "UntrustedText",
+                                      "type": "object"
                                     },
                                     {
                                       "type": "null"
                                     }
                                   ],
-                                  "default": null,
-                                  "title": "Note Text"
+                                  "default": null
                                 }
                               },
                               "required": [
@@ -3885,7 +5658,197 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                             "anyOf": [
                               {
                                 "items": {
-                                  "additionalProperties": true,
+                                  "description": "One typed step in the PVS1 decision flowchart.\n\n``code``, ``description``, and ``note_text`` are AutoPVS1's own scraped\nHTML prose (low-trust provenance: autopvs1.bgi.com) and ship as the\nResponse-Envelope v1.1 ``untrusted_text`` object, never a bare string.\n``note_id`` is a short upstream marker (``#1``, ``#2``, ...), not prose.",
+                                  "properties": {
+                                    "code": {
+                                      "description": "External prose represented as typed data with digest and provenance.",
+                                      "properties": {
+                                        "kind": {
+                                          "const": "untrusted_text",
+                                          "default": "untrusted_text",
+                                          "title": "Kind",
+                                          "type": "string"
+                                        },
+                                        "provenance": {
+                                          "description": "Source identity for one fenced external text object.",
+                                          "properties": {
+                                            "record_id": {
+                                              "title": "Record Id",
+                                              "type": "string"
+                                            },
+                                            "retrieved_at": {
+                                              "format": "date-time",
+                                              "title": "Retrieved At",
+                                              "type": "string"
+                                            },
+                                            "source": {
+                                              "title": "Source",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "source",
+                                            "record_id",
+                                            "retrieved_at"
+                                          ],
+                                          "title": "UntrustedTextProvenance",
+                                          "type": "object"
+                                        },
+                                        "raw_sha256": {
+                                          "pattern": "^[0-9a-f]{64}$",
+                                          "title": "Raw Sha256",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "title": "Text",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "text",
+                                        "provenance",
+                                        "raw_sha256"
+                                      ],
+                                      "title": "UntrustedText",
+                                      "type": "object"
+                                    },
+                                    "description": {
+                                      "anyOf": [
+                                        {
+                                          "description": "External prose represented as typed data with digest and provenance.",
+                                          "properties": {
+                                            "kind": {
+                                              "const": "untrusted_text",
+                                              "default": "untrusted_text",
+                                              "title": "Kind",
+                                              "type": "string"
+                                            },
+                                            "provenance": {
+                                              "description": "Source identity for one fenced external text object.",
+                                              "properties": {
+                                                "record_id": {
+                                                  "title": "Record Id",
+                                                  "type": "string"
+                                                },
+                                                "retrieved_at": {
+                                                  "format": "date-time",
+                                                  "title": "Retrieved At",
+                                                  "type": "string"
+                                                },
+                                                "source": {
+                                                  "title": "Source",
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "source",
+                                                "record_id",
+                                                "retrieved_at"
+                                              ],
+                                              "title": "UntrustedTextProvenance",
+                                              "type": "object"
+                                            },
+                                            "raw_sha256": {
+                                              "pattern": "^[0-9a-f]{64}$",
+                                              "title": "Raw Sha256",
+                                              "type": "string"
+                                            },
+                                            "text": {
+                                              "title": "Text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "text",
+                                            "provenance",
+                                            "raw_sha256"
+                                          ],
+                                          "title": "UntrustedText",
+                                          "type": "object"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "default": null
+                                    },
+                                    "note_id": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "default": null,
+                                      "title": "Note Id"
+                                    },
+                                    "note_text": {
+                                      "anyOf": [
+                                        {
+                                          "description": "External prose represented as typed data with digest and provenance.",
+                                          "properties": {
+                                            "kind": {
+                                              "const": "untrusted_text",
+                                              "default": "untrusted_text",
+                                              "title": "Kind",
+                                              "type": "string"
+                                            },
+                                            "provenance": {
+                                              "description": "Source identity for one fenced external text object.",
+                                              "properties": {
+                                                "record_id": {
+                                                  "title": "Record Id",
+                                                  "type": "string"
+                                                },
+                                                "retrieved_at": {
+                                                  "format": "date-time",
+                                                  "title": "Retrieved At",
+                                                  "type": "string"
+                                                },
+                                                "source": {
+                                                  "title": "Source",
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "source",
+                                                "record_id",
+                                                "retrieved_at"
+                                              ],
+                                              "title": "UntrustedTextProvenance",
+                                              "type": "object"
+                                            },
+                                            "raw_sha256": {
+                                              "pattern": "^[0-9a-f]{64}$",
+                                              "title": "Raw Sha256",
+                                              "type": "string"
+                                            },
+                                            "text": {
+                                              "title": "Text",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "text",
+                                            "provenance",
+                                            "raw_sha256"
+                                          ],
+                                          "title": "UntrustedText",
+                                          "type": "object"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "default": null
+                                    }
+                                  },
+                                  "required": [
+                                    "code"
+                                  ],
+                                  "title": "FlowchartStepMCP",
                                   "type": "object"
                                 },
                                 "type": "array"
@@ -3914,7 +5877,56 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                             "anyOf": [
                               {
                                 "additionalProperties": {
-                                  "type": "string"
+                                  "description": "External prose represented as typed data with digest and provenance.",
+                                  "properties": {
+                                    "kind": {
+                                      "const": "untrusted_text",
+                                      "default": "untrusted_text",
+                                      "title": "Kind",
+                                      "type": "string"
+                                    },
+                                    "provenance": {
+                                      "description": "Source identity for one fenced external text object.",
+                                      "properties": {
+                                        "record_id": {
+                                          "title": "Record Id",
+                                          "type": "string"
+                                        },
+                                        "retrieved_at": {
+                                          "format": "date-time",
+                                          "title": "Retrieved At",
+                                          "type": "string"
+                                        },
+                                        "source": {
+                                          "title": "Source",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "record_id",
+                                        "retrieved_at"
+                                      ],
+                                      "title": "UntrustedTextProvenance",
+                                      "type": "object"
+                                    },
+                                    "raw_sha256": {
+                                      "pattern": "^[0-9a-f]{64}$",
+                                      "title": "Raw Sha256",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "title": "Text",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "text",
+                                    "provenance",
+                                    "raw_sha256"
+                                  ],
+                                  "title": "UntrustedText",
+                                  "type": "object"
                                 },
                                 "type": "object"
                               },
@@ -3928,14 +5940,62 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                           "path_gloss": {
                             "anyOf": [
                               {
-                                "type": "string"
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
                               },
                               {
                                 "type": "null"
                               }
                             ],
-                            "default": null,
-                            "title": "Path Gloss"
+                            "default": null
                           },
                           "preliminary_decision_path": {
                             "title": "Preliminary Decision Path",
@@ -3944,14 +6004,62 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
                           "terminal_note": {
                             "anyOf": [
                               {
-                                "type": "string"
+                                "description": "External prose represented as typed data with digest and provenance.",
+                                "properties": {
+                                  "kind": {
+                                    "const": "untrusted_text",
+                                    "default": "untrusted_text",
+                                    "title": "Kind",
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "description": "Source identity for one fenced external text object.",
+                                    "properties": {
+                                      "record_id": {
+                                        "title": "Record Id",
+                                        "type": "string"
+                                      },
+                                      "retrieved_at": {
+                                        "format": "date-time",
+                                        "title": "Retrieved At",
+                                        "type": "string"
+                                      },
+                                      "source": {
+                                        "title": "Source",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "record_id",
+                                      "retrieved_at"
+                                    ],
+                                    "title": "UntrustedTextProvenance",
+                                    "type": "object"
+                                  },
+                                  "raw_sha256": {
+                                    "pattern": "^[0-9a-f]{64}$",
+                                    "title": "Raw Sha256",
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "title": "Text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "raw_sha256"
+                                ],
+                                "title": "UntrustedText",
+                                "type": "object"
                               },
                               {
                                 "type": "null"
                               }
                             ],
-                            "default": null,
-                            "title": "Terminal Note"
+                            "default": null
                           }
                         },
                         "required": [
@@ -4627,7 +6735,7 @@ not clinical decision support.
           "title": "Retry After Ms"
         },
         "server_version": {
-          "default": "3.1.0",
+          "default": "4.0.0",
           "title": "Server Version",
           "type": "string"
         },
