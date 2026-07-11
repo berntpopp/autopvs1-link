@@ -32,6 +32,7 @@ from autopvs1_link.mcp.mode_validation import (
 )
 from autopvs1_link.mcp.next_commands import bulk_retry_failed
 from autopvs1_link.mcp.telemetry import get_call_telemetry, reset_call_telemetry
+from autopvs1_link.mcp.tools._bulk_echo import echo_cnv_input, echo_variant_input
 from autopvs1_link.mcp.tools._bulk_untrusted import (
     bulk_untrusted_limit_envelope,
     collect_untrusted_texts,
@@ -378,7 +379,7 @@ def register(mcp: FastMCP) -> None:
             results.append(
                 BulkVariantPVS1ResultItem(
                     ok=error is None,
-                    input=item,
+                    input=echo_variant_input(item),
                     data=data,
                     error=error,
                     meta=item_meta,
@@ -557,7 +558,7 @@ def register(mcp: FastMCP) -> None:
             results.append(
                 BulkCNVPVS1ResultItem(
                     ok=error is None,
-                    input=item,
+                    input=echo_cnv_input(item),
                     data=data,
                     error=error,
                     meta=item_meta,

@@ -42,6 +42,13 @@ def build_mcp_server() -> FastMCP:
         tools_changed=False,
     )
 
+    # Fence the arg-validation boundary: FastMCP raises ValidationError (echoing
+    # a hostile top-level argument name + control code points) BEFORE its masked
+    # generic path. This middleware returns our fixed invalid_input envelope.
+    from autopvs1_link.mcp.error_guard import ArgumentValidationGuard
+
+    mcp.add_middleware(ArgumentValidationGuard())
+
     from autopvs1_link.mcp import prompts, resources
     from autopvs1_link.mcp.tools import (
         bulk_tools,

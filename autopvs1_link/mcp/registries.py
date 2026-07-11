@@ -31,6 +31,7 @@ KNOWN_ERROR_CODES: dict[str, str] = {
     "invalid_search_query": "Query empty or malformed (limit handled separately).",
     "invalid_search_cursor": "Cursor is malformed; reset by omitting cursor.",
     "invalid_bulk_input": "items list missing or malformed.",
+    "invalid_input": "One or more tool arguments are missing or invalid.",
     "invalid_response_mode": "response_mode not a documented enum value.",
     "invalid_meta_mode": "meta_mode not a documented enum value.",
     "not_found": "Upstream returned 404 for the requested ID.",
@@ -80,6 +81,9 @@ ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
     ],
     "invalid_bulk_input": [
         "Pass items as a JSON list of 1-10 objects matching the per-item schema.",
+    ],
+    "invalid_input": [
+        "Call the tool with the documented argument names and types.",
     ],
     "invalid_response_mode": [
         "Use one of: ids_only, summary, standard, full.",

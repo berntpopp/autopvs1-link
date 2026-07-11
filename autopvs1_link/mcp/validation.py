@@ -50,13 +50,21 @@ _RSID_RE = re.compile(r"^rs\d{1,12}$")  # lowercase 'rs' required per dbSNP FAQ
 # immediately followed by a position number (or a bare ``=``). This rejects
 # free-form tails such as ``c.IGNORE_ALL_PREVIOUS_INSTRUCTIONS`` at validation.
 _HGVS_VARIANT_CHARS = r"[A-Za-z0-9>_.()+*=?-]*"
-# The leading token must be a real HGVS position (optionally paren-wrapped for
-# uncertain ranges): a numeric coordinate for c./n./g., or a 1-3 letter
-# amino-acid code + coordinate for p. Instruction prose (no leading position)
-# never matches.
-_HGVS_CN_TAIL = rf"\(?[*-]?\d{_HGVS_VARIANT_CHARS}"
+# c./n./g. tails are a numeric position (optionally an intronic offset, a range,
+# or paren-wrapped) followed by ONE structured HGVS change operation — never an
+# arbitrary letter run. This rejects instruction prose such as
+# ``c.5DELETE_EVERYTHING`` (a digit-prefixed tail no longer slips through). p.
+# tails must start with a 1-3 letter amino-acid code + coordinate (or a bare
+# ``=``); the trailing protein-change alphabet is broad but the required
+# code+coordinate prefix rejects free prose without a leading position.
+_HGVS_POS = r"[*-]?\d+(?:[+-]\d+)?"
+_HGVS_CHANGE = (
+    r"(?:[ACGTUN]*>[ACGTUN]+|delins[ACGTUN]+|del[ACGTUN]*|dup[ACGTUN]*"
+    r"|ins[ACGTUN0-9]+|inv[ACGTUN]*|[ACGTUN]+|=)"
+)
+_HGVS_CN_TAIL = rf"\(?{_HGVS_POS}(?:_{_HGVS_POS})?\)?{_HGVS_CHANGE}?"
+_HGVS_G_TAIL = _HGVS_CN_TAIL
 _HGVS_P_TAIL = rf"(?:=|\(?[A-Za-z*]{{1,3}}\d+{_HGVS_VARIANT_CHARS}\)?)"
-_HGVS_G_TAIL = rf"\(?\d{_HGVS_VARIANT_CHARS}"
 _HGVS_C_RE = re.compile(
     # NM/NR/LRG use ``_`` separator (NM_000059); Ensembl uses no separator
     # (ENST00000357654). Gene parenthetical is optional. Cover ``n.`` too —
@@ -347,3 +355,32 @@ def normalize_limit_cursor(limit: object, cursor: object | None) -> tuple[int, i
         raise _invalid_search_cursor("Search cursor must be a non-empty opaque string.")
     offset = _decode_cursor(cursor)
     return bounded_limit, offset, requested_limit
+
+
+# Fixed marker echoed in place of a bulk item's raw identifier that is not a
+# strict, non-free-form form. Canonical SPDI and rsID have no unbounded tail, so
+# they are safe to reflect verbatim; HGVS / unknown inputs (whose tail could
+# carry instruction prose) are never reflected in results[*].input / next_commands.
+ECHO_REDACTED = "<omitted: unrecognized identifier>"
+
+
+def safe_echo_variant_id(variant_id: str) -> str:
+    """Reflect a bulk variant_id only if it is canonical SPDI or an rsID."""
+    value = variant_id.strip()
+    if _CANONICAL_SPDI_LOOSE_RE.fullmatch(value) or _RSID_RE.fullmatch(value):
+        return variant_id
+    return ECHO_REDACTED
+
+
+def safe_echo_cnv_id(cnv_id: str) -> str:
+    """Reflect a bulk cnv_id only if it matches the strict CNV grammar."""
+    if CNV_ID_RE.fullmatch(cnv_id.strip().upper()) or COLON_CNV_RE.fullmatch(cnv_id.strip()):
+        return cnv_id
+    return ECHO_REDACTED
+
+
+def safe_echo_genome_build(genome_build: str) -> str:
+    """Reflect a bulk genome_build only if it is a recognized build."""
+    if isinstance(genome_build, str) and genome_build.strip() in VALID_GENOME_BUILDS:
+        return genome_build
+    return ECHO_REDACTED
