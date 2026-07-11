@@ -6,6 +6,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-11
+
+### Security
+
+- Re-enabled FastMCP 3.4.4 strict Host/Origin protection with configurable
+  allowlists (default-deny). The v3.0.0 release had left FastMCP's DNS-rebinding
+  guard disabled as an emergency workaround; this restores it properly on
+  FastMCP >=3.4.4 with explicit `allowed_hosts`/`allowed_origins` and an
+  outermost strict host/origin middleware covering `/health`, `/api/...`,
+  `/metrics`, and the mounted `/mcp` sub-app.
+- New env configuration: `AUTOPVS1_LINK_SERVER_ALLOWED_HOSTS` and
+  `AUTOPVS1_LINK_SERVER_ALLOWED_ORIGINS` (JSON arrays; wildcards rejected).
+  Defaults are loopback-only, so operators must add the proxied public host in
+  production or router federation will return 421.
+
 ## 3.0.0
 
 **BREAKING.** Outbound variant transfer is now disabled by default. Deployments
