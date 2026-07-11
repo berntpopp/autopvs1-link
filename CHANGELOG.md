@@ -6,6 +6,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.0.2] - 2026-07-11
+
+### Security
+
+Guard the FastMCP-core not-found reflection surface. FastMCP core reflected the
+caller's OWN requested tool name, resource URI, or prompt name (with any
+control/zero-width/bidi/NUL code points) back to the caller and to logs BEFORE
+backend middleware ran. A new `autopvs1_link/mcp/notfound_guard.py` closes it
+with fixed, input-free messages built from constants only: a tool-name registry
+preflight (`on_call_tool` -> fixed `not_found` envelope, no `_meta.tool` echo), a
+URI-free `on_read_resource` boundary, an outermost protocol-handler backstop for
+the unknown-tool return path and the unknown-resource/prompt dispatch errors, and
+a validation-log scrub filter over the FastMCP-core and MCP-SDK request logs.
+Caller self-reflection surface; defense in depth; research use only.
+
 ## [4.0.1] - 2026-07-11
 
 ### Security
