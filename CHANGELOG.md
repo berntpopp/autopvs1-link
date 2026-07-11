@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-07-11
+
+### Security
+
+Defense in depth: caller-visible error messages/details are fixed/validated and
+sanitized of control/zero-width/bidi/NUL code points; the upstream Variant
+Recoder body, raw/instruction-shaped variant input, and hostile argument names
+are no longer echoed into MCP messages, details, bulk rows, or next_commands.
+Research use only.
+
 ## [4.0.0] - 2026-07-11
 
 ### Security
