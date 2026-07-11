@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import unicodedata
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -120,3 +120,22 @@ def sanitize_message(text: str) -> str:
     """
     clean = "".join(char for char in text if ord(char) not in FORBIDDEN_CODEPOINTS)
     return clean[:MAX_MESSAGE_CHARS]
+
+
+def sanitize_error_details(value: Any) -> Any:
+    """Recursively strip forbidden code points from every string leaf of an error detail.
+
+    Defensive backstop for the ``details`` block of an error envelope (and the
+    bulk per-item error row). Forbidden code points are rejected at input
+    validation, so a legitimate identifier/query never reaches here dirty; this
+    is a second line of defence over any string leaf a detail tree may still
+    carry (e.g. upstream-sourced resolver candidate fields). Non-string leaves
+    (ints, bools, None) pass through unchanged.
+    """
+    if isinstance(value, str):
+        return sanitize_message(value)
+    if isinstance(value, dict):
+        return {key: sanitize_error_details(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [sanitize_error_details(child) for child in value]
+    return value

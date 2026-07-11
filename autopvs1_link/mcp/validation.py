@@ -9,8 +9,23 @@ from typing import Literal
 
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.errors import MCPInputError
+from autopvs1_link.mcp.untrusted_content import FORBIDDEN_CODEPOINTS
 
 VALID_GENOME_BUILDS = {"hg19", "hg38"}
+
+
+def contains_forbidden_codepoint(value: str) -> bool:
+    """True when ``value`` carries a forbidden control/zero-width/bidi/NUL code point.
+
+    These code points cannot occur in any legitimate rsID / HGVS / SPDI / CNV /
+    gene-symbol identifier or query; their only purpose in an input is to smuggle
+    control characters into a caller-visible echo (an error ``details`` leaf, a
+    bulk ``results[*].input`` row, or a ``next_commands`` argument). The caller
+    is rejected outright rather than served a sanitized copy of hostile input.
+    """
+    return any(ord(char) in FORBIDDEN_CODEPOINTS for char in value)
+
+
 VARIANT_ID_RE = re.compile(r"^(?:[1-9]|1[0-9]|2[0-2]|X|Y|MT)-[1-9][0-9]*-[ACGTN]+-[ACGTN]+$")
 
 # Sniffer regexes for non-canonical variant inputs. These detect the input
@@ -139,16 +154,22 @@ def normalize_genome_builds(
     return canonical or deprecated or "hg38", warnings
 
 
+def _invalid_variant_id_error() -> MCPInputError:
+    return MCPInputError(
+        code="invalid_variant_id",
+        message="Variant IDs must use AutoPVS1 format such as X-82763936-A-T.",
+        suggestions=[
+            "Use search_variants with a gene symbol if you do not know the AutoPVS1 variant ID."
+        ],
+    )
+
+
 def normalize_variant_id(variant_id: str) -> str:
+    if contains_forbidden_codepoint(variant_id):
+        raise _invalid_variant_id_error()
     value = variant_id.strip().upper()
     if not value or not VARIANT_ID_RE.fullmatch(value):
-        raise MCPInputError(
-            code="invalid_variant_id",
-            message="Variant IDs must use AutoPVS1 format such as X-82763936-A-T.",
-            suggestions=[
-                "Use search_variants with a gene symbol if you do not know the AutoPVS1 variant ID."
-            ],
-        )
+        raise _invalid_variant_id_error()
     return value
 
 
@@ -174,6 +195,12 @@ def _invalid_cnv_interval_error() -> MCPInputError:
 
 
 def normalize_cnv_id(cnv_id: str) -> str:
+    if contains_forbidden_codepoint(cnv_id):
+        raise MCPInputError(
+            code="invalid_cnv_id",
+            message="CNV IDs must use {chrom}-{start}-{end}-{TYPE}, with TYPE DEL or DUP.",
+            suggestions=[CNV_FORMAT_SUGGESTION],
+        )
     value = cnv_id.strip().upper()
     match = CNV_ID_RE.fullmatch(value)
     if not match:
@@ -198,6 +225,14 @@ def normalize_search_query(query: object) -> str:
         raise MCPInputError(
             code="invalid_search_query",
             message="Search query must be text.",
+            suggestions=[
+                "Search by gene symbol, partial AutoPVS1 variant ID, or upstream-supported query."
+            ],
+        )
+    if contains_forbidden_codepoint(query):
+        raise MCPInputError(
+            code="invalid_search_query",
+            message="Search query contains disallowed control characters.",
             suggestions=[
                 "Search by gene symbol, partial AutoPVS1 variant ID, or upstream-supported query."
             ],

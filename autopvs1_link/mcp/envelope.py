@@ -21,7 +21,7 @@ from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
 from autopvs1_link.mcp.next_commands import error_next_commands
 from autopvs1_link.mcp.registries import capabilities_version, next_actions_for
 from autopvs1_link.mcp.telemetry import get_call_telemetry
-from autopvs1_link.mcp.untrusted_content import sanitize_message
+from autopvs1_link.mcp.untrusted_content import sanitize_error_details, sanitize_message
 
 
 class ErrorToolResult(ToolResult):
@@ -532,6 +532,15 @@ def error_envelope(
     will hit upstream again — keep the cost hints so an LLM scheduling a
     retry sees the real cost.
     """
+    # Defensively strip forbidden code points from every string leaf of the
+    # detail tree BEFORE it is read, so both the ``details`` block and the
+    # ``next_commands`` derived from it (error_next_commands) are clean.
+    # Caller-supplied identifiers are already rejected at input validation; this
+    # covers any upstream-sourced detail leaf (e.g. resolver candidate fields).
+    if details is not None:
+        details = sanitize_error_details(details)
+    if suggestions is not None:
+        suggestions = [sanitize_message(item) for item in suggestions]
     tier = cost_tier_for(tool_name)
     upstream_was_contacted = code in _RETRYABLE_TRANSIENT_CODES
     rate_limit_floor_ms = (

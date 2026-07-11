@@ -19,8 +19,11 @@ from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.errors import MCPInputError
-from autopvs1_link.mcp.untrusted_content import sanitize_message
-from autopvs1_link.mcp.validation import classify_variant_input, normalize_variant_id
+from autopvs1_link.mcp.validation import (
+    classify_variant_input,
+    contains_forbidden_codepoint,
+    normalize_variant_id,
+)
 
 
 def _autopvs1_variant_uri(genome_build: str, variant_id: str) -> str:
@@ -51,6 +54,19 @@ async def resolve_or_normalize_variant_id(
     HGVS via redirect; Ensembl REST is the authoritative resolver and
     its result is then passed to AutoPVS1 for scoring as canonical SPDI.
     """
+    # Reject forbidden control/zero-width/bidi/NUL code points at the input
+    # boundary: a HGVS-like input can pass the form regex with such a code point
+    # embedded (``\S`` matches them), and it would otherwise survive verbatim in
+    # ``details.original_input`` / bulk ``results[*].input`` / ``next_commands``.
+    # Sever the request instead of echoing a sanitized copy of hostile input.
+    if isinstance(variant_id, str) and contains_forbidden_codepoint(variant_id):
+        raise MCPInputError(
+            code="invalid_variant_id",
+            message="Variant IDs must use AutoPVS1 format such as X-82763936-A-T.",
+            suggestions=[
+                "Use search_variants with a gene symbol if you do not know the AutoPVS1 variant ID."
+            ],
+        )
     form = classify_variant_input(variant_id)
     if form == "canonical":
         canonical = variant_id.strip().upper().removeprefix("CHR")
@@ -80,10 +96,12 @@ async def resolve_or_normalize_variant_id(
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
-                # str(exc) is a classified-exception diagnostic surfaced to the
-                # caller; strip forbidden code points defensively (the upstream
-                # body is already severed at the recoder client, Surface A).
-                "resolver_message": sanitize_message(str(exc)),
+                # FIXED classified string only: never serialize str(exc), which
+                # can carry hostile upstream/exception PROSE (not just code
+                # points). The upstream body is already severed at the recoder
+                # client (Surface A); this keeps the caller-visible detail
+                # body-free too.
+                "resolver_message": "Ensembl Variant Recoder did not recognize the identifier.",
             },
         ) from exc
     except RecoderUnavailableError as exc:
@@ -105,8 +123,8 @@ async def resolve_or_normalize_variant_id(
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
-                # See above: sanitize the classified-exception diagnostic.
-                "resolver_message": sanitize_message(str(exc)),
+                # See above: FIXED classified string, never str(exc).
+                "resolver_message": "Ensembl Variant Recoder is unavailable.",
             },
         ) from exc
 

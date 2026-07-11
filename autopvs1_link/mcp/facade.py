@@ -22,6 +22,15 @@ def build_mcp_server() -> FastMCP:
         name=SERVER_NAME,
         version=SERVER_VERSION,
         instructions=SERVER_DESCRIPTION,
+        # Mask UNHANDLED tool/resource exceptions: every expected failure is
+        # already returned as a fixed/sanitized error envelope, but an
+        # unexpected exception type (e.g. a RuntimeError from a presenter) would
+        # otherwise bypass the envelope and surface str(exc) — potentially raw
+        # upstream text with control/zero-width/bidi/NUL code points — in the
+        # TextContent mirror. Masking replaces it with a fixed "Error calling
+        # tool" message; classified ToolError/ResourceError messages (which we
+        # author) are still surfaced.
+        mask_error_details=True,
     )
     # Spec compliance (MCP 2025-06-18 / basic/lifecycle §Capability Negotiation):
     # advertise listChanged=False because this server never emits

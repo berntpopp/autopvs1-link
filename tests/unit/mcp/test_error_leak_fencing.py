@@ -22,6 +22,9 @@ import json
 from typing import Any
 from unittest.mock import AsyncMock
 
+import pytest
+from fastmcp.exceptions import ResourceError, ToolError
+
 from autopvs1_link.api.variant_recoder import (
     RecoderNotFoundError,
     RecoderUnavailableError,
@@ -165,12 +168,12 @@ async def test_single_tool_classified_error_strips_codepoints_on_both_mirrors(mo
     structured = _assert_both_mirrors_clean(result)
     assert structured["success"] is False
     assert structured["error_code"] == "not_found"
-    # the nested resolver_message detail is the leak surface: str(exc) flows
-    # into it. Prose may survive as data, but the control code points must be
-    # stripped (proven by _assert_both_mirrors_clean above).
+    # resolver_message is a FIXED classified string: neither the hostile PROSE
+    # nor its code points survive (str(exc) is never serialized into it).
     resolver_message = structured["details"]["resolver_message"]
-    for cp in _FORBIDDEN_SAMPLE:
-        assert cp not in resolver_message
+    assert "delete_everything" not in resolver_message
+    # prose is severed everywhere in BOTH mirrors, not just code-point-stripped.
+    assert "delete_everything" not in result.content[0].text
 
 
 async def test_bulk_per_item_error_row_strips_codepoints(mocker) -> None:
@@ -191,8 +194,9 @@ async def test_bulk_per_item_error_row_strips_codepoints(mocker) -> None:
     assert row["ok"] is False
     assert row["error"]["code"] == "not_found"
     resolver_message = row["error"]["details"]["resolver_message"]
-    for cp in _FORBIDDEN_SAMPLE:
-        assert cp not in resolver_message
+    assert "delete_everything" not in resolver_message
+    # prose severed in BOTH the structured row and the TextContent mirror.
+    assert "delete_everything" not in result.content[0].text
 
 
 async def test_transport_error_path_yields_clean_fixed_message(mocker) -> None:
@@ -226,3 +230,129 @@ def test_error_envelope_central_message_sanitize() -> None:
     assert mirrored["message"] == "boom tail"
     _assert_no_forbidden_codepoints(structured)
     _assert_no_forbidden_codepoints(mirrored)
+
+
+def test_error_envelope_sanitizes_detail_leaves() -> None:
+    """Every string leaf of the details tree is stripped of forbidden code points."""
+    result = error_envelope(
+        code="requires_disambiguation",
+        message="ambiguous",
+        retryable=False,
+        details={
+            "original_input": "rs1\x00‍",
+            "candidates": [{"id": "17-1-A-T‮", "allele_key": "G﻿"}],
+        },
+        tool_name="get_variant_pvs1_data",
+    )
+    _assert_no_forbidden_codepoints(result.structured_content)
+    _assert_no_forbidden_codepoints(json.loads(result.content[0].text))
+
+
+# ---------------------------------------------------------------------------
+# Critical 1 — uncaught tool exceptions are masked (never bypass the envelope
+# into the TextContent mirror with raw code points).
+# ---------------------------------------------------------------------------
+
+
+async def test_uncaught_tool_exception_is_masked(mocker) -> None:
+    """An unexpected RuntimeError bypasses the tool's typed excepts; masking
+    must replace its str(exc) with a fixed message, not leak hostile text."""
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.get_variant",
+        new=AsyncMock(side_effect=RuntimeError("UNCAUGHT " + HOSTILE)),
+    )
+    mcp = build_mcp_server()
+    with pytest.raises(ToolError) as excinfo:
+        await mcp.call_tool(
+            "get_variant_pvs1_data",
+            {"genome_build": "hg38", "variant_id": "X-82763936-A-T"},
+        )
+    masked = str(excinfo.value)
+    assert "delete_everything" not in masked
+    assert "UNCAUGHT" not in masked
+    for cp in _FORBIDDEN_SAMPLE:
+        assert cp not in masked
+
+
+# ---------------------------------------------------------------------------
+# Critical 3/4 — forbidden code points are REJECTED at input, never echoed.
+# ---------------------------------------------------------------------------
+
+
+async def test_forbidden_codepoint_variant_input_is_rejected(mocker) -> None:
+    """A HGVS-like variant_id carrying a zero-width joiner is rejected outright,
+    and the hostile input is never echoed into structured content."""
+    recode = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recode)
+    mcp = build_mcp_server()
+    # NM_..c.5266dup passes the HGVS form regex, but the embedded ZWJ is rejected.
+    hostile_id = "NM_007294.4:c.5266dup‍﻿‮"
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {"genome_build": "hg38", "variant_id": hostile_id},
+    )
+    structured = _assert_both_mirrors_clean(result)
+    assert structured["success"] is False
+    assert structured["error_code"] == "invalid_variant_id"
+    # rejected BEFORE any resolver hop; the hostile identifier never echoed.
+    recode.assert_not_awaited()
+    assert "c.5266dup" not in result.content[0].text
+
+
+async def test_forbidden_codepoint_bulk_item_is_rejected(mocker) -> None:
+    """A bulk item whose identifier carries forbidden code points fails the whole
+    request with a fixed invalid_bulk_input; no row echoes the hostile input."""
+    recode = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.recode_variant", new=recode)
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variants_pvs1_data_bulk",
+        {"items": [{"genome_build": "hg38", "variant_id": "rs80357906‍﻿‮"}]},
+    )
+    structured = _assert_both_mirrors_clean(result)
+    assert structured["success"] is False
+    assert structured["error_code"] == "invalid_bulk_input"
+    assert "results" not in structured
+    recode.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Critical 5 — bulk arg-validation returns a FIXED message (no {exc} prose).
+# ---------------------------------------------------------------------------
+
+
+async def test_bulk_arg_validation_uses_fixed_message() -> None:
+    """A malformed bulk item yields a fixed invalid_bulk_input message that does
+    not interpolate the pydantic exception (which echoes the offending input)."""
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variants_pvs1_data_bulk",
+        {"items": [{"genome_build": "hg38"}]},  # missing variant_id
+    )
+    structured = result.structured_content
+    assert structured["success"] is False
+    assert structured["error_code"] == "invalid_bulk_input"
+    assert structured["message"] == "items[0] is missing required fields or has invalid values."
+    # no pydantic internals leaked into the message
+    assert "validation error" not in structured["message"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Critical 6 — the cache-statistics resource translates failures to a fixed
+# ResourceError instead of surfacing str(exc) + a traceback log.
+# ---------------------------------------------------------------------------
+
+
+async def test_cache_statistics_resource_translates_failure_to_fixed_error(mocker) -> None:
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.cache_statistics",
+        new=AsyncMock(side_effect=RuntimeError("adapter blew up " + HOSTILE)),
+    )
+    mcp = build_mcp_server()
+    with pytest.raises(ResourceError) as excinfo:
+        await mcp.read_resource("autopvs1-link://cache/statistics")
+    message = str(excinfo.value)
+    assert message == "Cache statistics are temporarily unavailable."
+    assert "delete_everything" not in message
+    for cp in _FORBIDDEN_SAMPLE:
+        assert cp not in message

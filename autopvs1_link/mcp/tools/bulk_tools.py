@@ -42,6 +42,7 @@ from autopvs1_link.mcp.untrusted_content import (
     UntrustedTextLimitError,
     enforce_untrusted_text_limits,
 )
+from autopvs1_link.mcp.validation import contains_forbidden_codepoint
 
 _WARM_CACHE_STATUSES = frozenset({"hit", "coalesced"})
 _COLD_CACHE_STATUSES = frozenset({"miss", "bypass"})
@@ -163,6 +164,10 @@ def _coerce_items_list(raw: Any) -> list[dict[str, Any]]:
 def _coerce_item_dict(item: Any, index: int) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise _bulk_input_error(f"items[{index}] must be an object.")
+    # Reject forbidden code points before a row could echo a hostile identifier.
+    for value in item.values():
+        if isinstance(value, str) and contains_forbidden_codepoint(value):
+            raise _bulk_input_error(f"items[{index}] contains disallowed control characters.")
     return item
 
 
@@ -188,11 +193,11 @@ def _validate_size(items: list[Any]) -> None:
 def _parse_variant_items(raw_items: list[dict[str, Any]]) -> list[BulkVariantPVS1InputItem]:
     parsed: list[BulkVariantPVS1InputItem] = []
     for index, item in enumerate(raw_items):
-        try:
+        try:  # FIXED message (no {exc}): a pydantic error echoes the offending input
             parsed.append(BulkVariantPVS1InputItem.model_validate(item))
         except Exception as exc:
             raise _bulk_input_error(
-                f"items[{index}] is missing required fields or has invalid values: {exc}"
+                f"items[{index}] is missing required fields or has invalid values."
             ) from exc
     return parsed
 
@@ -204,7 +209,7 @@ def _parse_cnv_items(raw_items: list[dict[str, Any]]) -> list[BulkCNVPVS1InputIt
             parsed.append(BulkCNVPVS1InputItem.model_validate(item))
         except Exception as exc:
             raise _bulk_input_error(
-                f"items[{index}] is missing required fields or has invalid values: {exc}"
+                f"items[{index}] is missing required fields or has invalid values."
             ) from exc
     return parsed
 
