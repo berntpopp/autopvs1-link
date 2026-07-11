@@ -70,15 +70,17 @@ async def test_decision_tree_array_item_declares_untrusted_text_kind_const() -> 
 
 
 @pytest.mark.asyncio
-async def test_decision_tree_raw_array_item_declares_untrusted_text_kind_const() -> None:
-    """Regression: ``decision_tree_raw`` used to be a bare ``list[dict]``."""
+async def test_flowchart_schema_drops_duplicative_notes_and_decision_tree_raw() -> None:
+    """v1.1 no-duplication: the notes legend and decision_tree_raw audit copy
+    were removed (they re-embedded decision_tree's scraped prose), so they must
+    not appear in the published output schema at all."""
     mcp = build_mcp_server()
     tools = {tool.name: tool for tool in await mcp.list_tools()}
     schema = tools["get_variant_pvs1_data"].output_schema
     result_schema = _resolve_ref(schema, _non_null(schema["properties"]["result"]))
     flowchart = _resolve_ref(schema, _non_null(result_schema["properties"]["pvs1_flowchart"]))
-    raw_item = _untrusted_text_item_schema(schema, flowchart["properties"]["decision_tree_raw"])
-    _assert_kind_const_untrusted_text(schema, raw_item["properties"]["code"])
+    assert "notes" not in flowchart["properties"]
+    assert "decision_tree_raw" not in flowchart["properties"]
 
 
 @pytest.mark.asyncio

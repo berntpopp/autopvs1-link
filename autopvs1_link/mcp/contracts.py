@@ -101,45 +101,42 @@ class FlowchartStepMCP(MCPContractModel):
 class PVS1FlowchartMCP(MCPContractModel):
     """Typed PVS1 flowchart decision path and outcome.
 
-    ``notes`` is the legend dict ``#1 -> prose`` and is duplicative in
-    standard mode because ``decision_tree[*].note_text`` is the already-
-    hoisted form. It is therefore ``None`` (and dropped on the wire) in
-    ``summary``/``standard`` modes and only present in ``full`` mode for
-    auditors who want the canonical legend alongside the decision tree.
+    ``decision_tree`` is the single canonical carrier of every scraped
+    criterion description (``code``) and its hoisted footnote
+    (``note_text``). Response-Envelope v1.1 forbids the same upstream
+    prose in more than one field (even when both copies are fenced), so
+    there is deliberately no ``notes`` legend dict and no
+    ``decision_tree_raw`` audit copy — both re-embedded prose that
+    ``decision_tree`` already carries. A caller that needs the raw
+    ``#N -> prose`` legend reads it off ``decision_tree[*].note_id`` +
+    ``note_text``.
 
     ``terminal_note`` is the one-line rationale for the verdict, hoisted
     from the leaf step's note_text (or ``notes[preliminary_decision_path]``
-    when the decision tree is empty). Populated in summary mode for
+    when the decision tree is empty). Populated ONLY in ``summary`` mode
+    (where ``decision_tree`` is stripped, so it duplicates nothing) for
     callers that need to explain non-Strong / non-Very-Strong outcomes
     without re-fetching the full decision tree. Absent when the upstream
     note is empty or the verdict is unambiguous (PVS1_Strong /
-    PVS1_Very_Strong) and the rationale adds no new signal.
+    PVS1_Very_Strong).
 
     ``path_gloss`` is a one-line, deterministic compression of the
-    decision-tree branch the variant traversed plus the terminal
-    strength (ASCII ``->`` separated). Unlike ``terminal_note`` it is
-    emitted for EVERY path in summary/standard/full modes (not just
-    ambiguous verdicts), so a summary-mode caller can always state why a
-    verdict landed without widening to standard. Built only from upstream
-    scraped node text — no hand-authored clinical mappings.
+    decision-tree branch the variant traversed plus the terminal strength
+    (ASCII ``->`` separated). It embeds the scraped node text, so to avoid
+    duplicating ``decision_tree[*].code`` it is emitted ONLY in ``summary``
+    mode — the tier where ``decision_tree`` is absent and the gloss is the
+    sole prose carrier. Built only from upstream scraped node text — no
+    hand-authored clinical mappings.
 
-    ``notes``, ``decision_tree_raw`` entries' ``code``/``description``,
-    ``terminal_note``, and ``path_gloss`` all carry AutoPVS1 scraped prose
-    and therefore ship as ``untrusted_text`` objects (Response-Envelope
-    v1.1), the same as each ``decision_tree`` step.
+    ``terminal_note`` and ``path_gloss`` ship as ``untrusted_text`` objects
+    (Response-Envelope v1.1), the same as each ``decision_tree`` step's
+    ``code`` / ``note_text``.
     """
 
     preliminary_decision_path: str
     final_strength: str
     final_strength_source: Literal["asserted", "inferred"] = "asserted"
     decision_tree: list[FlowchartStepMCP] = Field(default_factory=list)
-    notes: dict[str, UntrustedText] | None = None
-    # Typed (not ``list[dict[str, Any]]``) so the array ITEM schema declares
-    # the ``untrusted_text`` object with its ``kind`` const on ``code`` /
-    # ``description`` too — a bare permissive array would hide that literal
-    # from the published output schema even though the runtime data is
-    # fenced (Response-Envelope v1.1 list-item schema requirement).
-    decision_tree_raw: list[FlowchartStepMCP] | None = None
     terminal_note: UntrustedText | None = None
     path_gloss: UntrustedText | None = None
 

@@ -290,8 +290,9 @@ def test_present_variant_full_preserves_rich_fields_and_unmet_by_default() -> No
     assert payload["variant_info"]["gene_url"] == "https://example.test/gene"
     assert payload["variant_info"]["chgvs"] == "c.1A>T"
     assert payload["variant_info"]["external_links"]["gnomAD"] == "https://example.test/variant"
-    assert payload["pvs1_flowchart"]["notes"]["#1"]["kind"] == "untrusted_text"
-    assert payload["pvs1_flowchart"]["notes"]["#1"]["text"] == "Resolved note text."
+    # v1.1 no-duplication: the note prose lives once, on the step's note_text;
+    # the standalone notes legend was removed.
+    assert "notes" not in payload["pvs1_flowchart"]
     assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"]["text"] == (
         "Resolved note text."
     )
@@ -436,7 +437,7 @@ def test_present_cnv_full_preserves_rich_fields_and_unmet_by_default() -> None:
     payload = data.model_dump(mode="json")
     assert payload["cnv_info"]["cnv_type"] == "DEL"
     assert payload["cnv_info"]["size"] == 5000000
-    assert payload["pvs1_flowchart"]["notes"]["#1"]["text"] == "Resolved CNV note text."
+    assert "notes" not in payload["pvs1_flowchart"]
     assert payload["pvs1_flowchart"]["decision_tree"][0]["note_text"]["text"] == (
         "Resolved CNV note text."
     )
@@ -491,7 +492,7 @@ def _canonical_parsed() -> AutoPVS1Data:
     )
 
 
-def test_present_variant_full_exposes_raw_fields_for_audit() -> None:
+def test_present_variant_full_exposes_external_links_raw_for_audit() -> None:
     parsed = _canonical_parsed()
     data, _ = present_variant(
         parsed,
@@ -500,21 +501,17 @@ def test_present_variant_full_exposes_raw_fields_for_audit() -> None:
     )
     payload = data.model_dump(mode="json")
 
+    # external_links_raw (URLs, not scraped prose) is full mode's audit surface.
     assert payload["variant_info"]["external_links_raw"] == {
         "gnomAD": "https://gnomad.broadinstitute.org/variant/X-82763936-A-T",
         "ClinVar": "https://www.ncbi.nlm.nih.gov/clinvar/variation/na",
         "dbSNP": "https://www.ncbi.nlm.nih.gov/snp/variation/na",
     }
-    raw_tree = payload["pvs1_flowchart"]["decision_tree_raw"]
-    assert raw_tree is not None
-    assert [step["code"]["text"] for step in raw_tree] == ["NF1", "NF5"]
-    assert all(step["code"]["kind"] == "untrusted_text" for step in raw_tree)
-    # raw tree has NO injected note_text (audit before notes inlining). It is
-    # now a typed FlowchartStepMCP (for the list-item schema requirement), so
-    # an un-hoisted note_text dumps as an explicit null rather than an
-    # absent key; the OK-envelope wire path still strips it (see
-    # test_ok_envelope_full_mode_data_has_no_null_fields).
-    assert all(step.get("note_text") is None for step in raw_tree)
+    # v1.1 no-duplication removed decision_tree_raw (it re-embedded the same
+    # scraped codes as decision_tree). The canonical codes still ride once.
+    assert "decision_tree_raw" not in payload["pvs1_flowchart"]
+    codes = [step["code"]["text"] for step in payload["pvs1_flowchart"]["decision_tree"]]
+    assert codes == ["NF1", "NF5"]
 
 
 def test_present_variant_standard_omits_raw_fields() -> None:
@@ -588,9 +585,10 @@ def test_ok_envelope_full_mode_data_has_no_null_fields() -> None:
     envelope = ok_envelope(data, warnings=warnings)
     hit = _has_null_field(envelope["result"])
     assert hit is None, f"full-mode wire data must drop null fields; first hit: {hit}"
-    # And the audit fields are still present:
-    assert "decision_tree_raw" in envelope["result"]["pvs1_flowchart"]
+    # external_links_raw (URLs) is full mode's remaining audit surface;
+    # decision_tree_raw was removed under the v1.1 no-duplication rule.
     assert "external_links_raw" in envelope["result"]["variant_info"]
+    assert "decision_tree_raw" not in envelope["result"]["pvs1_flowchart"]
 
 
 def test_present_variant_summary_drops_invalid_external_link_warning() -> None:
@@ -661,8 +659,9 @@ def test_present_variant_standard_still_emits_invalid_external_link_warning() ->
     assert "invalid_external_link" in codes
 
 
-def test_present_variant_full_keeps_notes_dict_for_audit() -> None:
-    """``notes`` survives in full mode so auditors can cross-check the legend."""
+def test_present_variant_full_drops_notes_legend_to_avoid_duplication() -> None:
+    """v1.1 no-duplication: the notes legend is gone; the same note prose is
+    carried once, hoisted onto each step's ``note_text``."""
     parsed = _canonical_parsed()
     data, _ = present_variant(
         parsed,
@@ -670,12 +669,11 @@ def test_present_variant_full_keeps_notes_dict_for_audit() -> None:
         response_mode="full",
     )
     payload = data.model_dump(mode="json", exclude_none=True)
-    notes = payload["pvs1_flowchart"]["notes"]
-    assert {note_id: obj["text"] for note_id, obj in notes.items()} == {
-        "#1": "Note one.",
-        "#2": "Note two.",
-    }
-    assert all(obj["kind"] == "untrusted_text" for obj in notes.values())
+    flowchart = payload["pvs1_flowchart"]
+    assert "notes" not in flowchart
+    note_texts = {step["note_text"]["text"] for step in flowchart["decision_tree"]}
+    assert note_texts == {"Note one.", "Note two."}
+    assert all(step["note_text"]["kind"] == "untrusted_text" for step in flowchart["decision_tree"])
 
 
 def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:
@@ -691,7 +689,7 @@ def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:
         response_mode="standard",
     )
     # Serialize both modes with the same exclude_none setting so the only
-    # delta is the new raw audit fields, not asymmetric Pydantic defaults.
+    # delta is the extra full-mode audit field, not asymmetric Pydantic defaults.
     full_json = json.dumps(
         full_data.model_dump(mode="json", exclude_none=True),
         separators=(",", ":"),
@@ -701,10 +699,12 @@ def test_present_variant_full_bytes_strictly_greater_than_standard() -> None:
         separators=(",", ":"),
     )
 
-    # Direct regression guard: the raw fields are the difference.
+    # Direct regression guard: external_links_raw (URLs, not scraped prose) is
+    # the remaining full-vs-standard difference. decision_tree_raw was removed
+    # under the v1.1 no-duplication rule, so it is in neither.
     assert "external_links_raw" in full_json
-    assert "decision_tree_raw" in full_json
     assert "external_links_raw" not in std_json
+    assert "decision_tree_raw" not in full_json
     assert "decision_tree_raw" not in std_json
 
     assert len(full_json) > len(std_json), (
@@ -942,11 +942,15 @@ def test_path_gloss_present_in_summary_for_strong_verdict() -> None:
     )
 
 
-def test_path_gloss_present_in_standard_mode() -> None:
+def test_path_gloss_absent_in_standard_mode_to_avoid_duplication() -> None:
+    """v1.1 no-duplication: path_gloss embeds decision_tree's code prose, so in
+    standard mode (where decision_tree is present) it is dropped. The caller
+    reads the path off decision_tree instead."""
     parsed = _variant_with_path("Unmet", [FlowchartStep(code="Nonsense or Frameshift")])
     data, _ = present_variant(parsed, source_url=None, response_mode="standard")
     payload = data.model_dump(mode="json", exclude_none=True)
-    assert payload["pvs1_flowchart"]["path_gloss"]["text"] == "Nonsense or Frameshift -> Unmet"
+    assert "path_gloss" not in payload["pvs1_flowchart"]
+    assert payload["pvs1_flowchart"]["decision_tree"][0]["code"]["text"] == "Nonsense or Frameshift"
 
 
 def test_path_gloss_absent_in_ids_only_mode() -> None:

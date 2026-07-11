@@ -147,27 +147,18 @@ def _fence_flowchart_output(
 ) -> tuple[dict[str, Any], list[UntrustedText]]:
     """Fence every AutoPVS1 scraped-prose leaf in the shaped flowchart dict.
 
-    Runs once, after the existing mode-branching has settled on the final
-    wire shape (summary/standard/full each expose a different subset of
-    ``decision_tree`` / ``decision_tree_raw`` / ``notes`` / ``terminal_note``
-    / ``path_gloss``), so every scraped surface is fenced regardless of
-    which fields a given response_mode happens to populate.
+    Runs once, after the mode-branching has settled on the final wire shape.
+    Each scraped prose is emitted exactly once (Response-Envelope v1.1
+    no-duplication): ``decision_tree`` carries ``code`` + ``note_text`` in
+    standard/full; ``terminal_note`` and ``path_gloss`` appear only in
+    summary mode where ``decision_tree`` is absent, so nothing is fenced
+    twice.
     """
     fenced: list[UntrustedText] = []
     if "decision_tree" in raw:
         raw["decision_tree"] = [
             _fence_step(step, record_id=record_id, fenced=fenced) for step in raw["decision_tree"]
         ]
-    if raw.get("decision_tree_raw"):
-        raw["decision_tree_raw"] = [
-            _fence_step(step, record_id=record_id, fenced=fenced)
-            for step in raw["decision_tree_raw"]
-        ]
-    if raw.get("notes"):
-        raw["notes"] = {
-            note_id: _fence_prose(text, record_id=record_id, fenced=fenced)
-            for note_id, text in raw["notes"].items()
-        }
     if raw.get("terminal_note"):
         raw["terminal_note"] = _fence_prose(
             raw["terminal_note"], record_id=record_id, fenced=fenced
@@ -250,19 +241,18 @@ def _present_flowchart(
             )
             if note is not None:
                 summary["terminal_note"] = note
+        # path_gloss embeds the scraped node text. It rides here ONLY because
+        # summary mode strips decision_tree, so it is the single carrier of
+        # that prose — never a duplicate (Response-Envelope v1.1).
         if path_gloss is not None:
             summary["path_gloss"] = path_gloss
         raw = summary
-    elif response_mode == "full":
-        raw["decision_tree_raw"] = raw_decision_tree
-        if path_gloss is not None:
-            raw["path_gloss"] = path_gloss
     else:
-        # standard: notes legend is duplicative because decision_tree
-        # steps already carry note_text; drop it from the wire payload.
+        # standard/full: decision_tree is the single canonical carrier of
+        # every scraped code + hoisted note_text. Drop the duplicative notes
+        # legend and do NOT re-embed the same prose in path_gloss or a
+        # decision_tree_raw audit copy (v1.1 no-duplication rule).
         raw.pop("notes", None)
-        if path_gloss is not None:
-            raw["path_gloss"] = path_gloss
     raw, fenced = _fence_flowchart_output(raw, record_id=record_id)
     return raw, warnings, fenced
 

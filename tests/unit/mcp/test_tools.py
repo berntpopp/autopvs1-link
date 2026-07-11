@@ -247,9 +247,12 @@ async def test_data_tool_output_schemas_expose_typed_nested_payloads() -> None:
             "final_strength",
             "final_strength_source",
             "decision_tree",
-            "notes",
         },
     )
+    # v1.1 no-duplication: the notes legend and decision_tree_raw audit copy
+    # were removed because they re-embedded decision_tree's scraped prose.
+    assert "notes" not in resolved_flowchart["properties"]
+    assert "decision_tree_raw" not in resolved_flowchart["properties"]
     flowchart_step = _resolve_ref(
         variant_schema,
         resolved_flowchart["properties"]["decision_tree"]["items"],

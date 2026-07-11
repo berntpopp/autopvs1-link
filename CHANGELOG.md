@@ -23,25 +23,30 @@ Defense in depth; research use only.
   limits helper (`enforce_untrusted_text_limits`, `UntrustedTextLimitError`).
 - Fenced surfaces on `pvs1_flowchart`: `decision_tree[*].code` (the PVS1
   criterion description itself), `decision_tree[*].note_text`,
-  `decision_tree_raw[*].code`/`description` (full-mode audit copy),
-  `notes` legend values (full mode), `terminal_note` (summary mode,
-  ambiguous verdicts), and `path_gloss` (every mode, including the
-  default `summary` hot path).
+  `terminal_note` (summary mode, ambiguous verdicts), and `path_gloss`
+  (summary mode only — see no-duplication below).
 - Fenced surface found during the fleet-wide "hunt for missed surfaces"
   sweep: `disease_mechanisms[*].disease` (the scraped ClinGen disease
   name) — not in the original tracking-issue surface list. `gene`,
   `inheritance`, `clinical_validity`, `consideration`, and
   `adjusted_strength` stay bare strings; they are short controlled
   vocabulary (HGNC symbol, ClinGen categories), not free prose.
-- `decision_tree_raw` is now typed `list[FlowchartStepMCP]` (was
-  `list[dict[str, Any]]`) so its published output-schema array ITEM
-  declares the `untrusted_text` object with a real `kind` const, not a
-  bare permissive object.
-- Every `untrusted_text` object one response emits (flowchart prose plus
-  every `disease_mechanisms` row, across both `get_variant_pvs1_data` and
-  `get_cnv_pvs1_data`) is checked in one combined
-  `enforce_untrusted_text_limits` call, not per-record. A breach maps to
-  the new typed `untrusted_text_limit_exceeded` error code (registered in
+- **No-duplication (Response-Envelope v1.1):** each scraped prose is emitted
+  exactly once. `decision_tree` is the single canonical carrier of every
+  `code` + hoisted `note_text`, so the old `notes` legend dict and the
+  `decision_tree_raw` audit copy — which re-shipped the same prose — were
+  **removed** from the output schema. `path_gloss` embeds the branch `code`
+  text, so it now rides ONLY in `summary` mode (where `decision_tree` is
+  absent and it is the sole carrier); standard/full modes drop it because
+  `decision_tree` already carries those codes.
+- Limit enforcement runs over every `untrusted_text` object a response emits,
+  aggregated (not per-record): `get_variant_pvs1_data` / `get_cnv_pvs1_data`
+  check flowchart prose + all `disease_mechanisms` rows in one call, and the
+  bulk tools (`get_variants_pvs1_data_bulk` / `get_cnvs_pvs1_data_bulk`) run a
+  single **response-wide** `enforce_untrusted_text_limits` across every item
+  so an aggregate over the 10-item batch cannot silently exceed the
+  128-object / 8 MiB ceiling. A breach maps to the new typed
+  `untrusted_text_limit_exceeded` error code (registered in
   `KNOWN_ERROR_CODES`), never the generic `parse_error`/`internal_error`.
 - `record_id` provenance: AutoPVS1's own cHGVS notation
   (`NM_000307.5:c.604A>T`, i.e. already `{transcript}:{variant}`) when the

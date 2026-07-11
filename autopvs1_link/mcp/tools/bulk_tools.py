@@ -32,8 +32,16 @@ from autopvs1_link.mcp.mode_validation import (
 )
 from autopvs1_link.mcp.next_commands import bulk_retry_failed
 from autopvs1_link.mcp.telemetry import get_call_telemetry, reset_call_telemetry
+from autopvs1_link.mcp.tools._bulk_untrusted import (
+    bulk_untrusted_limit_envelope,
+    collect_untrusted_texts,
+)
 from autopvs1_link.mcp.tools._pvs1_runners import run_cnv_pvs1, run_variant_pvs1
 from autopvs1_link.mcp.tools.mode_errors import invalid_mode_envelope
+from autopvs1_link.mcp.untrusted_content import (
+    UntrustedTextLimitError,
+    enforce_untrusted_text_limits,
+)
 
 _WARM_CACHE_STATUSES = frozenset({"hit", "coalesced"})
 _COLD_CACHE_STATUSES = frozenset({"miss", "bypass"})
@@ -388,6 +396,15 @@ def register(mcp: FastMCP) -> None:
             failed=failed,
             items=results,
         )
+        # Response-wide ceiling over EVERY fenced object across all items,
+        # not just per-item — 10 items each near the limit would otherwise
+        # aggregate past the 128-object / 8 MiB-total ceiling untyped.
+        try:
+            enforce_untrusted_text_limits(collect_untrusted_texts(payload))
+        except UntrustedTextLimitError:
+            return bulk_untrusted_limit_envelope(
+                meta_mode=normalized_meta_mode, tool_name=_VARIANTS_BULK_TOOL
+            )
         aggregate_kwargs = _aggregate_cache(per_item_cache_status, per_item_elapsed_ms)
         return ok_envelope(
             payload,
@@ -558,6 +575,13 @@ def register(mcp: FastMCP) -> None:
             failed=failed,
             items=results,
         )
+        # Response-wide ceiling over EVERY fenced object across all items.
+        try:
+            enforce_untrusted_text_limits(collect_untrusted_texts(payload))
+        except UntrustedTextLimitError:
+            return bulk_untrusted_limit_envelope(
+                meta_mode=normalized_meta_mode, tool_name=_CNVS_BULK_TOOL
+            )
         aggregate_kwargs = _aggregate_cache(per_item_cache_status, per_item_elapsed_ms)
         return ok_envelope(
             payload,
