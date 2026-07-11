@@ -20,7 +20,7 @@ from autopvs1_link.mcp.presenters.variant import (
     present_variant,
 )
 from autopvs1_link.mcp.resolution import resolve_or_normalize_variant_id
-from autopvs1_link.mcp.untrusted_content import UntrustedTextLimitError
+from autopvs1_link.mcp.untrusted_content import UntrustedTextLimitError, sanitize_message
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
 
@@ -45,9 +45,13 @@ def _err(
 
 
 def _from_input_error(exc: MCPInputError) -> MCPError:
+    # The bulk per-item error row is embedded in an otherwise-successful batch
+    # response (data.items[*].error) and bypasses the error_envelope builder, so
+    # the message is sanitized here directly. The nested details.resolver_message
+    # is already sanitized at its source in resolution.py.
     return _err(
         code=exc.code,
-        message=str(exc),
+        message=sanitize_message(str(exc)),
         retryable=exc.retryable,
         suggestions=exc.suggestions,
         details=exc.details or None,

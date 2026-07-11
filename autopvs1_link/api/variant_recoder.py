@@ -247,17 +247,26 @@ class VariantRecoderClient:
             ) from exc
 
         if response.status_code == 400:
+            # Classify the 400 by inspecting the upstream body, but NEVER
+            # interpolate that body (or a response.text slice) into the
+            # caller-visible exception message: a caller-influenced query can
+            # make Ensembl reflect hostile prose (incl. control/zero-width/
+            # bidi/NUL code points) into a 400 body, and echoing it verbatim
+            # would smuggle attacker-controlled text into the MCP error frame.
+            # Fixed, body-free messages are raised instead (the HTTP status is
+            # a safe, non-attacker-controlled scalar); the body is not logged
+            # either, preserving the no-PII-in-logs invariant.
             try:
                 body = response.json()
             except ValueError:
                 body = {}
-            message = body.get("error") if isinstance(body, dict) else None
-            if isinstance(message, str) and _is_not_found_message(message):
-                raise RecoderNotFoundError(message)
-            raise RecoderNotFoundError(
-                f"Variant Recoder rejected {input_id!r}: "
-                f"{message if isinstance(message, str) else response.text[:200]}"
-            )
+            upstream_error = body.get("error") if isinstance(body, dict) else None
+            if isinstance(upstream_error, str) and _is_not_found_message(upstream_error):
+                raise RecoderNotFoundError(
+                    f"Ensembl Variant Recoder does not recognize {input_id!r} "
+                    f"as a known rsID or parseable HGVS notation."
+                )
+            raise RecoderNotFoundError(f"Ensembl Variant Recoder rejected {input_id!r} as invalid.")
         if response.status_code == 429 or response.status_code >= 500:
             raise RecoderUnavailableError(
                 f"Variant Recoder returned HTTP {response.status_code} resolving {input_id!r}"

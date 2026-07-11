@@ -21,6 +21,7 @@ from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
 from autopvs1_link.mcp.next_commands import error_next_commands
 from autopvs1_link.mcp.registries import capabilities_version, next_actions_for
 from autopvs1_link.mcp.telemetry import get_call_telemetry
+from autopvs1_link.mcp.untrusted_content import sanitize_message
 
 
 class ErrorToolResult(ToolResult):
@@ -558,7 +559,12 @@ def error_envelope(
     payload: dict[str, Any] = {
         "success": False,
         "error_code": code,
-        "message": message,
+        # Defensive backstop: strip forbidden control/zero-width/bidi/NUL code
+        # points from the caller-visible message whatever builder produced it
+        # (every tool funnels its ``message=str(exc)`` error through here). No
+        # upstream response body reaches this point (severed at the API client),
+        # but a caller-influenced str(exc) could still carry hostile code points.
+        "message": sanitize_message(message),
         "retryable": retryable,
         "recovery_action": _recovery_action_for(suggestions, next_actions),
         "_meta": meta.model_dump(mode="json"),

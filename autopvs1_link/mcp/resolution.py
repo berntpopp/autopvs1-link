@@ -19,6 +19,7 @@ from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.envelope import MCPWarning
 from autopvs1_link.mcp.errors import MCPInputError
+from autopvs1_link.mcp.untrusted_content import sanitize_message
 from autopvs1_link.mcp.validation import classify_variant_input, normalize_variant_id
 
 
@@ -79,7 +80,10 @@ async def resolve_or_normalize_variant_id(
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
-                "resolver_message": str(exc),
+                # str(exc) is a classified-exception diagnostic surfaced to the
+                # caller; strip forbidden code points defensively (the upstream
+                # body is already severed at the recoder client, Surface A).
+                "resolver_message": sanitize_message(str(exc)),
             },
         ) from exc
     except RecoderUnavailableError as exc:
@@ -101,7 +105,8 @@ async def resolve_or_normalize_variant_id(
                 "form": form,
                 "genome_build": genome_build,
                 "resolver_source": "ensembl_variant_recoder",
-                "resolver_message": str(exc),
+                # See above: sanitize the classified-exception diagnostic.
+                "resolver_message": sanitize_message(str(exc)),
             },
         ) from exc
 
