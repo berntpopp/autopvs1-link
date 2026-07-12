@@ -68,7 +68,9 @@ class ClientManager:
         try:
             yield client
         except Exception as e:
-            logger.error("Error during client operation", error=str(e))
+            # Log the exception CLASS only: str(e) can embed the variant-bearing
+            # upstream URL (GDPR Art. 9 / finding F-03).
+            logger.error("Error during client operation", error_type=type(e).__name__)
             raise
 
     async def _rate_limit(self) -> None:
@@ -95,7 +97,7 @@ class ClientManager:
                 "last_request": self._last_request_time,
             }
         except Exception as e:
-            logger.error("Health check failed", error=str(e))
+            logger.error("Health check failed", error_type=type(e).__name__)
             return {
                 "status": "unhealthy",
                 "error": str(e),
@@ -112,7 +114,7 @@ class ClientManager:
                 await self._client.close()
                 logger.info("AutoPVS1Client closed successfully")
             except Exception as e:
-                logger.error("Error closing AutoPVS1Client", error=str(e))
+                logger.error("Error closing AutoPVS1Client", error_type=type(e).__name__)
             finally:
                 self._client = None
 

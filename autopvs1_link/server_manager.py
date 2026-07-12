@@ -13,6 +13,7 @@ from autopvs1_link import __version__
 from autopvs1_link.api.client_manager import shutdown_clients
 from autopvs1_link.api.routes import cache, cnv, gene, variant
 from autopvs1_link.config import settings
+from autopvs1_link.logging_config import configure_logging
 from autopvs1_link.mcp.facade import build_mcp_server
 from autopvs1_link.middleware.logging_middleware import RequestLoggingMiddleware
 from autopvs1_link.observability.correlation import install as install_correlation
@@ -103,5 +104,14 @@ def create_app() -> FastAPI:
     app.mount("/", mcp_app)
     return app
 
+
+# The production entrypoint -- gunicorn (``autopvs1_link.server_manager:app``)
+# and the uvicorn worker/reload subprocesses -- imports THIS module to obtain
+# ``app``; unlike the CLI it never calls ``configure_logging()`` itself. Install
+# the structured-logging pipeline (including the GDPR Art. 9 field-name +
+# exception redaction processor) at import time so genomic identifiers, upstream
+# URLs and exception prose are scrubbed for EVERY worker before any request is
+# served (finding F-03). Idempotent with the CLI's own call.
+configure_logging()
 
 app = create_app()

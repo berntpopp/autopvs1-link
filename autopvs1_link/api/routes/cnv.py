@@ -12,6 +12,10 @@ from autopvs1_link.services.service_manager import get_managed_service
 logger = structlog.get_logger()
 router = APIRouter(tags=["CNV"])
 
+# Fixed, caller-safe error detail: never embeds the cnv_id or exception prose
+# (finding F-03; parity with the variant/gene routes).
+_INTERNAL_DETAIL = "Internal server error."
+
 
 @router.get(
     "/cnv/{genome_build}/{cnv_id}",
@@ -77,5 +81,7 @@ async def get_cnv(
         result = await service.get_cnv_data(genome_build, cnv_id)
         return result
     except Exception as e:
-        logger.error("Error fetching CNV", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e!s}")
+        # Log the exception CLASS only and return a FIXED caller-safe detail:
+        # str(exc) can embed the cnv_id / upstream URL (GDPR Art. 9 / F-03).
+        logger.error("error fetching CNV", error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail=_INTERNAL_DETAIL) from None

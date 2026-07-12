@@ -128,9 +128,15 @@ def configure_logging() -> None:
             # Fallback to standard JSON if orjson not available
             processors.append(structlog.processors.JSONRenderer())
     else:
+        # Emit ANSI colors only to an interactive terminal. When stdout is
+        # captured (tests) or redirected to a file / log aggregator, colors add
+        # ESC (U+001B) control code points that pollute the log stream -- and a
+        # control code point in a log record is exactly what the fleet
+        # forbidden-codepoint guards reject. Auto-disabling on non-TTY keeps dev
+        # ergonomics without smuggling control chars into machine-read logs.
         processors.append(
             structlog.dev.ConsoleRenderer(
-                colors=True,
+                colors=sys.stdout.isatty(),
                 exception_formatter=structlog.dev.plain_traceback,
             )
         )
@@ -139,7 +145,14 @@ def configure_logging() -> None:
         processors=processors,
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
-        cache_logger_on_first_use=True,
+        # Resolve module-level loggers against the CURRENT config on every emit
+        # rather than caching a bound logger on first use. The redaction
+        # processor runs per-call either way, but NOT caching keeps the pipeline
+        # reconfigurable -- so ``configure_logging`` running at production import
+        # time (finding F-03) cannot freeze a pre-config logger past a later
+        # reconfigure, and adversarial ``capture_logs`` tests can intercept the
+        # same module loggers the service/client/middleware layers use.
+        cache_logger_on_first_use=False,
     )
 
     # Configure standard library logging

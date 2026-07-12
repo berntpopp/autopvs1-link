@@ -134,8 +134,15 @@ class AdvancedCacheManager:
                 hit_rate=round(stats.hit_rate, 4),
             )
 
-    def _record_error(self, method_name: str, key: str, error: str) -> None:
-        """Record a cache error."""
+    def _record_error(self, method_name: str, key: str, error_type: str) -> None:
+        """Record a cache error.
+
+        ``error_type`` is the exception CLASS name only -- never ``str(exc)`` --
+        because a rendered exception can embed the variant-bearing upstream URL
+        (GDPR Art. 9 / finding F-03). The cache ``key`` also embeds the variant,
+        so it is logged under the ``key`` field, which ``configure_logging``
+        hashes (rather than dropping) to preserve hit/miss correlation.
+        """
         if not self._statistics_enabled:
             return
 
@@ -143,7 +150,7 @@ class AdvancedCacheManager:
         stats.errors += 1
 
         if self._event_logging:
-            logger.error("Cache error", method=method_name, key=key, error=error)
+            logger.error("Cache error", method=method_name, key=key, error_type=error_type)
 
     def _record_eviction(self, method_name: str) -> None:
         """Record a cache eviction."""
@@ -226,7 +233,9 @@ class AdvancedCacheManager:
                     cache_info_after = cached_func.cache_info()
                 except Exception as e:
                     execution_time = time.time() - start_time
-                    self._record_error(method_name, cache_key, str(e))
+                    # Class name only: str(e) can embed the variant-bearing
+                    # upstream URL (GDPR Art. 9 / finding F-03).
+                    self._record_error(method_name, cache_key, type(e).__name__)
                     raise
                 finally:
                     # Always clear our marker so a follow-up call (post-failure

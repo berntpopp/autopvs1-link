@@ -189,11 +189,15 @@ class PerformanceLogger:
                 duration_ms=round(duration_ms, 2),
             )
         else:
-            # Error
+            # Error. Log only the exception CLASS (``error_type``): ``str(exc)``
+            # can embed the variant-bearing upstream URL (GDPR Art. 9 / finding
+            # F-03), so it is never handed to the logger. ``exc_info`` renders a
+            # traceback whose ``exception`` field is scrubbed by name in
+            # ``configure_logging`` (installed on the production entrypoint), so
+            # the debug signal survives without leaking the coordinate.
             self.logger.error(
                 f"Failed {self.operation}",
                 duration_ms=round(duration_ms, 2),
-                error=str(exc_val),
                 error_type=exc_type.__name__,
                 exc_info=True,
             )

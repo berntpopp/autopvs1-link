@@ -429,7 +429,9 @@ def parse_search_results(soup: BeautifulSoup, genome_version: str) -> list[Searc
                 )
             )
         except (AttributeError, IndexError) as e:
-            logger.warning("Error parsing search result row", error=str(e))
+            # Class only: str(e) can echo scraped upstream HTML/coordinates
+            # (GDPR Art. 9 / finding F-03).
+            logger.warning("Error parsing search result row", error_type=type(e).__name__)
             continue
 
     logger.info("Parsed search results", count=len(results), genome_version=genome_version)

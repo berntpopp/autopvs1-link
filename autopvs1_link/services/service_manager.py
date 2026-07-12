@@ -62,7 +62,9 @@ class ServiceManager:
                 "cache_info": cache_info,
             }
         except Exception as e:
-            logger.error("Service health check failed", error=str(e))
+            # Log the exception CLASS only: str(e) can embed the variant-bearing
+            # upstream URL (GDPR Art. 9 / finding F-03).
+            logger.error("Service health check failed", error_type=type(e).__name__)
             return {
                 "status": "unhealthy",
                 "error": str(e),
@@ -80,7 +82,7 @@ class ServiceManager:
                 "message": "All caches cleared successfully",
             }
         except Exception as e:
-            logger.error("Error clearing caches", error=str(e))
+            logger.error("Error clearing caches", error_type=type(e).__name__)
             return {
                 "status": "error",
                 "error": str(e),
@@ -92,7 +94,7 @@ class ServiceManager:
             service = await self.get_service()
             return await service.get_cache_statistics()
         except Exception as e:
-            logger.error("Error getting cache statistics", error=str(e))
+            logger.error("Error getting cache statistics", error_type=type(e).__name__)
             return {
                 "error": str(e),
             }
@@ -107,7 +109,7 @@ class ServiceManager:
                 await self._service.clear_cache()
                 logger.info("Service caches cleared during shutdown")
             except Exception as e:
-                logger.error("Error during service shutdown", error=str(e))
+                logger.error("Error during service shutdown", error_type=type(e).__name__)
             finally:
                 self._service = None
 
