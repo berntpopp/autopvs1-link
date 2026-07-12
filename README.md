@@ -217,6 +217,7 @@ make docker-logs     # Follow logs
 - [`docs/api.md`](docs/api.md) - REST + MCP surface
 - [`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md) - generated tool schemas
 - [`docs/mcp-evaluation-checklist.md`](docs/mcp-evaluation-checklist.md) - MCP contract checks
+- [`SECURITY.md`](SECURITY.md) - vulnerability reporting + required repo security settings
 - [`AGENTS.md`](AGENTS.md) - shared instructions for agentic coding tools
 - [`CHANGELOG.md`](CHANGELOG.md) - release notes
 
