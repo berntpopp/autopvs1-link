@@ -1,7 +1,13 @@
 services:
   autopvs1-link:
     env_file:
+      # The example carries the committed production defaults; the operator's
+      # real .env.docker is layered on top so host-specific values take effect.
+      # .env.docker must come last to win on conflicting keys -- before this it
+      # was not listed at all, so edits to it silently no-oped.
       - path: ../.env.docker.example
+        required: false
+      - path: ../.env.docker
         required: false
     environment:
       # Drives the production preset: debug=False, level=WARNING (suppresses
