@@ -7,6 +7,15 @@ services:
     ports: !reset []
     expose:
       - "8000"
+    environment:
+      # The DNS-rebinding guard allowlists loopback only by default. Behind NPM
+      # the container sees the proxied public Host, so it must be listed here or
+      # every request through the proxy -- including the genefoundry-router
+      # federating /mcp -- is rejected with HTTP 421.
+      AUTOPVS1_LINK_SERVER_ALLOWED_HOSTS: >-
+        ["localhost","127.0.0.1","::1","autopvs1-link.genefoundry.org"]
+      AUTOPVS1_LINK_SERVER_ALLOWED_ORIGINS: >-
+        ["https://autopvs1-link.genefoundry.org"]
     networks:
       - npm
     labels:
