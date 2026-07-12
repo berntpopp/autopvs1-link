@@ -5,12 +5,20 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from autopvs1_link.api.rest_validation import (
+    RestInputError,
+    validate_gene_query,
+    validate_genome_build,
+)
 from autopvs1_link.models.autopvs1_models import AutoPVS1SearchResults
 from autopvs1_link.services.autopvs1_service import AutoPVS1Service
 from autopvs1_link.services.service_manager import get_managed_service
 
 logger = structlog.get_logger()
 router = APIRouter(tags=["Gene"])
+
+# Fixed, caller-safe error detail (finding F-03).
+_INTERNAL_DETAIL = "Internal server error."
 
 
 @router.get(
@@ -89,18 +97,25 @@ async def search_gene_variants(
     Raises:
         HTTPException: 400 for invalid query format, 500 for server errors
     """
+    # Bound + validate BEFORE any I/O, logging, or cache use.
     try:
-        logger.info("Gene search request", gene=q, genome_version=genome_version)
+        genome_version = validate_genome_build(genome_version)
+        q = validate_gene_query(q)
+    except RestInputError as exc:
+        logger.warning("gene search rejected", error_code=exc.code)
+        raise HTTPException(status_code=400, detail=exc.message) from None
+
+    try:
+        logger.info("gene search request", genome_version=genome_version)
         result = await service.search_variants(q, genome_version)
 
         logger.info(
-            "Gene search completed",
-            gene=q,
+            "gene search completed",
             genome_version=genome_version,
             result_count=len(result.results),
         )
 
         return result
     except Exception as e:
-        logger.error("Error searching gene variants", gene=q, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e!s}")
+        logger.error("error searching gene variants", error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail=_INTERNAL_DETAIL) from None

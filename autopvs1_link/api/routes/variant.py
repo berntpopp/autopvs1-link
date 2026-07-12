@@ -7,12 +7,24 @@ import httpx
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Path
 
+from autopvs1_link.api.rest_validation import (
+    RestInputError,
+    validate_genome_build,
+    validate_variant_id,
+)
 from autopvs1_link.models.autopvs1_models import AutoPVS1Data
 from autopvs1_link.services.autopvs1_service import AutoPVS1Service
 from autopvs1_link.services.service_manager import get_managed_service
 
 logger = structlog.get_logger()
 router = APIRouter(tags=["Variant"])
+
+# Fixed, caller-safe error details. None embeds a caller-supplied identifier or
+# raw exception/upstream prose (finding F-03).
+_UNRESOLVED_DETAIL = "Variant identifier could not be resolved."
+_NOT_FOUND_DETAIL = "Variant not found."
+_UPSTREAM_DETAIL = "Upstream service returned an error."
+_INTERNAL_DETAIL = "Internal server error."
 
 # HGVS notation patterns for detection (transcript-level only)
 HGVS_PATTERNS = [
@@ -123,48 +135,51 @@ async def get_variant(
     Raises:
         HTTPException: 400 for invalid format, 404 if not found, 500 for server errors
     """
+    # Bound + validate BEFORE any I/O, logging, or cache use. Reject
+    # oversize/hostile identifiers with a FIXED caller-safe message.
+    try:
+        genome_build = validate_genome_build(genome_build)
+        variant_id = validate_variant_id(variant_id)
+    except RestInputError as exc:
+        logger.warning("variant request rejected", error_code=exc.code)
+        raise HTTPException(status_code=400, detail=exc.message) from None
+
     try:
         is_hgvs = _detect_hgvs_pattern(variant_id)
 
-        logger.info(
-            "API request for variant",
-            genome_build=genome_build,
-            variant_id=variant_id,
-            is_hgvs=is_hgvs,
-        )
+        logger.info("API request for variant", genome_build=genome_build, is_hgvs=is_hgvs)
 
         if is_hgvs:
             # Handle HGVS notation - resolve through enhanced search
-            logger.debug("Resolving HGVS notation", hgvs=variant_id)
+            logger.debug("Resolving HGVS notation")
             result = await service.resolve_hgvs_notation(variant_id, genome_build)
 
             logger.info(
                 "HGVS resolved successfully",
-                hgvs=variant_id,
-                resolved_variant=result.variant_info.variant_id,
-                gene=result.variant_info.gene_symbol,
+                genome_build=genome_build,
                 final_strength=result.pvs1_flowchart.final_strength,
             )
         else:
             # Handle standard variant ID
-            logger.debug("Looking up standard variant", variant_id=variant_id)
+            logger.debug("Looking up standard variant")
             result = await service.get_variant_data(genome_build, variant_id)
 
         return result
 
     except ValueError as e:
-        # HGVS resolution failed or invalid format
-        logger.warning("Invalid variant identifier", variant_id=variant_id, error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        # HGVS resolution failed or otherwise unresolvable: log class only.
+        logger.warning("variant resolution failed", error_type=type(e).__name__)
+        raise HTTPException(status_code=400, detail=_UNRESOLVED_DETAIL) from None
     except httpx.HTTPStatusError as e:
+        status_code = e.response.status_code
         logger.error(
-            "HTTP error fetching variant",
-            error=str(e),
-            status_code=e.response.status_code,
+            "upstream error fetching variant",
+            error_type=type(e).__name__,
+            status_code=status_code,
         )
-        if e.response.status_code == 404:
-            raise HTTPException(status_code=404, detail=f"Variant {variant_id} not found")
-        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+        if status_code == 404:
+            raise HTTPException(status_code=404, detail=_NOT_FOUND_DETAIL) from None
+        raise HTTPException(status_code=502, detail=_UPSTREAM_DETAIL) from None
     except Exception as e:
-        logger.error("Error fetching variant", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e!s}")
+        logger.error("error fetching variant", error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail=_INTERNAL_DETAIL) from None

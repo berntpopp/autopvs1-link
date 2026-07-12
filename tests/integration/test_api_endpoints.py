@@ -156,7 +156,9 @@ class TestVariantEndpoints:
             message="Not Found", request=httpx.Request("GET", "http://test"), response=mock_response
         )
 
-        response = await async_client.get("http://test/variant/hg38/nonexistent-variant")
+        # Grammar-valid id that the upstream reports as not found (the route
+        # now rejects malformed ids with 400 before any I/O -- finding F-03).
+        response = await async_client.get("http://test/variant/hg38/X-99999999-A-T")
 
         assert response.status_code == 404
         data = response.json()
