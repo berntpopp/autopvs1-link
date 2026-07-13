@@ -1,14 +1,10 @@
 services:
   autopvs1-link:
-    env_file:
-      # The example carries the committed production defaults; the operator's
-      # real .env.docker is layered on top so host-specific values take effect.
-      # .env.docker must come last to win on conflicting keys -- before this it
-      # was not listed at all, so edits to it silently no-oped.
-      - path: ../.env.docker.example
-        required: false
-      - path: ../.env.docker
-        required: false
+    build: !reset null
+    image: ${AUTOPVS1_LINK_IMAGE:?set a verified digest-addressed image}
+    pull_policy: missing
+    container_name: !reset null
+    env_file: !reset []
     environment:
       # Drives the production preset: debug=False, level=WARNING (suppresses
       # the per-request INFO log line that can carry variant IDs), JSON logs.
@@ -20,6 +16,7 @@ services:
       AUTOPVS1_LINK_API_EGRESS_MODE: allowlist
       AUTOPVS1_LINK_API_ALLOWED_UPSTREAM_ORIGINS: >-
         https://autopvs1.bgi.com,https://rest.ensembl.org,https://grch37.rest.ensembl.org
+      GF_HEALTHCHECK_HOST: localhost
     ports: !reset []
     expose:
       - "8000"
@@ -28,36 +25,35 @@ services:
 
     read_only: true
     tmpfs:
-      - /tmp/autopvs1-link:rw,noexec,nosuid,size=64m,mode=1777
-      # gunicorn's control server writes a socket under the app user's home;
-      # give it a writable tmpfs so a read_only rootfs doesn't error on boot.
-      - /home/app/.gunicorn:rw,noexec,nosuid,size=8m,mode=1777
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
 
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
 
-    pids_limit: 256
     init: true
 
-    command: ["gunicorn", "-c", "gunicorn_conf.py", "autopvs1_link.server_manager:app"]
+    command: !reset null
 
-    restart: always
+    restart: on-failure
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '1.0'
           pids: 256
-        reservations:
-          memory: 256M
-          cpus: '0.5'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+
+    healthcheck:
+      test:
+        - CMD
+        - sh
+        - -c
+        - 'curl -f -H "Host: $${GF_HEALTHCHECK_HOST}" http://localhost:8000/health'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
     # Bound log growth (Standard v1 rule 24); overrides the base 10m x 3.
     logging:
