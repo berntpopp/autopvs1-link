@@ -39,7 +39,8 @@ secure_scheme_headers = {
 preload_app = True
 reuse_port = True
 
-worker_tmp_dir = "/dev/shm"
+worker_tmp_dir = "/tmp"  # noqa: S108 -- tmpfs-mounted in the production overlay.
+control_socket_disable = True
 
 
 def on_starting(server: Any) -> None:
