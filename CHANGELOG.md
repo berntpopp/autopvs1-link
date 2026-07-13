@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.0.4] - 2026-07-13
+
+### Fixed
+
+- Re-pin the reusable container CI and container release workflows to the
+  corrected GeneFoundry container release standard revision
+  (`58d011d9c72efe90337244342fdec703f2b5b4b9`). The previously pinned revision
+  carried latent release-pipeline defects that were fixed centrally, including
+  GHCR authentication before the version alias push. Research use only.
+
 ## [4.0.3] - 2026-07-13
 
 ### Build
