@@ -48,6 +48,20 @@ The project follows a layered architecture with singleton managers for resource 
 +------------------------------------------------------+
 ```
 
+## Technology Stack
+
+- Python 3.12+ (3.13 / 3.14 supported).
+- `uv` for dependency management, with a committed `uv.lock`.
+- `hatchling` build backend.
+- `ruff` for both lint and format (Black removed).
+- `mypy` in strict mode.
+- FastAPI + Pydantic v2 (pinned ranges live in `pyproject.toml`).
+- FastMCP 3.x with the Streamable HTTP transport; the legacy SSE transport is retired.
+- Observability: `structlog` + `asgi-correlation-id` + `prometheus-client`.
+- `defusedxml` for XML/HTML hardening (`defusedxml.defuse_stdlib()` at import).
+- `gunicorn` + uvicorn workers in production (Docker).
+- Multi-stage Dockerfile on `python:3.14-slim`.
+
 ## Directory Structure
 
 Target layout (post-migration):
@@ -87,7 +101,7 @@ autopvs1-link/
 |  |- architecture.md                 # this file
 |  |- configuration.md
 |  |- api.md
-|  |- MCP_CONNECTION_GUIDE.md
+|  |- deployment.md
 |  |- mcp-tool-catalog.md             # generated
 |  +- superpowers/
 |     |- specs/
@@ -281,6 +295,44 @@ async def lifespan(app: FastAPI):
 - Requires internet access to `autopvs1.bgi.com`
 - Service availability depends on upstream status
 - No offline mode available
+
+## Fleet Federation Contract
+
+This server is a member of the GeneFoundry `*-link` MCP fleet and conforms to the
+[Tool-Naming & Normalization Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/TOOL-NAMING-STANDARD-v1.md)
+(tracking issue: berntpopp/autopvs1-link#24).
+
+### Identity
+
+- `serverInfo.name` is the stable, lowercase, hyphenated **`autopvs1-link`**, set in
+  `autopvs1_link/mcp/server_info.py` and asserted by the conformance workflow
+  (`CONFORMANCE_NAME`). It matches the namespace token.
+- Tool names are left **unprefixed** (`get_variant_pvs1_data`, not
+  `autopvs1_get_variant_pvs1_data`): namespacing is the gateway's job. When
+  `genefoundry-router` mounts this server it applies the canonical **namespace token
+  `autopvs1`**, so tools surface at the gateway as `autopvs1_<tool>`. The router pins
+  `get_variant_pvs1_data` as this backend's entry point.
+
+### Naming rules
+
+- All tool names use the canonical verb set (`get`, `search`) and stay well under the 50-char
+  limit.
+- The sole exception is the gated, off-by-default `clear_cache` tool. Its `clear` verb is
+  covered by the Standard v1.1 ops/meta **tag carve-out** (it carries the `meta` tag), not a
+  per-name exception, and it never pollutes the default surface — it registers only when
+  `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`.
+- Every tool carries domain `tags` (`variant`, `cnv` / `copy-number`, `classification`,
+  `discovery`, `bulk`, `meta`) so the gateway can filter and curate the surfaced toolset.
+
+### Guards
+
+- `tests/unit/mcp/test_tool_names.py` enforces the naming and tagging contract above.
+- `tests/unit/test_readme_tools.py` asserts the README's `## Tools` table matches the server's
+  registered default surface exactly, so adding a tool without documenting it fails CI.
+- Responses follow the
+  [Response-Envelope Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/RESPONSE-ENVELOPE-STANDARD-v1.md)
+  flat banner; the envelope, `response_mode` / `meta_mode` controls, and error codes are
+  specified in [`api.md`](api.md).
 
 ## Related Resources
 

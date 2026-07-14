@@ -62,6 +62,8 @@ Useful focused commands:
 - `make format`
 - `make lint`
 - `make lint-fix`
+- `make lint-loc`
+- `make lint-readme`
 - `make typecheck`
 - `make typecheck-fast`
 - `make test`
@@ -76,6 +78,34 @@ Useful focused commands:
 - `make docker-build`
 - `make docker-up`
 - `make docker-down`
+- `make docker-prod-config`
+- `make docker-npm-config`
+
+Install the pre-commit hooks once per clone (config in
+`.pre-commit-config.yaml`):
+
+```bash
+uv run pre-commit install
+```
+
+## README Discipline
+
+The README follows the GeneFoundry README Standard v1 (canonical text:
+`docs/README-STANDARD-v1.md` in `genefoundry-router`). It is a front door, not
+a manual: hard ceiling 200 lines, fixed H2 order, four canonical badges, the
+verbatim research-use callout, no hand-typed counts or scores.
+
+Two gates enforce it, both wired into `make ci-local`:
+
+- `make lint-readme` (`scripts/check_readme.py`) - a static linter, copied
+  verbatim from `genefoundry-router`. Do not edit it locally.
+- `tests/unit/test_readme_tools.py` - asserts the README `## Tools` table
+  matches the server's registered default tool surface exactly. Adding or
+  renaming a tool means updating that table in the same commit.
+
+Operator runbooks, env tables, architecture and data notes belong in `docs/`
+(`deployment.md`, `configuration.md`, `architecture.md`, `api.md`), not in the
+README. Relocate content; never delete a real fact.
 
 ## Coding Standards
 
