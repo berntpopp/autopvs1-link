@@ -1,240 +1,118 @@
-# AutoPVS1 Link
+# autopvs1-link
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
-[![FastMCP](https://img.shields.io/badge/FastMCP-3.2+-orange.svg)](https://github.com/jlowin/fastmcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![CI](https://github.com/berntpopp/autopvs1-link/actions/workflows/ci.yml/badge.svg)](https://github.com/berntpopp/autopvs1-link/actions/workflows/ci.yml)
+[![Conformance](https://github.com/berntpopp/autopvs1-link/actions/workflows/conformance.yml/badge.svg)](https://github.com/berntpopp/autopvs1-link/actions/workflows/conformance.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A unified server providing both REST API and MCP (Model Context Protocol)
-interfaces for accessing PVS1 variant classification data from
-[AutoPVS1](https://autopvs1.bgi.com). Built with FastAPI and FastMCP for
-seamless integration with AI assistants and web applications.
+An MCP (Model Context Protocol) server — and a REST API on the same process — serving PVS1
+loss-of-function evidence for variants and CNVs from
+[AutoPVS1](https://autopvs1.bgi.com), the automated ACMG PVS1 interpreter.
 
-## Modern stack (May 2026)
+> [!IMPORTANT]
+> Research use only. Not clinical decision support. Do not use for diagnosis,
+> treatment, triage, or patient management.
 
-- Python 3.12+ (3.13 / 3.14 supported)
-- `uv` for dependency management with committed `uv.lock`
-- `hatchling` build backend
-- `ruff` for both lint and format (Black removed)
-- `mypy` strict
-- FastAPI + Pydantic 2.11+
-- FastMCP 3.2+ with Streamable HTTP transport (SSE retired)
-- Observability: `structlog` + `asgi-correlation-id` + `prometheus-client`
-- `defusedxml` for XML/HTML hardening
-- `gunicorn` + `uvicorn` workers in production (Docker)
-- Multi-stage Dockerfile on `python:3.14-slim`
+## Why
+
+**AutoPVS1 has no API.** It is a web form that renders results as HTML, so every programmatic
+consumer has to scrape and parse the page. This server does that once, defensively, and hands
+back typed JSON: the PVS1 strength, the flowchart decision path, and the disease-mechanism rows.
+
+Doing it properly is the whole point. Parsers are pinned to committed HTML fixtures so an
+upstream DOM change fails CI instead of silently returning wrong evidence; a 1.0s courtesy
+delay and a 24h cache keep a chatty agent from hammering a service that never asked for the
+traffic; and every scraped payload carries a provenance note saying the fields came from
+unversioned HTML and may drift. Bulk and CNV entry points, which the web form has no
+equivalent for, come for free.
 
 ## Quick start
 
-### Installation
+Use the hosted deployment — no install, no upstream scraping of your own:
 
 ```bash
-git clone https://github.com/berntpopp/autopvs1-link.git
-cd autopvs1-link
+claude mcp add --transport http autopvs1 https://autopvs1-link.genefoundry.org/mcp
+```
 
-# Install with development dependencies
+To run it locally (Python 3.12+, [uv](https://github.com/astral-sh/uv)):
+
+```bash
 uv sync --group dev
+cp .env.example .env
+make dev            # REST + MCP on http://127.0.0.1:8000 (MCP at /mcp)
 ```
 
-### Run
+There is no data build — the server holds no local corpus and fetches from AutoPVS1 live.
+But **outbound network access is denied by default**, so a fresh checkout answers nothing
+until you opt in explicitly:
 
 ```bash
-# Unified server (REST + MCP) on http://127.0.0.1:8000
-make dev
-
-# Or via the CLI
-uv run autopvs1-link server
-
-# MCP stdio (for Claude Desktop and similar)
-uv run autopvs1-link mcp
-
-# MCP over Streamable HTTP
-uv run autopvs1-link mcp --http --port 3000
+AUTOPVS1_LINK_API_EGRESS_MODE=allowlist
+AUTOPVS1_LINK_API_ALLOWED_UPSTREAM_ORIGINS=https://autopvs1.bgi.com,https://rest.ensembl.org,https://grch37.rest.ensembl.org
 ```
 
-### Claude Desktop integration
+Those public services receive the variant identifiers you submit. Do not point this profile at
+patient-derived data — see [Configuration](docs/configuration.md) for the controlled-deployment
+alternative, and [Deployment](docs/deployment.md) for stdio (Claude Desktop) and Docker.
 
-Add to your Claude Desktop config:
+## Tools
 
-```json
-{
-  "mcpServers": {
-    "autopvs1-link": {
-      "command": "python",
-      "args": ["-m", "autopvs1_link.cli", "mcp"]
-    }
-  }
-}
-```
+| Tool | Purpose |
+|------|---------|
+| `get_variant_pvs1_data` | PVS1 evidence for one SNV/indel (e.g. `X-82763936-A-T`) — strength, flowchart, disease mechanisms |
+| `get_cnv_pvs1_data` | PVS1 evidence for one CNV (e.g. `17-15000000-20000000-DEL`) |
+| `get_variants_pvs1_data_bulk` | Batch the SNV/indel lookup over many identifiers in one call |
+| `get_cnvs_pvs1_data_bulk` | Batch the CNV lookup over many identifiers in one call |
+| `search_variants` | Find AutoPVS1 variant records by gene or free text; cursor-paginated |
+| `get_server_health` | Local server health, version, and destructive-tool registration — never calls upstream |
+| `get_server_capabilities` | Compact discovery payload pointing at `autopvs1-link://capabilities` |
 
-Then ask Claude:
+Leaf names are unprefixed per
+[Tool-Naming Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/TOOL-NAMING-STANDARD-v1.md) —
+namespacing is the gateway's job. Behind `genefoundry-router` this server mounts under the
+canonical namespace token `autopvs1`, so the tools above surface as `autopvs1_<tool>` (e.g.
+`autopvs1_get_variant_pvs1_data`, the pinned entry point).
 
-> Analyze the PVS1 criteria for variant X:g.83508928A>T in hg19.
+A destructive `clear_cache` tool exists but is **off the default surface**; it registers only
+when `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`. Two MCP resources and two classification
+prompts ship alongside the tools. Response envelopes, `response_mode` / `meta_mode` token
+controls, pagination, and error codes are documented in the
+[API reference](docs/api.md); full schemas are in the generated
+[tool catalog](docs/mcp-tool-catalog.md).
 
-## API
+## Data & provenance
 
-### REST endpoints
-
-OpenAPI docs at `http://localhost:8000/docs` for local `make dev`.
-The Docker development stack publishes the container on
-`http://localhost:8012` by default to avoid collisions with sibling projects.
-
-```
-GET  /variant/{genome_build}/{variant_id}              # PVS1 analysis for a variant
-GET  /variant/search?q={gene}&genome_version={build}   # Variant search
-GET  /cnv/{genome_build}/{cnv_id}                      # PVS1 analysis for a CNV
-GET  /health                                           # Health probe
-GET  /metrics                                          # Prometheus metrics
-GET  /api/cache/stats                                  # Cache stats
-POST /api/cache/clear                                  # Clear caches
-```
-
-See [`docs/api.md`](docs/api.md) for the full reference.
-
-### MCP tools and resources
-
-Default tools (7):
-
-- `get_variant_pvs1_data(genome_build, variant_id)`
-- `get_cnv_pvs1_data(genome_build, cnv_id)`
-- `search_variants(query, genome_build=None, limit=10, cursor=None)`
-- `get_server_health()`
-- `get_server_capabilities()`
-
-Bulk tools:
-
-- `get_variants_pvs1_data_bulk(items, ...)`
-- `get_cnvs_pvs1_data_bulk(items, ...)`
-
-Opt-in destructive tool:
-
-- `clear_cache()` - registered only when
-  `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true`
-
-### GeneFoundry router / namespace token
-
-This server is a member of the GeneFoundry `*-link` MCP fleet and conforms to
-the [GeneFoundry Tool-Naming & Normalization Standard v1](https://github.com/berntpopp/autopvs1-link/issues/24).
-Tool names are left **unprefixed** (`get_variant_pvs1_data`, not
-`autopvs1_get_variant_pvs1_data`): namespacing is the gateway's job. When the
-`genefoundry-router` mounts this server it applies the canonical **namespace
-token `autopvs1`**, so tools surface at the gateway as `autopvs1_<tool>` (for
-example `autopvs1_get_variant_pvs1_data`). The stable `serverInfo.name` is
-**`autopvs1-link`** (lowercase, hyphenated, matching the namespace; set in
-`autopvs1_link/mcp/server_info.py`).
-
-All tool names use the canonical verb set (`get`, `search`) and stay well under
-the 50-char limit. The sole exception is the gated, off-by-default `clear_cache`
-tool, whose `clear` verb is a documented exception for destructive cache
-management (it never pollutes the default surface). Tools also carry domain
-`tags` (`variant`, `cnv`/`copy-number`, `classification`, `discovery`, `bulk`,
-`meta`) so the gateway can filter and curate the surfaced toolset. The
-`tests/unit/mcp/test_tool_names.py` CI guard enforces this contract.
-
-Resources (2):
-
-- `autopvs1-link://cache/statistics` - read-only cache stats snapshot
-- `autopvs1-link://capabilities` - detailed MCP usage guidance
-
-Prompts (2):
-
-- `classify_variant` - canonical variant classification workflow guidance
-- `classify_cnv` - canonical CNV classification workflow guidance
-
-Cache statistics expose stable method-keyed counters and cache-key-shape
-metadata for the configured service methods.
-
-MCP tool responses use the GeneFoundry Response-Envelope Standard v1 flat
-banner: `{"success": true, "result"|"results", "_meta"}` on success,
-`{"success": false, "error_code", "message", "retryable", "recovery_action",
-"_meta"}` on failure (with MCP `isError: true`).
-Read tools accept `response_mode` (`summary`, `standard`, `full`) and
-`meta_mode` (`full`, `compact`, `minimal`) so agents can control token cost
-while preserving research-use framing. Variant and CNV tools also accept
-`include_unmet` to filter disease-mechanism rows. Validation and upstream
-failures return stable `error_code` values; CNV colon-form validation errors
-include a structured `details.corrected_id` when a corrected AutoPVS1 ID
-can be derived. Search pagination uses `limit` plus the returned
-`pagination.next_cursor`; omitting `genome_build` defaults to `hg38` with a warning.
-Outputs are research-use AutoPVS1 data, not clinical decision support; cite
-AutoPVS1 (`10.1002/humu.24051`) where appropriate.
-
-The auto-generated tool catalog with full schemas lives in
-[`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md).
-
-## Configuration
-
-Settings are read from the `AUTOPVS1_LINK_*` env-var family (or a local
-`.env` file). The legacy `AUTOPVS1_*` prefix is still accepted for one
-release with a `DeprecationWarning`. See
-[`docs/configuration.md`](docs/configuration.md) for the full migration
-table and tunable knobs.
-
-```bash
-AUTOPVS1_LINK_API_BASE_URL=https://autopvs1.bgi.com
-AUTOPVS1_LINK_API_REQUEST_TIMEOUT=30
-AUTOPVS1_LINK_CACHE_SIZE=256
-AUTOPVS1_LINK_LOG_LEVEL=INFO
-AUTOPVS1_LINK_METRICS_ENABLED=true
-AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=false
-```
-
-## Development
-
-```bash
-make install         # Install + sync dev deps
-make format          # Run ruff format
-make lint            # Run ruff check
-make typecheck       # Run mypy strict
-make test            # Run tests
-make test-cov        # Run tests with coverage report
-make ci-local        # format-check + lint + typecheck + test (the CI gate)
-```
-
-Pre-commit hooks ship in `.pre-commit-config.yaml`:
-
-```bash
-uv run pre-commit install
-```
-
-## Docker
-
-Multi-stage Dockerfile on `python:3.14-slim` and four Compose stacks (base,
-dev, prod, npm) live under `docker/`. See
-[`docker/README.md`](docker/README.md) for usage.
-
-```bash
-make docker-build    # Build image
-make docker-up       # Start dev stack
-make docker-down     # Stop
-make docker-logs     # Follow logs
-```
+- **Upstream**: [AutoPVS1](https://autopvs1.bgi.com) (BGI). Genome builds `hg19` and `hg38`;
+  omitting the build defaults to `hg38` and returns a warning.
+- **Refresh model**: none — this server mirrors nothing. Every answer is scraped live from
+  AutoPVS1's HTML and cached in memory (default 256 entries, 24h TTL). Upstream requests are
+  spaced by a 1.0s rate-limit delay by contract; do not shorten it.
+- **Fragility**: AutoPVS1's HTML is not a versioned contract. Scrape-tier responses carry an
+  `upstream_provenance` note saying so, and `_meta.unsafe_for_clinical_use` is always `true`.
+- **Citation** — cite AutoPVS1, not this wrapper:
+  > Xiang J, Peng J, Baxter S, Peng Z. AutoPVS1: An automatic classification tool for PVS1
+  > interpretation of null variants. *Human Mutation*. 2020;41(9):1488-1498.
+  > DOI [10.1002/humu.24051](https://doi.org/10.1002/humu.24051), PMID 32442321.
 
 ## Documentation
 
-- [`docs/architecture.md`](docs/architecture.md) - layered architecture
-- [`docs/configuration.md`](docs/configuration.md) - env-var reference
-- [`docs/api.md`](docs/api.md) - REST + MCP surface
-- [`docs/mcp-tool-catalog.md`](docs/mcp-tool-catalog.md) - generated tool schemas
-- [`docs/mcp-evaluation-checklist.md`](docs/mcp-evaluation-checklist.md) - MCP contract checks
-- [`SECURITY.md`](SECURITY.md) - vulnerability reporting + required repo security settings
-- [`AGENTS.md`](AGENTS.md) - shared instructions for agentic coding tools
-- [`CHANGELOG.md`](CHANGELOG.md) - release notes
+- [Architecture](docs/architecture.md) — layered design, the technology stack, and the fleet federation contract.
+- [Configuration](docs/configuration.md) — every `AUTOPVS1_LINK_*` variable, the egress policy, and the legacy-prefix migration.
+- [Deployment](docs/deployment.md) — transports, Claude Desktop stdio, Docker, and the reverse-proxy boundary.
+- [API reference](docs/api.md) — REST endpoints, the response envelope, resources, and prompts.
+- [Tool catalog](docs/mcp-tool-catalog.md) — generated input/output schemas for every tool.
+- [MCP evaluation checklist](docs/mcp-evaluation-checklist.md) — the MCP contract checks.
+- [SECURITY.md](SECURITY.md) · [CHANGELOG.md](CHANGELOG.md) · [AGENTS.md](AGENTS.md)
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Run `make ci-local` and make sure it passes
-4. Open a Pull Request
+Read [`AGENTS.md`](AGENTS.md) for engineering conventions — it is the contributor guide.
+`make ci-local` is the definition-of-done gate: format, lint, line budget, README standard,
+mypy, and tests. New parser behaviour needs an HTML fixture under `tests/fixtures/`.
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
-
-## Acknowledgments
-
-- [AutoPVS1](https://autopvs1.bgi.com) for providing the PVS1 variant classification service
-- [FastAPI](https://fastapi.tiangolo.com/) for the web framework
-- [FastMCP](https://github.com/jlowin/fastmcp) for MCP integration
-- [Pydantic](https://docs.pydantic.dev/) for data validation and settings
+Code: [MIT](LICENSE) © Bernt Popp. Data: PVS1 classifications are produced by the upstream
+AutoPVS1 service and remain subject to its terms; this repository redistributes none of them
+and asserts no licence over them. Research use only — mirror AutoPVS1's disclaimers and the
+citation above.

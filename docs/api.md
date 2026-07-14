@@ -113,5 +113,5 @@ variants. Human Mutation. 2020;41(9):1488-1498. DOI: `10.1002/humu.24051`.
   on the FastAPI app. The legacy SSE transport is retired in FastMCP 3.
 - **Unified** - Both REST and MCP on the same server (default).
 
-See [MCP_CONNECTION_GUIDE.md](MCP_CONNECTION_GUIDE.md) for client setup
-instructions.
+See [deployment.md](deployment.md) for client setup instructions (hosted
+Streamable HTTP, Claude Desktop stdio, and Docker).
