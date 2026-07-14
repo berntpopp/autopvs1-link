@@ -4,6 +4,27 @@ All notable changes to autopvs1-link are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.5] - 2026-07-14
+
+### Fixed
+
+- **The NPM deployment would have lost its public hostname on the next deploy.**
+  `docker-compose.prod.yml` sets `container_name: !reset null`, which is right for the
+  standalone production stack it targets. But the deployed chain is
+  `docker-compose.yml -f docker-compose.prod.yml -f docker-compose.npm.yml`, and Nginx
+  Proxy Manager forwards to a **container name** on the shared network — the live proxy
+  host emits `proxy_pass http://autopvs1_link_server:8000;`. With the name reset and
+  nothing restoring it, Compose would have named the container
+  `autopvs1-link-npm-autopvs1-link-1`, NPM could not have resolved it, and
+  `autopvs1-link.genefoundry.org` would have started returning 502 the moment the server
+  pulled this compose. `docker-compose.npm.yml` now restores
+  `container_name: autopvs1_link_server`. `docker-compose.prod.yml` is untouched.
+
+### Added
+
+- `AUTOPVS1_LINK_IMAGE` in `.env.docker.example`. The prod overlay has always required it
+  (it fails closed without it), but it was documented nowhere an operator would copy.
+
 ## [Unreleased]
 
 ## [4.0.4] - 2026-07-13
