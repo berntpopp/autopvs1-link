@@ -248,14 +248,17 @@ class TestPVS1FlowchartParsing:
 class TestDiseaseMechanismParsing:
     """Test disease mechanism table parsing."""
 
-    def test_parse_disease_mechanisms_uses_selected_clinical_validity_option(self):
-        """A select cell must expose only its selected upstream option."""
+    def test_parse_disease_mechanisms_requires_one_clinical_validity_option(self):
+        """A select cell must expose exactly one non-empty selected upstream option."""
         html = load_fixture("disease_mechanism_clinical_validity.html")
         mechanisms = parse_disease_mechanisms(BeautifulSoup(html, "html.parser"))
 
         assert [item.clinical_validity for item in mechanisms] == [
             "No Reported Evidence",
             "Strong",
+            "not_available",
+            "not_available",
+            "not_available",
             "not_available",
         ]
         assert "DefinitiveNo Reported EvidenceLimited" not in {

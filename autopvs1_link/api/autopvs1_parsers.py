@@ -51,10 +51,12 @@ def _parse_clinical_validity(cell: Tag) -> str:
     if not isinstance(select, Tag):
         return _collapse_html_text(cell) or CLINICAL_VALIDITY_UNAVAILABLE
 
-    for option in select.find_all("option"):
-        if option.has_attr("selected"):
-            return _collapse_html_text(option) or CLINICAL_VALIDITY_UNAVAILABLE
-    return CLINICAL_VALIDITY_UNAVAILABLE
+    selected_options = [
+        option for option in select.find_all("option") if option.has_attr("selected")
+    ]
+    if len(selected_options) != 1:
+        return CLINICAL_VALIDITY_UNAVAILABLE
+    return _collapse_html_text(selected_options[0]) or CLINICAL_VALIDITY_UNAVAILABLE
 
 
 def _is_note_marker(node: object) -> bool:
