@@ -215,7 +215,7 @@ async def test_transport_error_path_yields_clean_fixed_message(mocker) -> None:
 
     structured = _assert_both_mirrors_clean(result)
     assert structured["success"] is False
-    assert structured["error_code"] == "external_resolver_unavailable"
+    assert structured["error_subcode"] == "external_resolver_unavailable"
 
 
 def test_error_envelope_central_message_sanitize() -> None:
@@ -295,7 +295,7 @@ async def test_forbidden_codepoint_variant_input_is_rejected(mocker) -> None:
     )
     structured = _assert_both_mirrors_clean(result)
     assert structured["success"] is False
-    assert structured["error_code"] == "invalid_variant_id"
+    assert structured["error_subcode"] == "invalid_variant_id"
     # rejected BEFORE any resolver hop; the hostile identifier never echoed.
     recode.assert_not_awaited()
     assert "c.5266dup" not in result.content[0].text
@@ -313,7 +313,7 @@ async def test_forbidden_codepoint_bulk_item_is_rejected(mocker) -> None:
     )
     structured = _assert_both_mirrors_clean(result)
     assert structured["success"] is False
-    assert structured["error_code"] == "invalid_bulk_input"
+    assert structured["error_subcode"] == "invalid_bulk_input"
     assert "results" not in structured
     recode.assert_not_awaited()
 
@@ -333,7 +333,7 @@ async def test_bulk_arg_validation_uses_fixed_message() -> None:
     )
     structured = result.structured_content
     assert structured["success"] is False
-    assert structured["error_code"] == "invalid_bulk_input"
+    assert structured["error_subcode"] == "invalid_bulk_input"
     assert structured["message"] == "items[0] is missing required fields or has invalid values."
     # no pydantic internals leaked into the message
     assert "validation error" not in structured["message"].lower()
@@ -381,7 +381,7 @@ async def test_instruction_shaped_hgvs_input_is_rejected(mocker) -> None:
     )
     structured = _assert_both_mirrors_clean(result)
     assert structured["success"] is False
-    assert structured["error_code"] == "invalid_variant_id"
+    assert structured["error_subcode"] == "invalid_variant_id"
     recode.assert_not_awaited()
     assert _INJECTION not in result.content[0].text
 
@@ -469,7 +469,7 @@ async def test_hostile_upstream_candidate_data_is_dropped_over_real_recode(mocke
     )
     structured = _assert_both_mirrors_clean(result)
     assert structured["success"] is False
-    assert structured["error_code"] == "requires_disambiguation"
+    assert structured["error_subcode"] == "requires_disambiguation"
     # two clean candidates survived; the injection token is nowhere.
     assert len(structured["details"]["candidates"]) == 2
     assert _INJECTION not in result.content[0].text

@@ -21,6 +21,7 @@ from autopvs1_link.mcp.cost_tiers import (
     SCRAPE_TIER as _SCRAPE_TIER,
 )
 from autopvs1_link.mcp.registries import (
+    CANONICAL_ERROR_CODES,
     KNOWN_ERROR_CODES,
     KNOWN_WARNING_CODES,
     PAYLOAD_MODES,
@@ -298,6 +299,7 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "error_fields": [
                 "success",
                 "error_code",
+                "error_subcode",
                 "message",
                 "retryable",
                 "recovery_action",
@@ -311,6 +313,13 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "succeeded/failed for bulk). All other tools return a "
                 "single top-level result object."
             ),
+            "error_code_semantics": (
+                "error_code is the closed six-value enum clients branch on "
+                "(Response-Envelope Standard v1). The specific reason is kept "
+                "as the optional error_subcode; stable_error_codes below lists "
+                "those subcode values."
+            ),
+            "canonical_error_codes": sorted(CANONICAL_ERROR_CODES),
             "stable_error_codes": sorted(KNOWN_ERROR_CODES),
             "stable_warning_codes": sorted(KNOWN_WARNING_CODES),
             "meta_recovery_hints": (
@@ -501,16 +510,18 @@ _AUTO_RESOLUTION_BLOCK: dict[str, Any] = {
             "canonical CHROM-POS-REF-ALT directly to skip resolution)."
         ),
         "multi_hit": (
-            "error_code='requires_disambiguation' with candidates list in "
+            "error_code='ambiguous_query' (error_subcode "
+            "'requires_disambiguation') with candidates list in "
             "details.candidates. Each candidate: id, spdi, allele_key, "
             "synonym_ids, genome_build, resource_uri. Caller picks one "
             "and re-calls. Server never silently best-guesses to avoid "
             "multi-allelic mis-scoring (Ensembl VEP #989 failure mode)."
         ),
         "resolver_unavailable": (
-            "error_code='external_resolver_unavailable' (retryable=true) "
-            "when Ensembl REST times out, rate-limits, or returns 5xx. "
-            "Distinguishes transient failure from permanent not_found."
+            "error_code='upstream_unavailable' (error_subcode "
+            "'external_resolver_unavailable', retryable=true) when Ensembl "
+            "REST times out, rate-limits, or returns 5xx. Distinguishes "
+            "transient failure from permanent not_found."
         ),
     },
     "build_safety": (

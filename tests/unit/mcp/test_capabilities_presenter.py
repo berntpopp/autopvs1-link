@@ -105,10 +105,19 @@ def test_detailed_capabilities_resource_has_examples_and_is_not_duplicate() -> N
     assert detailed["response_envelope"]["error_fields"] == [
         "success",
         "error_code",
+        "error_subcode",
         "message",
         "retryable",
         "recovery_action",
         "_meta",
+    ]
+    assert detailed["response_envelope"]["canonical_error_codes"] == [
+        "ambiguous_query",
+        "internal",
+        "invalid_input",
+        "not_found",
+        "rate_limited",
+        "upstream_unavailable",
     ]
     assert detailed != compact
     assert set(detailed["response_envelope"]["stable_error_codes"]) >= {

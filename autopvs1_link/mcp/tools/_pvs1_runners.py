@@ -25,11 +25,9 @@ from autopvs1_link.mcp.untrusted_content import (
     sanitize_error_details,
     sanitize_message,
 )
+from autopvs1_link.mcp.upstream_errors import http_status_error_code
+from autopvs1_link.mcp.upstream_errors import is_retryable_status as _retryable
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
-
-
-def _retryable(status_code: int) -> bool:
-    return status_code in {408, 429} or status_code >= 500
 
 
 def _err(
@@ -125,7 +123,7 @@ async def run_variant_pvs1(
             ),
         )
     except httpx.HTTPStatusError as exc:
-        code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
+        code = http_status_error_code(exc.response.status_code)
         return (
             None,
             [],
@@ -231,7 +229,7 @@ async def run_cnv_pvs1(
             ),
         )
     except httpx.HTTPStatusError as exc:
-        code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
+        code = http_status_error_code(exc.response.status_code)
         return (
             None,
             [],

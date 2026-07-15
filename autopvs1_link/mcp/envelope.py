@@ -19,7 +19,11 @@ from autopvs1_link.config import settings
 from autopvs1_link.mcp.cost_tiers import SCRAPE_TIER, cold_latency_ms_for, cost_tier_for
 from autopvs1_link.mcp.mode_validation import MetaMode, normalize_meta_mode
 from autopvs1_link.mcp.next_commands import error_next_commands
-from autopvs1_link.mcp.registries import capabilities_version, next_actions_for
+from autopvs1_link.mcp.registries import (
+    canonical_error_code,
+    capabilities_version,
+    next_actions_for,
+)
 from autopvs1_link.mcp.telemetry import get_call_telemetry
 from autopvs1_link.mcp.untrusted_content import sanitize_error_details, sanitize_message
 
@@ -209,67 +213,6 @@ def _normalize_meta_mode(meta_mode: Any) -> MetaMode:
     return normalize_meta_mode(meta_mode)
 
 
-def _split_defs(schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Pop ``$defs`` off a pydantic JSON Schema so it can be re-hoisted to a new root.
-
-    ``$ref`` pointers (``#/$defs/Foo``) resolve against the schema ROOT, so
-    nesting a model's own schema as a property value only stays valid if
-    its ``$defs`` are hoisted alongside it rather than left nested.
-    """
-    schema = dict(schema)
-    defs = schema.pop("$defs", {})
-    schema.pop("title", None)
-    return schema, defs
-
-
-def success_output_schema(
-    data_model: type[BaseModel],
-    *,
-    collection_field: str | None = None,
-) -> dict[str, Any]:
-    """Build the MCP ``outputSchema`` for the flat Response-Envelope v1 banner.
-
-    Single-item tools (``collection_field=None``) get ``data_model``'s own
-    schema embedded as the ``result`` object. Collection tools pass the
-    ``data_model`` field name whose array becomes the canonical top-level
-    ``results`` key (Response-Envelope Standard v1 §1); every other field
-    on ``data_model`` becomes a sibling top-level key (e.g. ``pagination``,
-    ``total_count``) rather than a nested alias.
-
-    The frame declares both the success shape (``result``/``results``) and
-    the flat error shape (``error_code``/``message``/``retryable``/
-    ``recovery_action``) as optional properties on one schema, matching the
-    envelope's existing non-discriminated-union pattern: a given response is
-    one or the other, never both.
-    """
-    inner, inner_defs = _split_defs(data_model.model_json_schema())
-    meta_schema, meta_defs = _split_defs(MCPMeta.model_json_schema())
-    properties: dict[str, Any] = {
-        "success": {"type": "boolean"},
-        "error_code": {"type": "string"},
-        "message": {"type": "string"},
-        "retryable": {"type": "boolean"},
-        "recovery_action": {"type": "string"},
-        "_meta": meta_schema,
-    }
-    if collection_field is None:
-        properties["result"] = inner
-    else:
-        inner_properties = dict(inner.get("properties", {}))
-        results_schema = inner_properties.pop(collection_field, {"type": "array"})
-        properties["results"] = results_schema
-        properties.update(inner_properties)
-    schema: dict[str, Any] = {
-        "type": "object",
-        "properties": properties,
-        "required": ["success", "_meta"],
-    }
-    defs = {**inner_defs, **meta_defs}
-    if defs:
-        schema["$defs"] = defs
-    return schema
-
-
 def _apply_meta_mode(payload: dict[str, Any], meta_mode: Any) -> dict[str, Any]:
     mode = _normalize_meta_mode(meta_mode)
     meta = payload["_meta"]
@@ -388,7 +331,7 @@ def _strip_none_warning_aggregate_fields(payload: dict[str, Any]) -> dict[str, A
 
 
 _RETRYABLE_TRANSIENT_CODES = frozenset(
-    {"upstream_timeout", "upstream_unavailable", "external_resolver_unavailable"}
+    {"upstream_timeout", "upstream_unavailable", "external_resolver_unavailable", "rate_limited"}
 )
 
 
@@ -422,6 +365,7 @@ def ok_envelope(
     uncached_count: int | None = None,
     next_commands: list[dict[str, Any]] | None = None,
     collection_field: str | None = None,
+    pagination: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a successful MCP envelope as a JSON-ready dict (Response-Envelope Standard v1).
 
@@ -489,6 +433,12 @@ def ok_envelope(
         banner["results"] = payload.pop(collection_field, [])
         banner.update(payload)
     banner["_meta"] = meta.model_dump(mode="json")
+    # Response-Envelope Standard v1: a paginated collection surfaces
+    # ``_meta.pagination`` with ``total_count`` + ``has_more`` so a client can tell
+    # a partial page from an exhaustive one. Kept alongside (not instead of) any
+    # data-level pagination block the payload already carries.
+    if pagination is not None:
+        banner["_meta"]["pagination"] = pagination
     out = _apply_meta_mode(banner, meta_mode)
     cleaned = _strip_none_error_details(out)
     assert isinstance(cleaned, dict)
@@ -508,6 +458,7 @@ def error_envelope(
     meta_mode: Any = "compact",
     tool_name: str | None = None,
     retry_after_ms: int | None = None,
+    allowed_values: list[str] | None = None,
 ) -> ErrorToolResult:
     """Return a failed MCP result that flips ``CallToolResult.isError=true``.
 
@@ -565,21 +516,34 @@ def error_envelope(
         next_actions=next_actions,
         next_commands=error_next_commands(code, details),
     )
+    # Response-Envelope Standard v1: ``error_code`` is a closed six-value enum.
+    # The granular ``code`` (invalid_variant_id, upstream_timeout, ...) stays on
+    # the wire as ``error_subcode`` so a caller keeps the specific reason, while
+    # ``error_code`` carries the canonical value clients branch on. All the
+    # recovery machinery above (next_actions, next_commands, retry hints) keys off
+    # the granular code, so canonicalisation touches only the wire field.
+    canonical = canonical_error_code(code)
     payload: dict[str, Any] = {
         "success": False,
-        "error_code": code,
-        # Defensive backstop: strip forbidden control/zero-width/bidi/NUL code
-        # points from the caller-visible message whatever builder produced it
-        # (every tool funnels its ``message=str(exc)`` error through here). No
-        # upstream response body reaches this point (severed at the API client),
-        # but a caller-influenced str(exc) could still carry hostile code points.
-        "message": sanitize_message(message),
-        "retryable": retryable,
-        "recovery_action": _recovery_action_for(suggestions, next_actions),
-        "_meta": meta.model_dump(mode="json"),
+        "error_code": canonical,
     }
-    if payload["recovery_action"] is None:
-        payload.pop("recovery_action")
+    if code != canonical:
+        payload["error_subcode"] = code
+    # Defensive backstop: strip forbidden control/zero-width/bidi/NUL code
+    # points from the caller-visible message whatever builder produced it
+    # (every tool funnels its ``message=str(exc)`` error through here). No
+    # upstream response body reaches this point (severed at the API client),
+    # but a caller-influenced str(exc) could still carry hostile code points.
+    payload["message"] = sanitize_message(message)
+    payload["retryable"] = retryable
+    recovery_action = _recovery_action_for(suggestions, next_actions)
+    if recovery_action is not None:
+        payload["recovery_action"] = recovery_action
+    payload["_meta"] = meta.model_dump(mode="json")
+    # ``allowed_values`` names the parameters/values the caller may use — the
+    # actionable structured field the Behaviour gate looks for on an input error.
+    if allowed_values:
+        payload["allowed_values"] = allowed_values
     if suggestions:
         payload["suggestions"] = suggestions
     if details:

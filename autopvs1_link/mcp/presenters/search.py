@@ -100,7 +100,14 @@ def present_search(
     )
 
     if mode == "summary":
-        emitted_results: list[dict[str, Any]] = []
+        # Response-Envelope Standard v1: minimal/summary "omits optional record
+        # detail" but RETAINS stable identifiers. Emitting the two guaranteed
+        # fields (variant_id + re-fetch url) keeps the page navigable and avoids
+        # the silent-empty anti-pattern of a zero-row success while pagination
+        # reports matches. Suggestions are kept (unlike ids_only).
+        emitted_results: list[dict[str, Any]] = [
+            {"variant_id": row["variant_id"], "url": row["url"]} for row in page
+        ]
         emitted_suggestions = suggestions
     elif mode == "ids_only":
         emitted_results = [{"variant_id": row["variant_id"], "url": row["url"]} for row in page]

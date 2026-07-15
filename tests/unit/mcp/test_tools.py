@@ -24,41 +24,6 @@ def _non_null_schema(schema: JsonSchema) -> JsonSchema:
     return schema
 
 
-def _resolve_ref(root: JsonSchema, schema: JsonSchema) -> JsonSchema:
-    ref = schema.get("$ref")
-    if ref is None:
-        return schema
-
-    assert isinstance(ref, str)
-    assert ref.startswith("#/")
-    resolved: Any = root
-    for part in ref.removeprefix("#/").split("/"):
-        resolved = resolved[part]
-    assert isinstance(resolved, dict)
-    return resolved
-
-
-def _data_schema(output_schema: JsonSchema) -> JsonSchema:
-    return _non_null_schema(output_schema["properties"]["result"])
-
-
-def _property_schema(root: JsonSchema, schema: JsonSchema, property_name: str) -> JsonSchema:
-    raw = _non_null_schema(schema["properties"][property_name])
-    return _resolve_ref(root, raw)
-
-
-def _assert_typed_object_schema(
-    root: JsonSchema,
-    schema: JsonSchema,
-    expected_properties: set[str],
-) -> JsonSchema:
-    resolved = _resolve_ref(root, schema)
-    assert "properties" in resolved
-    assert expected_properties <= set(resolved["properties"])
-    assert resolved.get("additionalProperties") is not True
-    return resolved
-
-
 def _schema_allows_null(schema: dict) -> bool:
     return schema.get("type") == "null" or any(
         branch.get("type") == "null" for branch in schema.get("anyOf", [])
@@ -110,15 +75,8 @@ async def test_clear_cache_is_registered_only_when_destructive_tools_enabled(mon
     schema = tools["clear_cache"].parameters
     assert schema.get("properties", {}) == {}
     assert "_" not in schema.get("properties", {})
-    assert set(tools["clear_cache"].output_schema["properties"]) == {
-        "success",
-        "result",
-        "error_code",
-        "message",
-        "retryable",
-        "recovery_action",
-        "_meta",
-    }
+    # outputSchema is suppressed (Tool-Surface Budget Standard v1).
+    assert tools["clear_cache"].output_schema is None
 
 
 @pytest.mark.asyncio
@@ -197,7 +155,7 @@ async def test_search_variants_parameters_use_clean_runtime_annotations() -> Non
 
 
 @pytest.mark.asyncio
-async def test_data_tools_have_titles_annotations_and_output_schemas() -> None:
+async def test_data_tools_have_titles_and_annotations_and_no_output_schema() -> None:
     mcp: FastMCP = build_mcp_server()
     tools = {tool.name: tool for tool in await mcp.list_tools()}
 
@@ -209,90 +167,13 @@ async def test_data_tools_have_titles_annotations_and_output_schemas() -> None:
     ):
         tool = tools[name]
         assert tool.title
-        assert tool.output_schema is not None
-        assert set(tool.output_schema["properties"]) == {
-            "success",
-            "result",
-            "error_code",
-            "message",
-            "retryable",
-            "recovery_action",
-            "_meta",
-        }
+        # outputSchema is suppressed (Tool-Surface Budget Standard v1); the runtime
+        # envelope shape is verified via call_tool in test_tool_runtime instead.
+        assert tool.output_schema is None
         assert tool.annotations is not None
         assert tool.annotations.readOnlyHint is True
         assert tool.annotations.destructiveHint is False
         assert tool.annotations.idempotentHint is True
-
-
-@pytest.mark.asyncio
-async def test_data_tool_output_schemas_expose_typed_nested_payloads() -> None:
-    mcp: FastMCP = build_mcp_server()
-    tools = {tool.name: tool for tool in await mcp.list_tools()}
-
-    variant_schema = tools["get_variant_pvs1_data"].output_schema
-    variant_data = _data_schema(variant_schema)
-    variant_info = _property_schema(variant_schema, variant_data, "variant_info")
-    _assert_typed_object_schema(
-        variant_schema,
-        variant_info,
-        {"variant_id", "variant_type", "gene_symbol", "pli_score_display", "external_links"},
-    )
-    pvs1_flowchart = _property_schema(variant_schema, variant_data, "pvs1_flowchart")
-    resolved_flowchart = _assert_typed_object_schema(
-        variant_schema,
-        pvs1_flowchart,
-        {
-            "preliminary_decision_path",
-            "final_strength",
-            "final_strength_source",
-            "decision_tree",
-        },
-    )
-    # v1.1 no-duplication: the notes legend and decision_tree_raw audit copy
-    # were removed because they re-embedded decision_tree's scraped prose.
-    assert "notes" not in resolved_flowchart["properties"]
-    assert "decision_tree_raw" not in resolved_flowchart["properties"]
-    flowchart_step = _resolve_ref(
-        variant_schema,
-        resolved_flowchart["properties"]["decision_tree"]["items"],
-    )
-    _assert_typed_object_schema(
-        variant_schema,
-        flowchart_step,
-        {"code", "description", "note_id", "note_text"},
-    )
-    disease_mechanism = _resolve_ref(
-        variant_schema,
-        variant_data["properties"]["disease_mechanisms"]["items"],
-    )
-    _assert_typed_object_schema(
-        variant_schema,
-        disease_mechanism,
-        {"gene", "disease", "inheritance", "clinical_validity", "adjusted_strength"},
-    )
-
-    cnv_schema = tools["get_cnv_pvs1_data"].output_schema
-    cnv_data = _data_schema(cnv_schema)
-    cnv_info = _property_schema(cnv_schema, cnv_data, "cnv_info")
-    _assert_typed_object_schema(
-        cnv_schema,
-        cnv_info,
-        {"cnv_id", "cnv_type", "gene_symbol", "coordinates", "size"},
-    )
-    _assert_typed_object_schema(
-        cnv_schema,
-        _property_schema(cnv_schema, cnv_data, "pvs1_flowchart"),
-        {"preliminary_decision_path", "final_strength", "decision_tree"},
-    )
-
-    search_schema = tools["search_variants"].output_schema
-    search_result = _resolve_ref(search_schema, search_schema["properties"]["results"]["items"])
-    _assert_typed_object_schema(
-        search_schema,
-        search_result,
-        {"variant_id", "gene", "variant_type", "genome_build", "url"},
-    )
 
 
 @pytest.mark.asyncio
@@ -353,7 +234,7 @@ async def test_classify_variant_prompt_explains_payload_sizing_and_error_handlin
     assert "summary" in body
     assert "pvs1_not_applicable" in body
     assert "not_found" in body
-    assert "upstream_timeout" in body
+    assert "upstream_unavailable" in body
     assert "isError" in body
 
 

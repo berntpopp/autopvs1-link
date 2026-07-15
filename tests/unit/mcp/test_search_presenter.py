@@ -203,7 +203,7 @@ def test_present_search_uses_generic_guidance_for_transcript_only_hgvs_like_quer
     assert warnings[0].code == "unsupported_hgvs_like_search"
 
 
-def test_present_search_summary_keeps_counts_and_omits_result_rows() -> None:
+def test_present_search_summary_keeps_counts_and_identifier_rows() -> None:
     parsed = AutoPVS1SearchResults(
         query="BRCA1",
         genome_version="hg38",
@@ -228,7 +228,13 @@ def test_present_search_summary_keeps_counts_and_omits_result_rows() -> None:
     assert payload["pagination"]["next_cursor"] is not None
     assert payload["pagination"]["has_more"] is True
     assert payload["ordering"] == "upstream"
-    assert payload["results"] == []
+    # summary retains stable identifiers (Response-Envelope Standard v1): the two
+    # guaranteed fields (variant_id + url), but none of the optional record detail
+    # (which serialises to None here and is stripped on the wire via exclude_none).
+    rows = payload["results"]
+    assert [row["variant_id"] for row in rows] == ["17-0-A-T", "17-1-A-T"]
+    assert all(row["url"] for row in rows)
+    assert all(row["gene"] is None and row["variant_type"] is None for row in rows)
     assert warnings[0].code == "search_results_truncated"
 
 

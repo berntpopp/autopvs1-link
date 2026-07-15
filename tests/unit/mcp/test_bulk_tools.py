@@ -155,7 +155,7 @@ async def test_bulk_variants_rejects_too_many_items() -> None:
     )
     payload = result.structured_content
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_bulk_input"
+    assert payload["error_subcode"] == "invalid_bulk_input"
     assert "10" in payload["message"]
 
 
@@ -168,7 +168,7 @@ async def test_bulk_variants_rejects_empty_list() -> None:
     )
     payload = result.structured_content
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_bulk_input"
+    assert payload["error_subcode"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -246,7 +246,7 @@ async def test_bulk_cnvs_rejects_too_many_items() -> None:
     result = await mcp.call_tool("get_cnvs_pvs1_data_bulk", {"items": items})
     payload = result.structured_content
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_bulk_input"
+    assert payload["error_subcode"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -255,7 +255,7 @@ async def test_bulk_variants_rejects_non_list_items() -> None:
     result = await mcp.call_tool("get_variants_pvs1_data_bulk", {"items": "not_a_list"})
     payload = result.structured_content
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_bulk_input"
+    assert payload["error_subcode"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -267,7 +267,7 @@ async def test_bulk_variants_rejects_non_object_item() -> None:
     )
     payload = result.structured_content
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_bulk_input"
+    assert payload["error_subcode"] == "invalid_bulk_input"
 
 
 @pytest.mark.asyncio
@@ -300,7 +300,7 @@ async def test_bulk_variants_per_item_invalid_genome_build_yields_per_item_error
     [
         (_http_status_error(404), "not_found", False),
         (_http_status_error(500), "upstream_unavailable", True),
-        (_http_status_error(429), "upstream_unavailable", True),
+        (_http_status_error(429), "rate_limited", True),
         (httpx.ConnectError("boom"), "upstream_unavailable", True),
         (ValueError("parse fail"), "parse_error", False),
     ],
@@ -391,7 +391,7 @@ async def test_bulk_variants_invalid_response_mode_returns_top_level_error() -> 
     )
     payload = result.structured_content
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_response_mode"
+    assert payload["error_subcode"] == "invalid_response_mode"
 
 
 @pytest.mark.asyncio
@@ -738,7 +738,7 @@ async def test_bulk_cnvs_invalid_mode_returns_top_level_error() -> None:
     )
     payload = result.structured_content
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_meta_mode"
+    assert payload["error_subcode"] == "invalid_meta_mode"
 
 
 # ---------------------------------------------------------------------------

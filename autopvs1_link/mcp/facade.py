@@ -22,6 +22,12 @@ def build_mcp_server() -> FastMCP:
         name=SERVER_NAME,
         version=SERVER_VERSION,
         instructions=SERVER_DESCRIPTION,
+        # Do NOT inline every $defs/$ref at each use site (Tool-Surface Budget
+        # Standard v1, Rule 4). The constructor defaults this to True and appends
+        # DereferenceRefsMiddleware, which amplifies schema size ~1.35x. Turning it
+        # off is free and safe: 0/7 of this server's INPUT schemas contain a $ref,
+        # so no input-schema client can be affected.
+        dereference_schemas=False,
         # Mask UNHANDLED tool/resource exceptions: every expected failure is
         # already returned as a fixed/sanitized error envelope, but an
         # unexpected exception type (e.g. a RuntimeError from a presenter) would

@@ -11,13 +11,11 @@ from pydantic import Field, SkipValidation
 from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from autopvs1_link.mcp.contracts import SearchMCPData
 from autopvs1_link.mcp.envelope import (
     MCPWarning,
     ToolResponse,
     error_envelope,
     ok_envelope,
-    success_output_schema,
 )
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import (
@@ -32,6 +30,7 @@ from autopvs1_link.mcp.tools.mode_errors import (
     external_egress_disabled_envelope,
     invalid_mode_envelope,
 )
+from autopvs1_link.mcp.upstream_errors import http_status_error_code, is_retryable_status
 from autopvs1_link.mcp.validation import (
     normalize_genome_builds,
     normalize_limit_cursor,
@@ -63,13 +62,16 @@ def register(mcp: FastMCP) -> None:
         name="search_variants",
         title="Search AutoPVS1 Variants",
         tags={"variant", "discovery"},
-        output_schema=success_output_schema(SearchMCPData, collection_field="results"),
+        # outputSchema suppressed (Tool-Surface Budget Standard v1, Rule 3);
+        # structuredContent is still emitted for the dict envelope this tool returns.
+        output_schema=None,
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def search_variants(
         query: Annotated[
             SearchTextParam,
             Field(
+                examples=["BRCA1"],
                 description="Gene symbol, HGVS text, or partial variant string.",
             ),
         ],
@@ -111,8 +113,8 @@ def register(mcp: FastMCP) -> None:
                     "Response detail level. Default 'ids_only' emits the "
                     "AutoPVS1 variant_id and url per row — the leanest "
                     "shape for hand-off to get_variant_pvs1_data. "
-                    "'summary' drops the rows entirely (use only with "
-                    "pagination metadata); 'standard' returns rich rows "
+                    "'summary' keeps variant_id + url per row plus "
+                    "suggestions (lean navigable page); 'standard' returns rich rows "
                     "with gene + variant_type; 'full' is identical to "
                     "'standard' for search."
                 ),
@@ -165,6 +167,10 @@ def register(mcp: FastMCP) -> None:
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
                 collection_field="results",
+                pagination={
+                    "total_count": data.total_count,
+                    "has_more": data.pagination.has_more,
+                },
                 next_commands=search_next_page(
                     {
                         "query": normalized_query,
@@ -202,9 +208,9 @@ def register(mcp: FastMCP) -> None:
             )
         except httpx.HTTPStatusError as exc:
             return error_envelope(
-                code="upstream_unavailable",
+                code=http_status_error_code(exc.response.status_code),
                 message="AutoPVS1 upstream could not complete the search request.",
-                retryable=exc.response.status_code in {408, 429} or exc.response.status_code >= 500,
+                retryable=is_retryable_status(exc.response.status_code),
                 suggestions=["Retry later or simplify the search query."],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,

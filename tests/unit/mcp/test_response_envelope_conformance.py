@@ -10,7 +10,7 @@ and set MCP ``isError=true``. See
 from __future__ import annotations
 
 from autopvs1_link.mcp.contracts import ClearCacheData
-from autopvs1_link.mcp.envelope import error_envelope, ok_envelope, success_output_schema
+from autopvs1_link.mcp.envelope import error_envelope, ok_envelope
 
 
 def test_ok_envelope_single_item_uses_flat_success_banner() -> None:
@@ -85,7 +85,7 @@ def test_error_envelope_uses_flat_error_banner() -> None:
     payload = result.structured_content
 
     assert payload["success"] is False
-    assert payload["error_code"] == "invalid_variant_id"
+    assert payload["error_subcode"] == "invalid_variant_id"
     assert payload["message"] == ("Variant IDs must use AutoPVS1 format such as X-82763936-A-T.")
     assert payload["retryable"] is False
     assert payload["recovery_action"] == "Use search_variants with a gene symbol."
@@ -146,26 +146,3 @@ def test_error_envelope_omits_recovery_action_when_no_hint_available() -> None:
         tool_name="get_variant_pvs1_data",
     )
     assert "recovery_action" not in result.structured_content
-
-
-def test_success_output_schema_single_item_declares_result_key() -> None:
-    schema = success_output_schema(ClearCacheData)
-
-    assert schema["type"] == "object"
-    assert set(schema["required"]) == {"success", "_meta"}
-    assert "result" in schema["properties"]
-    assert "results" not in schema["properties"]
-    for key in ("error_code", "message", "retryable", "recovery_action"):
-        assert key in schema["properties"]
-
-
-def test_success_output_schema_collection_hoists_field_and_siblings() -> None:
-    from autopvs1_link.mcp.contracts import SearchMCPData
-
-    schema = success_output_schema(SearchMCPData, collection_field="results")
-
-    assert "results" in schema["properties"]
-    assert "result" not in schema["properties"]
-    # Sibling domain keys from SearchMCPData surface at the top level.
-    assert "pagination" in schema["properties"]
-    assert "total_count" in schema["properties"]

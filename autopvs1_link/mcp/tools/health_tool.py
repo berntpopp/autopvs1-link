@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from autopvs1_link.api.egress import EgressDeniedError, guarded_request
 from autopvs1_link.config import settings
 from autopvs1_link.mcp.annotations import READ_ONLY_CLOSED_WORLD
-from autopvs1_link.mcp.envelope import ok_envelope, success_output_schema
+from autopvs1_link.mcp.envelope import ok_envelope
 from autopvs1_link.mcp.server_info import SERVER_NAME, SERVER_VERSION
 from autopvs1_link.mcp.tools.cache_tools import destructive_tools_enabled
 
@@ -77,7 +77,9 @@ def register(mcp: FastMCP) -> None:
         name="get_server_health",
         title="Get AutoPVS1-Link Health",
         tags={"meta", "health"},
-        output_schema=success_output_schema(HealthData),
+        # outputSchema suppressed (Tool-Surface Budget Standard v1, Rule 3);
+        # structuredContent is still emitted for the dict envelope this tool returns.
+        output_schema=None,
         annotations=READ_ONLY_CLOSED_WORLD,
     )
     async def get_server_health(

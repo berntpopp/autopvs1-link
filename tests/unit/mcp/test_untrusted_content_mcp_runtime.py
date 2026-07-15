@@ -167,7 +167,7 @@ async def test_untrusted_text_limit_exceeded_maps_to_typed_error_not_generic(moc
 
     structured = result.structured_content
     assert structured["success"] is False
-    assert structured["error_code"] == "untrusted_text_limit_exceeded"
+    assert structured["error_subcode"] == "untrusted_text_limit_exceeded"
     assert structured["retryable"] is False
 
 
@@ -227,5 +227,5 @@ async def test_bulk_variants_response_wide_limit_breach_maps_to_typed_error(mock
 
     structured = result.structured_content
     assert structured["success"] is False
-    assert structured["error_code"] == "untrusted_text_limit_exceeded"
+    assert structured["error_subcode"] == "untrusted_text_limit_exceeded"
     assert structured["retryable"] is False

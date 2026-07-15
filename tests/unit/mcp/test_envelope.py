@@ -31,7 +31,8 @@ def test_error_envelope_contains_machine_readable_error() -> None:
 
     assert envelope["success"] is False
     assert "result" not in envelope
-    assert envelope["error_code"] == "invalid_variant_id"
+    assert envelope["error_code"] == "invalid_input"
+    assert envelope["error_subcode"] == "invalid_variant_id"
     assert envelope["message"] == "Variant IDs must use AutoPVS1 format such as X-82763936-A-T."
     assert envelope["retryable"] is False
     assert envelope["recovery_action"] == "Use search_variants with a gene symbol."
@@ -60,20 +61,10 @@ def test_mcp_input_error_converts_to_error_envelope() -> None:
     envelope = exc.to_envelope()
 
     assert envelope["success"] is False
-    assert envelope["error_code"] == "invalid_cnv_id"
+    assert envelope["error_code"] == "invalid_input"
+    assert envelope["error_subcode"] == "invalid_cnv_id"
     assert envelope["retryable"] is False
     assert envelope["suggestions"] == ["Use 17-15000000-20000000-DEL."]
-
-
-def test_success_output_schema_uses_flat_banner_fields() -> None:
-    from autopvs1_link.mcp.envelope import success_output_schema
-
-    schema = success_output_schema(ClearCacheData)
-
-    assert set(schema["required"]) == {"success", "_meta"}
-    assert {"success", "result", "error_code", "message", "retryable", "_meta"} <= set(
-        schema["properties"]
-    )
 
 
 def test_mcp_warning_serializes_without_aggregate_fields_when_unset() -> None:
