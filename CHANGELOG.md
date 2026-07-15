@@ -18,8 +18,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Disease-mechanism `clinical_validity` now preserves only the selected
   AutoPVS1 option rather than concatenating every HTML select option.
-  `"not_available"` explicitly represents malformed upstream cells with no
-  selected/non-empty value; it is not a clinical conclusion.
+  `"not_available"` explicitly represents a blank static cell or a select
+  without exactly one selected, non-empty value (zero, multiple, or empty
+  selected options); it is not a clinical conclusion.
 
 ## [4.1.0] - 2026-07-15
 

@@ -61,8 +61,10 @@ Read tools accept optional response-shaping controls:
   omit disease-mechanism rows whose adjusted strength is `Unmet`.
 
 For every disease-mechanism row, `clinical_validity` is the selected upstream
-AutoPVS1 option. The literal `"not_available"` means the upstream table
-contained no selected/non-empty value; it is not a clinical conclusion.
+AutoPVS1 option. The literal `"not_available"` means the upstream table did
+not yield a usable value: a static cell was blank, or a select did not yield
+exactly one selected, non-empty value (zero, multiple, or empty selected
+options). It is not a clinical conclusion.
 
 CNV validation accepts AutoPVS1 hyphen IDs and rejects colon-form input with a
 structured correction when possible. For example,
