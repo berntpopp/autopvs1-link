@@ -30,6 +30,7 @@ PVS1_STRENGTH_LABELS = {
     "Moderate_RWS",
     "Supporting_RWS",
 }
+CLINICAL_VALIDITY_UNAVAILABLE = "not_available"
 
 
 def _href(tag: Tag | None) -> str | None:
@@ -42,6 +43,20 @@ def _href(tag: Tag | None) -> str | None:
 def _collapse_html_text(tag: Tag) -> str:
     """Return visible text with HTML layout whitespace collapsed."""
     return re.sub(r"\s+", " ", tag.get_text(" ", strip=True)).strip()
+
+
+def _parse_clinical_validity(cell: Tag) -> str:
+    """Return the selected clinical-validity value from an upstream table cell."""
+    select = cell.find("select")
+    if not isinstance(select, Tag):
+        return _collapse_html_text(cell) or CLINICAL_VALIDITY_UNAVAILABLE
+
+    selected_options = [
+        option for option in select.find_all("option") if option.has_attr("selected")
+    ]
+    if len(selected_options) != 1:
+        return CLINICAL_VALIDITY_UNAVAILABLE
+    return _collapse_html_text(selected_options[0]) or CLINICAL_VALIDITY_UNAVAILABLE
 
 
 def _is_note_marker(node: object) -> bool:
@@ -375,7 +390,7 @@ def parse_disease_mechanisms(soup: BeautifulSoup) -> list[DiseaseMechanism]:
                     disease=disease,
                     disease_url=disease_url,
                     inheritance=cols[2].text.strip(),
-                    clinical_validity=cols[3].text.strip(),
+                    clinical_validity=_parse_clinical_validity(cols[3]),
                     consideration=cols[4].text.strip(),
                     adjusted_strength=cols[5].text.strip(),
                 )

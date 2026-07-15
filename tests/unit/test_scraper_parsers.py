@@ -7,6 +7,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from autopvs1_link.api.autopvs1_client import AutoPVS1Client
+from autopvs1_link.api.autopvs1_parsers import parse_disease_mechanisms
 from autopvs1_link.config import settings
 from autopvs1_link.models.autopvs1_models import AutoPVS1Data
 
@@ -246,6 +247,23 @@ class TestPVS1FlowchartParsing:
 
 class TestDiseaseMechanismParsing:
     """Test disease mechanism table parsing."""
+
+    def test_parse_disease_mechanisms_requires_one_clinical_validity_option(self):
+        """A select cell must expose exactly one non-empty selected upstream option."""
+        html = load_fixture("disease_mechanism_clinical_validity.html")
+        mechanisms = parse_disease_mechanisms(BeautifulSoup(html, "html.parser"))
+
+        assert [item.clinical_validity for item in mechanisms] == [
+            "No Reported Evidence",
+            "Strong",
+            "not_available",
+            "not_available",
+            "not_available",
+            "not_available",
+        ]
+        assert "DefinitiveNo Reported EvidenceLimited" not in {
+            item.clinical_validity for item in mechanisms
+        }
 
     def test_parse_disease_mechanisms_basic(self, client, variant_soup):
         """Test parsing disease mechanism table."""
