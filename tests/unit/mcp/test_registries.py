@@ -70,6 +70,35 @@ def test_known_error_codes_messages_are_one_line_strings() -> None:
         assert isinstance(message, str) and "\n" not in message, code
 
 
+def test_every_known_error_code_maps_into_the_canonical_enum() -> None:
+    """Response-Envelope Standard v1 closes ``error_code`` to six values; the wire
+    canonicalises every granular subcode onto one of them. A subcode with no
+    mapping — or one pointing outside the enum — would ship a non-conformant
+    ``error_code``, so the chokepoint's guarantee is enforced here, once, rather
+    than trusted at every call site.
+    """
+    from autopvs1_link.mcp.registries import CANONICAL_ERROR_CODES, canonical_error_code
+
+    assert {
+        "invalid_input",
+        "not_found",
+        "ambiguous_query",
+        "upstream_unavailable",
+        "rate_limited",
+        "internal",
+    } == CANONICAL_ERROR_CODES
+    for code in KNOWN_ERROR_CODES:
+        assert canonical_error_code(code) in CANONICAL_ERROR_CODES, code
+
+
+def test_canonical_error_code_backstops_an_unmapped_code_to_internal() -> None:
+    """Prove the guard by breaking it: an unmapped/future subcode must still
+    resolve to a canonical value (``internal``), never leak a non-enum code."""
+    from autopvs1_link.mcp.registries import canonical_error_code
+
+    assert canonical_error_code("some_future_unmapped_code") == "internal"
+
+
 def test_known_warning_codes_messages_are_one_line_strings() -> None:
     for code, message in KNOWN_WARNING_CODES.items():
         assert isinstance(message, str) and "\n" not in message, code

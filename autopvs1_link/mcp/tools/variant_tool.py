@@ -13,12 +13,10 @@ from autopvs1_link.api.egress import EgressDeniedError
 from autopvs1_link.config import settings
 from autopvs1_link.mcp import service_adapters
 from autopvs1_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from autopvs1_link.mcp.contracts import VariantMCPData
 from autopvs1_link.mcp.envelope import (
     ToolResponse,
     error_envelope,
     ok_envelope,
-    success_output_schema,
 )
 from autopvs1_link.mcp.errors import MCPInputError
 from autopvs1_link.mcp.mode_validation import (
@@ -53,7 +51,9 @@ def register(mcp: FastMCP) -> None:
         name="get_variant_pvs1_data",
         title="Get Variant PVS1 Data",
         tags={"variant", "classification"},
-        output_schema=success_output_schema(VariantMCPData),
+        # outputSchema suppressed (Tool-Surface Budget Standard v1, Rule 3);
+        # structuredContent is still emitted for the dict envelope this tool returns.
+        output_schema=None,
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def get_variant_pvs1_data(
@@ -61,12 +61,14 @@ def register(mcp: FastMCP) -> None:
             str,
             Field(
                 description="Genome build: hg19 or hg38.",
+                examples=["hg38", "hg19"],
                 json_schema_extra={"enum": ["hg19", "hg38"]},
             ),
         ],
         variant_id: Annotated[
             str,
             Field(
+                examples=["X-82763936-A-T"],
                 description=(
                     "Variant identifier. Canonical SPDI (CHROM-POS-REF-ALT, "
                     "e.g. X-82763936-A-T) scores in one upstream call. "

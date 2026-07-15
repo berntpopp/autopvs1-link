@@ -21,6 +21,7 @@ from autopvs1_link.mcp.cost_tiers import (
     SCRAPE_TIER as _SCRAPE_TIER,
 )
 from autopvs1_link.mcp.registries import (
+    CANONICAL_ERROR_CODES,
     KNOWN_ERROR_CODES,
     KNOWN_WARNING_CODES,
     PAYLOAD_MODES,
@@ -298,6 +299,7 @@ def detailed_capabilities_resource() -> dict[str, Any]:
             "error_fields": [
                 "success",
                 "error_code",
+                "error_subcode",
                 "message",
                 "retryable",
                 "recovery_action",
@@ -311,6 +313,13 @@ def detailed_capabilities_resource() -> dict[str, Any]:
                 "succeeded/failed for bulk). All other tools return a "
                 "single top-level result object."
             ),
+            "error_code_semantics": (
+                "error_code is the closed six-value enum clients branch on "
+                "(Response-Envelope Standard v1). The specific reason is kept "
+                "as the optional error_subcode; stable_error_codes below lists "
+                "those subcode values."
+            ),
+            "canonical_error_codes": sorted(CANONICAL_ERROR_CODES),
             "stable_error_codes": sorted(KNOWN_ERROR_CODES),
             "stable_warning_codes": sorted(KNOWN_WARNING_CODES),
             "meta_recovery_hints": (

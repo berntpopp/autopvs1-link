@@ -61,6 +61,64 @@ KNOWN_ERROR_CODES: dict[str, str] = {
     ),
 }
 
+# Response-Envelope Standard v1 closes ``error_code`` to a six-value enum. The
+# fleet's Behaviour Conformance gate rejects anything outside it, however sensible
+# it reads. autopvs1-link historically shipped a WIDER, more specific vocabulary
+# (invalid_variant_id, upstream_timeout, requires_disambiguation, ...) that is
+# still useful to a caller, so the wire keeps the granular value as
+# ``error_subcode`` while ``error_code`` is canonicalised to one of these six.
+CANONICAL_ERROR_CODES: frozenset[str] = frozenset(
+    {
+        "invalid_input",
+        "not_found",
+        "ambiguous_query",
+        "upstream_unavailable",
+        "rate_limited",
+        "internal",
+    }
+)
+
+# Every granular subcode this server can emit, mapped onto its canonical
+# ``error_code``. A drift test (test_registries.py) asserts every KNOWN_ERROR_CODES
+# key is present here and every value is one of CANONICAL_ERROR_CODES, so a new
+# subcode cannot ship without a conscious canonical mapping.
+_CANONICAL_BY_SUBCODE: dict[str, str] = {
+    # input validation -> invalid_input
+    "invalid_variant_id": "invalid_input",
+    "invalid_cnv_id": "invalid_input",
+    "invalid_genome_build": "invalid_input",
+    "invalid_search_query": "invalid_input",
+    "invalid_search_cursor": "invalid_input",
+    "invalid_bulk_input": "invalid_input",
+    "invalid_input": "invalid_input",
+    "invalid_response_mode": "invalid_input",
+    "invalid_meta_mode": "invalid_input",
+    # ambiguity -> ambiguous_query
+    "requires_disambiguation": "ambiguous_query",
+    # upstream / resolver / policy egress -> upstream_unavailable
+    "not_found": "not_found",
+    "parse_error": "upstream_unavailable",
+    "upstream_timeout": "upstream_unavailable",
+    "upstream_unavailable": "upstream_unavailable",
+    "external_resolver_unavailable": "upstream_unavailable",
+    "external_egress_disabled": "upstream_unavailable",
+    # server-side conditions the caller cannot fix via input -> internal
+    "destructive_disabled": "internal",
+    "internal_error": "internal",
+    "untrusted_text_limit_exceeded": "internal",
+}
+
+
+def canonical_error_code(subcode: str) -> str:
+    """Map a granular subcode onto the closed six-value ``error_code`` enum.
+
+    Unknown subcodes canonicalise to ``internal`` — the safe backstop that keeps
+    the wire ``error_code`` inside the enum no matter what a future call site
+    passes, so the invariant is a property of the chokepoint, not of every caller.
+    """
+    return _CANONICAL_BY_SUBCODE.get(subcode, "internal")
+
+
 ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
     "invalid_variant_id": [
         "Re-call with variant_id in CHROM-POS-REF-ALT form (X-82763936-A-T).",

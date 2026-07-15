@@ -22,7 +22,6 @@ from autopvs1_link.mcp.envelope import (
     ToolResponse,
     error_envelope,
     ok_envelope,
-    success_output_schema,
 )
 from autopvs1_link.mcp.mode_validation import (
     InvalidMCPModeError,
@@ -222,7 +221,7 @@ def register(mcp: FastMCP) -> None:
         name="get_variants_pvs1_data_bulk",
         title="Get Variant PVS1 Data (Bulk)",
         tags={"variant", "classification", "bulk"},
-        output_schema=success_output_schema(BulkVariantsMCPData, collection_field="items"),
+        output_schema=None,  # suppressed (Tool-Surface Budget Standard v1, Rule 3)
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def get_variants_pvs1_data_bulk(
@@ -233,6 +232,7 @@ def register(mcp: FastMCP) -> None:
                     f"List of 1 to {BULK_MAX_ITEMS} variant requests. Each item: "
                     "{genome_build: hg19|hg38, variant_id: ...}."
                 ),
+                examples=[[{"genome_build": "hg38", "variant_id": "X-82763936-A-T"}]],
                 json_schema_extra={
                     "type": "array",
                     "items": VARIANT_ITEM_SCHEMA,
@@ -426,7 +426,7 @@ def register(mcp: FastMCP) -> None:
         name="get_cnvs_pvs1_data_bulk",
         title="Get CNV PVS1 Data (Bulk)",
         tags={"cnv", "copy-number", "classification", "bulk"},
-        output_schema=success_output_schema(BulkCNVsMCPData, collection_field="items"),
+        output_schema=None,  # suppressed (Tool-Surface Budget Standard v1, Rule 3)
         annotations=READ_ONLY_OPEN_WORLD,
     )
     async def get_cnvs_pvs1_data_bulk(
@@ -437,6 +437,7 @@ def register(mcp: FastMCP) -> None:
                     f"List of 1 to {BULK_MAX_ITEMS} CNV requests. Each item: "
                     "{genome_build: hg19|hg38, cnv_id: chrom-start-end-DEL|DUP}."
                 ),
+                examples=[[{"genome_build": "hg38", "cnv_id": "17-15000000-20000000-DEL"}]],
                 json_schema_extra={
                     "type": "array",
                     "items": CNV_ITEM_SCHEMA,

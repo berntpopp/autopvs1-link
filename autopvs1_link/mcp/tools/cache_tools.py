@@ -13,7 +13,6 @@ from autopvs1_link.mcp.envelope import (
     ToolResponse,
     error_envelope,
     ok_envelope,
-    success_output_schema,
 )
 from autopvs1_link.mcp.errors import DestructiveOperationDisabledError
 
@@ -34,7 +33,9 @@ def register(mcp: FastMCP) -> None:
         name="clear_cache",
         title="Clear AutoPVS1-Link Cache",
         tags={"meta", "admin"},
-        output_schema=success_output_schema(ClearCacheData),
+        # outputSchema suppressed (Tool-Surface Budget Standard v1, Rule 3);
+        # structuredContent is still emitted for the dict envelope this tool returns.
+        output_schema=None,
         annotations=DESTRUCTIVE_CLOSED_WORLD,
     )
     async def clear_cache() -> ToolResponse:
