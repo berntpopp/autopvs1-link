@@ -60,6 +60,10 @@ Read tools accept optional response-shaping controls:
 - `include_unmet`: variant and CNV tools default to `true`; set `false` to
   omit disease-mechanism rows whose adjusted strength is `Unmet`.
 
+For every disease-mechanism row, `clinical_validity` is the selected upstream
+AutoPVS1 option. The literal `"not_available"` means the upstream table
+contained no selected/non-empty value; it is not a clinical conclusion.
+
 CNV validation accepts AutoPVS1 hyphen IDs and rejects colon-form input with a
 structured correction when possible. For example,
 `chr11:2797090-2869333:DEL` returns `success: false`,

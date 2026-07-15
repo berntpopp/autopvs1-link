@@ -12,6 +12,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`docs/conformance/behaviour.py` blob `c69801687`) so live MCP contract checks
   treat not-found example probes as inconclusive and keep empty auxiliary objects from hiding counted rows.
 
+## [4.1.1] - 2026-07-16
+
+### Fixed
+
+- Disease-mechanism `clinical_validity` now preserves only the selected
+  AutoPVS1 option rather than concatenating every HTML select option.
+  `"not_available"` explicitly represents malformed upstream cells with no
+  selected/non-empty value; it is not a clinical conclusion.
+
 ## [4.1.0] - 2026-07-15
 
 Tool-surface budget + MCP contract hardening (genefoundry-router#75). MINOR: the
