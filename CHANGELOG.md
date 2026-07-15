@@ -4,6 +4,14 @@ All notable changes to autopvs1-link are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Re-vendored the behaviour conformance gate from genefoundry-router `ba09fdc`
+  (`docs/conformance/behaviour.py` blob `30d639242b`) so live MCP contract checks
+  treat not-found example probes as inconclusive instead of failures.
+
 ## [4.1.0] - 2026-07-15
 
 Tool-surface budget + MCP contract hardening (genefoundry-router#75). MINOR: the
@@ -68,8 +76,6 @@ optional `error_subcode`. No tool, parameter, or runtime `_meta` field is remove
 
 - `AUTOPVS1_LINK_IMAGE` in `.env.docker.example`. The prod overlay has always required it
   (it fails closed without it), but it was documented nowhere an operator would copy.
-
-## [Unreleased]
 
 ## [4.0.4] - 2026-07-13
 
