@@ -174,6 +174,41 @@ async def test_get_variant_pvs1_data_tool_runtime(mocker) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_variant_pvs1_data_preserves_selected_clinical_validity(mocker) -> None:
+    """The public standard response exposes the parser's selected value unchanged."""
+    parsed = _variant_result()
+    parsed.disease_mechanisms.append(
+        DiseaseMechanism(
+            gene="CFTR",
+            disease="Cystic fibrosis",
+            inheritance="AR",
+            clinical_validity="No Reported Evidence",
+            consideration="No decrease",
+            adjusted_strength="Strong",
+        )
+    )
+    fake = AsyncMock(return_value=parsed)
+    mocker.patch("autopvs1_link.mcp.service_adapters.get_variant", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool(
+        "get_variant_pvs1_data",
+        {
+            "genome_build": "hg38",
+            "variant_id": "X-1-A-T",
+            "response_mode": "standard",
+        },
+    )
+
+    payload = result.structured_content
+    assert payload["success"] is True
+    assert payload["result"]["disease_mechanisms"][0]["clinical_validity"] == (
+        "No Reported Evidence"
+    )
+    assert "DefinitiveNo Reported EvidenceLimited" not in str(payload)
+
+
+@pytest.mark.asyncio
 async def test_get_variant_invalid_response_mode_returns_envelope_without_calling_upstream(
     mocker,
 ) -> None:
