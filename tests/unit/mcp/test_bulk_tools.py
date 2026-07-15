@@ -300,7 +300,7 @@ async def test_bulk_variants_per_item_invalid_genome_build_yields_per_item_error
     [
         (_http_status_error(404), "not_found", False),
         (_http_status_error(500), "upstream_unavailable", True),
-        (_http_status_error(429), "upstream_unavailable", True),
+        (_http_status_error(429), "rate_limited", True),
         (httpx.ConnectError("boom"), "upstream_unavailable", True),
         (ValueError("parse fail"), "parse_error", False),
     ],

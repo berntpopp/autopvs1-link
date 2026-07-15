@@ -1,9 +1,0 @@
-# Grandfathered per-file line-budget exceptions (path:ceiling).
-# See AGENTS.md "File Size Discipline" and scripts/check_file_size.py.
-
-# bulk_tools.py registers BOTH bulk PVS1 tools with exhaustive LLM-facing
-# docstrings and was already at the 600-line budget. Adopting the Tool-Schema
-# Documentation Standard v1 (per-item `examples`, issue #75) pushed it 1 line
-# over. Ceiling pinned at current length; decompose the two tool bodies into a
-# shared runner in a follow-up rather than cutting the (model-read) docstrings.
-autopvs1_link/mcp/tools/bulk_tools.py:601

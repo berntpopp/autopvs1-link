@@ -226,9 +226,9 @@ canonical SPDI via one Ensembl Variant Recoder REST call before
 scoring (build-scoped — GRCh37 host for hg19, GRCh38 host for
 hg38). Emits an ``auto_resolved`` warning carrying the input,
 the resolved id, and the resolver source. Ambiguous resolutions
-return ``requires_disambiguation`` with allele-keyed candidates
-instead of
-silently picking one (mitigates multi-allelic mis-scoring).
+return ``error_code='ambiguous_query'`` (subcode
+``requires_disambiguation``) with allele-keyed candidates instead
+of silently picking one (mitigates multi-allelic mis-scoring).
 
 First-turn LLM callers get the verdict under ~1.5KB by default
 (``response_mode='summary'``). Widen to ``response_mode='standard'``
@@ -281,7 +281,7 @@ not clinical decision support.
       "type": "string"
     },
     "variant_id": {
-      "description": "Variant identifier. Canonical SPDI (CHROM-POS-REF-ALT, e.g. X-82763936-A-T) scores in one upstream call. rsID (rs80357906) or HGVS (NM_007294.4:c.5266dup, NP_000050.2:p.Glu1756fs, NC_000017.11:g.43091983C>A) auto-resolves via Ensembl Variant Recoder REST (build-scoped) then scores. Multiple resolver candidates return error.code='requires_disambiguation' with allele-keyed rows in details.candidates \u2014 caller picks one. Recoder offline returns error.code='external_resolver_unavailable' (retryable).",
+      "description": "Variant identifier. Canonical SPDI (CHROM-POS-REF-ALT, e.g. X-82763936-A-T) scores in one upstream call. rsID (rs80357906) or HGVS (NM_007294.4:c.5266dup, NP_000050.2:p.Glu1756fs, NC_000017.11:g.43091983C>A) auto-resolves via Ensembl Variant Recoder REST (build-scoped) then scores. Multiple resolver candidates return error_code='ambiguous_query' (error_subcode 'requires_disambiguation') with allele-keyed rows in details.candidates \u2014 caller picks one. Recoder offline returns error_code='upstream_unavailable' (error_subcode 'external_resolver_unavailable', retryable).",
       "examples": [
         "X-82763936-A-T"
       ],
@@ -326,7 +326,8 @@ Standard v1 outer frame. Output items preserve input order.
 ``response_mode`` and ``include_unmet`` apply per item; the outer
 ``meta_mode`` controls the envelope. Per-item failures do not stop
 the batch unless ``continue_on_error=false``. Bulk dispatch errors
-(malformed ``items``) use error code ``invalid_bulk_input``.
+(malformed ``items``) use ``error_code='invalid_input'`` (subcode
+``invalid_bulk_input``).
 
 Aggregate cache observability: top-level ``_meta.cache_status``
 echoes the unanimous status when every item agrees; on a mixed

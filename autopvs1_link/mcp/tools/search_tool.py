@@ -30,6 +30,7 @@ from autopvs1_link.mcp.tools.mode_errors import (
     external_egress_disabled_envelope,
     invalid_mode_envelope,
 )
+from autopvs1_link.mcp.upstream_errors import http_status_error_code, is_retryable_status
 from autopvs1_link.mcp.validation import (
     normalize_genome_builds,
     normalize_limit_cursor,
@@ -207,9 +208,9 @@ def register(mcp: FastMCP) -> None:
             )
         except httpx.HTTPStatusError as exc:
             return error_envelope(
-                code="upstream_unavailable",
+                code=http_status_error_code(exc.response.status_code),
                 message="AutoPVS1 upstream could not complete the search request.",
-                retryable=exc.response.status_code in {408, 429} or exc.response.status_code >= 500,
+                retryable=is_retryable_status(exc.response.status_code),
                 suggestions=["Retry later or simplify the search query."],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,

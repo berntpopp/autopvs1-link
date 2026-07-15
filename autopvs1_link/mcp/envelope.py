@@ -331,7 +331,7 @@ def _strip_none_warning_aggregate_fields(payload: dict[str, Any]) -> dict[str, A
 
 
 _RETRYABLE_TRANSIENT_CODES = frozenset(
-    {"upstream_timeout", "upstream_unavailable", "external_resolver_unavailable"}
+    {"upstream_timeout", "upstream_unavailable", "external_resolver_unavailable", "rate_limited"}
 )
 
 

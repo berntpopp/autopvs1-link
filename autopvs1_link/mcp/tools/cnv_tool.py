@@ -32,15 +32,12 @@ from autopvs1_link.mcp.tools.mode_errors import (
     invalid_mode_envelope,
 )
 from autopvs1_link.mcp.untrusted_content import UntrustedTextLimitError
+from autopvs1_link.mcp.upstream_errors import http_status_error_code, is_retryable_status
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
 RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
 META_MODE_SCHEMA = {"type": "string", "enum": ["full", "compact", "minimal"]}
 _TOOL_NAME = "get_cnv_pvs1_data"
-
-
-def _is_retryable_status(status_code: int) -> bool:
-    return status_code in {408, 429} or status_code >= 500
 
 
 def register(mcp: FastMCP) -> None:
@@ -170,11 +167,10 @@ def register(mcp: FastMCP) -> None:
                 tool_name=_TOOL_NAME,
             )
         except httpx.HTTPStatusError as exc:
-            code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
             return error_envelope(
-                code=code,
+                code=http_status_error_code(exc.response.status_code),
                 message="AutoPVS1 upstream could not return CNV data for this request.",
-                retryable=_is_retryable_status(exc.response.status_code),
+                retryable=is_retryable_status(exc.response.status_code),
                 suggestions=["Use CNV format such as 17-15000000-20000000-DEL."],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,

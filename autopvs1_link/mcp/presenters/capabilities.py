@@ -510,16 +510,18 @@ _AUTO_RESOLUTION_BLOCK: dict[str, Any] = {
             "canonical CHROM-POS-REF-ALT directly to skip resolution)."
         ),
         "multi_hit": (
-            "error_code='requires_disambiguation' with candidates list in "
+            "error_code='ambiguous_query' (error_subcode "
+            "'requires_disambiguation') with candidates list in "
             "details.candidates. Each candidate: id, spdi, allele_key, "
             "synonym_ids, genome_build, resource_uri. Caller picks one "
             "and re-calls. Server never silently best-guesses to avoid "
             "multi-allelic mis-scoring (Ensembl VEP #989 failure mode)."
         ),
         "resolver_unavailable": (
-            "error_code='external_resolver_unavailable' (retryable=true) "
-            "when Ensembl REST times out, rate-limits, or returns 5xx. "
-            "Distinguishes transient failure from permanent not_found."
+            "error_code='upstream_unavailable' (error_subcode "
+            "'external_resolver_unavailable', retryable=true) when Ensembl "
+            "REST times out, rate-limits, or returns 5xx. Distinguishes "
+            "transient failure from permanent not_found."
         ),
     },
     "build_safety": (

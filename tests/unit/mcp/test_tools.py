@@ -234,7 +234,7 @@ async def test_classify_variant_prompt_explains_payload_sizing_and_error_handlin
     assert "summary" in body
     assert "pvs1_not_applicable" in body
     assert "not_found" in body
-    assert "upstream_timeout" in body
+    assert "upstream_unavailable" in body
     assert "isError" in body
 
 

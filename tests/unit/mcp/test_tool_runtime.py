@@ -440,7 +440,7 @@ async def test_get_cnv_connect_error_returns_upstream_unavailable_envelope(mocke
 
 
 @pytest.mark.asyncio
-async def test_get_variant_429_status_is_retryable_upstream_unavailable(mocker) -> None:
+async def test_get_variant_429_status_is_retryable_rate_limited(mocker) -> None:
     fake = AsyncMock(
         side_effect=_http_status_error(
             429,
@@ -457,7 +457,9 @@ async def test_get_variant_429_status_is_retryable_upstream_unavailable(mocker) 
 
     fake.assert_awaited_once_with("hg38", "X-1-A-T")
     assert result.structured_content["success"] is False
-    assert result.structured_content["error_code"] == "upstream_unavailable"
+    # HTTP 429 is a throttle, not an outage: it MUST surface as rate_limited so a
+    # caller can back off rather than treat it as a generic upstream failure.
+    assert result.structured_content["error_code"] == "rate_limited"
     assert result.structured_content["retryable"] is True
 
 
@@ -1164,7 +1166,7 @@ async def test_search_status_error_returns_upstream_unavailable_envelope(mocker)
 
 
 @pytest.mark.asyncio
-async def test_search_429_status_is_retryable_upstream_unavailable(mocker) -> None:
+async def test_search_429_status_is_retryable_rate_limited(mocker) -> None:
     fake = AsyncMock(side_effect=_http_status_error(429, "https://autopvs1.bgi.com/search"))
     mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
 
@@ -1173,7 +1175,7 @@ async def test_search_429_status_is_retryable_upstream_unavailable(mocker) -> No
 
     fake.assert_awaited_once_with("MYH9", "hg38")
     assert result.structured_content["success"] is False
-    assert result.structured_content["error_code"] == "upstream_unavailable"
+    assert result.structured_content["error_code"] == "rate_limited"
     assert result.structured_content["retryable"] is True
 
 

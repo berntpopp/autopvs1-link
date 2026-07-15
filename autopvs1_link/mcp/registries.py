@@ -38,6 +38,7 @@ KNOWN_ERROR_CODES: dict[str, str] = {
     "parse_error": "Upstream HTML did not match expected schema.",
     "upstream_timeout": "Upstream timed out; retry with backoff.",
     "upstream_unavailable": "Upstream unreachable or HTTP 5xx.",
+    "rate_limited": "Upstream returned HTTP 429; back off before retrying.",
     "destructive_disabled": ("clear_cache requires AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true."),
     "internal_error": "Unexpected server error; retry once with backoff.",
     "requires_disambiguation": (
@@ -102,6 +103,8 @@ _CANONICAL_BY_SUBCODE: dict[str, str] = {
     "upstream_unavailable": "upstream_unavailable",
     "external_resolver_unavailable": "upstream_unavailable",
     "external_egress_disabled": "upstream_unavailable",
+    # HTTP 429 -> rate_limited (throttle, not outage): callers branch on it.
+    "rate_limited": "rate_limited",
     # server-side conditions the caller cannot fix via input -> internal
     "destructive_disabled": "internal",
     "internal_error": "internal",
@@ -172,6 +175,10 @@ ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
     "upstream_unavailable": [
         "Retry after meta.retry_after_ms; AutoPVS1 may be temporarily down or rate-limiting.",
         "Call get_server_health(check_upstream=true) to confirm AutoPVS1 is reachable.",
+    ],
+    "rate_limited": [
+        "Back off and retry after meta.retry_after_ms; AutoPVS1 returned HTTP 429.",
+        "Space out calls (~1 req/s) or batch via the bulk tools to stay under the limit.",
     ],
     "parse_error": [
         "Confirm the identifier exists in AutoPVS1; the HTML schema may have changed for new edge cases.",

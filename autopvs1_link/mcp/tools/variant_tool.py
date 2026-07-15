@@ -33,15 +33,12 @@ from autopvs1_link.mcp.tools.mode_errors import (
     invalid_mode_envelope,
 )
 from autopvs1_link.mcp.untrusted_content import UntrustedTextLimitError
+from autopvs1_link.mcp.upstream_errors import http_status_error_code, is_retryable_status
 from autopvs1_link.mcp.validation import normalize_genome_build
 
 RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
 META_MODE_SCHEMA = {"type": "string", "enum": ["full", "compact", "minimal"]}
 _TOOL_NAME = "get_variant_pvs1_data"
-
-
-def _is_retryable_status(status_code: int) -> bool:
-    return status_code in {408, 429} or status_code >= 500
 
 
 def register(mcp: FastMCP) -> None:
@@ -76,10 +73,12 @@ def register(mcp: FastMCP) -> None:
                     "NP_000050.2:p.Glu1756fs, NC_000017.11:g.43091983C>A) "
                     "auto-resolves via Ensembl Variant Recoder REST "
                     "(build-scoped) then scores. Multiple resolver "
-                    "candidates return error.code='requires_disambiguation' "
-                    "with allele-keyed rows in details.candidates — caller "
-                    "picks one. Recoder offline returns "
-                    "error.code='external_resolver_unavailable' (retryable)."
+                    "candidates return error_code='ambiguous_query' "
+                    "(error_subcode 'requires_disambiguation') with "
+                    "allele-keyed rows in details.candidates — caller picks "
+                    "one. Recoder offline returns error_code="
+                    "'upstream_unavailable' (error_subcode "
+                    "'external_resolver_unavailable', retryable)."
                 ),
             ),
         ],
@@ -125,9 +124,9 @@ def register(mcp: FastMCP) -> None:
         scoring (build-scoped — GRCh37 host for hg19, GRCh38 host for
         hg38). Emits an ``auto_resolved`` warning carrying the input,
         the resolved id, and the resolver source. Ambiguous resolutions
-        return ``requires_disambiguation`` with allele-keyed candidates
-        instead of
-        silently picking one (mitigates multi-allelic mis-scoring).
+        return ``error_code='ambiguous_query'`` (subcode
+        ``requires_disambiguation``) with allele-keyed candidates instead
+        of silently picking one (mitigates multi-allelic mis-scoring).
 
         First-turn LLM callers get the verdict under ~1.5KB by default
         (``response_mode='summary'``). Widen to ``response_mode='standard'``
@@ -192,11 +191,10 @@ def register(mcp: FastMCP) -> None:
                 tool_name=_TOOL_NAME,
             )
         except httpx.HTTPStatusError as exc:
-            code = "not_found" if exc.response.status_code == 404 else "upstream_unavailable"
             return error_envelope(
-                code=code,
+                code=http_status_error_code(exc.response.status_code),
                 message="AutoPVS1 upstream could not return variant data for this request.",
-                retryable=_is_retryable_status(exc.response.status_code),
+                retryable=is_retryable_status(exc.response.status_code),
                 suggestions=["Confirm the genome_build and AutoPVS1 variant ID."],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
