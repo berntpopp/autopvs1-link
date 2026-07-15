@@ -4,6 +4,50 @@ All notable changes to autopvs1-link are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-07-15
+
+Tool-surface budget + MCP contract hardening (genefoundry-router#75). MINOR: the
+optional `outputSchema` wire field is removed and `error_code` is canonicalised to
+the closed six-value enum, with the previous granular value preserved as the new
+optional `error_subcode`. No tool, parameter, or runtime `_meta` field is removed.
+
+### Changed
+
+- **Tool surface cut from ~30,322 to ~3,739 tokens (−88%).** Every tool is now
+  registered with `@mcp.tool(output_schema=None)` and the server is built with
+  `FastMCP(dereference_schemas=False)`. `outputSchema` was 88% of this server's
+  surface and is optional in MCP; `structuredContent` is unchanged — the full
+  `_meta` (citation, capabilities_version, cost hints, pagination) still ships on
+  every dict-returning tool. All 7 tools are now well under the 1,200-token cap and
+  the server under 10,000 tokens (Tool-Surface Budget Standard v1, `#73`).
+- **`error_code` is now the closed six-value enum** `invalid_input | not_found |
+  ambiguous_query | upstream_unavailable | rate_limited | internal`
+  (Response-Envelope Standard v1). The specific reason (`invalid_variant_id`,
+  `upstream_timeout`, `requires_disambiguation`, …) is preserved on the wire as the
+  optional `error_subcode`. Canonicalisation happens once at the `error_envelope`
+  chokepoint, with an `internal` backstop, so a future subcode cannot leak a
+  non-enum `error_code`.
+- **`search_variants` `response_mode='summary'`** now retains the stable
+  identifiers (`variant_id` + re-fetch `url`) per row instead of dropping all rows —
+  a zero-row `success:true` while pagination reported matches was a silent-empty
+  anti-pattern the Behaviour gate forbids.
+
+### Added
+
+- **`examples` on every required and array parameter** (`genome_build`,
+  `variant_id`, `cnv_id`, bulk `items`, `query`) so the Behaviour Conformance gate
+  can construct a valid call for every tool — 0 UNGATED (Tool-Schema Documentation
+  Standard v1, S2/S3).
+- **`_meta.pagination`** (`total_count` + `has_more`) on `search_variants` so a
+  partial page is distinguishable from an exhaustive one.
+- **Arg-validation errors now name the valid parameters** via `allowed_values` (the
+  offending caller-supplied argument name is still never echoed) so a model can
+  self-correct (MCP 2025-11-25 SEP-1303).
+- **Behaviour Conformance v1 gate** vendored into `tests/conformance/`
+  (`behaviour.py` + `test_behaviour_v1.py`, byte-identical from the router) and
+  wired into `conformance.yml`; a `test_tool_surface_budget` regression guards the
+  server's own surface against the budget offline.
+
 ## [4.0.5] - 2026-07-14
 
 ### Fixed
