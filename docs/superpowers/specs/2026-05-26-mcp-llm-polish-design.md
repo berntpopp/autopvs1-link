@@ -1,5 +1,7 @@
 # MCP LLM Polish Design
 
+> Historical record
+
 - **Status:** Approved for direct execution by user request
 - **Date:** 2026-05-26
 - **Scope:** MCP contract polish, token-cost controls, structured schemas, prompts, and discovery hygiene

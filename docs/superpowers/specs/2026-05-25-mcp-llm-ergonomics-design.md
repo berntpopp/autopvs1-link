@@ -1,5 +1,7 @@
 # MCP LLM Ergonomics and Reliability Design
 
+> Historical record
+
 - **Status:** Draft for user review
 - **Date:** 2026-05-25
 - **Scope:** AutoPVS1-Link MCP output, validation, errors, observability, and docs

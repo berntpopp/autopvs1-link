@@ -1,5 +1,7 @@
 # Agentic Stack Alignment Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Align AutoPVS1-Link with the sibling Link repos' modern Python stack and agentic-development conventions without changing public REST or MCP behavior.
