@@ -1,5 +1,7 @@
 # Modernize autopvs1-link to mirror pubtator-link conventions
 
+> Historical record
+
 - **Status:** Draft, awaiting user approval
 - **Date:** 2026-05-11
 - **Reference repo:** `../pubtator-link` (May 2026)

@@ -1,5 +1,7 @@
 # MCP LLM Ergonomics Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the AutoPVS1-Link MCP surface reliable for LLM agents by returning stable envelope-shaped structured content, cleaner validation errors, fixture-backed parser fixes, richer MCP-only presentation data, stable cache resources, and updated documentation.

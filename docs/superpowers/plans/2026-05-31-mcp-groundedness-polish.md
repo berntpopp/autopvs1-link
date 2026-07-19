@@ -1,5 +1,7 @@
 # MCP Groundedness & Token-Efficiency Polish Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Lift the AutoPVS1-Link MCP surface from ~8.4/10 to ~9.5/10 for LLM consumers by adding a deterministic decision-path gloss, machine-executable next-step commands, a leaner default metadata tier, an honest cursor contract, and a per-response cold-latency hint.

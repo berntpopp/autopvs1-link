@@ -37,7 +37,7 @@ The destructive `clear_cache()` tool is not registered on the default MCP
 surface. It appears only when
 `AUTOPVS1_LINK_ENABLE_DESTRUCTIVE_TOOLS=true` is set before server startup.
 
-All MCP tools return structured content using the GeneFoundry
+The default MCP tool surface returns structured content using the GeneFoundry
 [Response-Envelope Standard v1](https://github.com/berntpopp/genefoundry-router/blob/main/docs/RESPONSE-ENVELOPE-STANDARD-v1.md)
 flat banner: `{"success": true, "result"|"results", "_meta"}` on success
 (single-item tools use `result`; `search_variants` and the bulk tools use

@@ -1,5 +1,7 @@
 # AutoPVS1-Link MCP Groundedness & Token-Efficiency Polish
 
+> Historical record
+
 Date: 2026-05-31
 Status: Approved (design)
 Target: lift the MCP surface from a measured ~8.4/10 to ~9.5/10 for LLM consumers

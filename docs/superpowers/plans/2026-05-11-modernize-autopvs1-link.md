@@ -1,5 +1,7 @@
 # Modernize autopvs1-link Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Migrate `autopvs1-link` to match `../pubtator-link`'s May 2026 conventions: uv + hatchling, Python 3.12+, ruff-only, typer, FastMCP 3 subpackage, observability stack (asgi-correlation-id + prometheus + defusedxml), gunicorn + multi-stage Docker, five GitHub workflows, AGENTS.md split, ≥80% coverage.

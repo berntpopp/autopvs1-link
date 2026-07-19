@@ -1,5 +1,7 @@
 # Agentic Stack Alignment Design
 
+> Historical record
+
 - **Status:** Approved for implementation
 - **Date:** 2026-05-25
 - **Reference repos:** `../pubtator-link`, `../genereviews-link`
