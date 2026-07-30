@@ -55,9 +55,9 @@ dev = [
     "pytest-mock>=3.14.0,<4.0.0",
     "pytest-xdist>=3.6.0,<4.0.0",
     "respx>=0.22.0,<1.0.0",
-    "ruff>=0.15.21,<1.0.0",
+    "ruff>=0.16.0,<1.0.0",
     "mypy>=2.3.0,<3.0.0",
-    "pre-commit>=4.0.0,<5.0.0",
+    "pre-commit>=4.6.1,<5.0.0",
     "types-defusedxml>=0.7.0.20260504",
 ]
 
@@ -78,7 +78,7 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-extend-select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "S", "T20", "SIM", "RUF"]
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "S", "T20", "SIM", "RUF"]
 ignore = ["S101", "E501"]
 
 [tool.ruff.format]
