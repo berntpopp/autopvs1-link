@@ -6,11 +6,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-07-30
+
+Consolidated Dependabot sweep. No runtime behaviour change.
+
 ### Changed
 
 - Re-vendored the behaviour conformance gate from genefoundry-router `56db958`
   (`docs/conformance/behaviour.py` blob `c69801687`) so live MCP contract checks
   treat not-found example probes as inconclusive and keep empty auxiliary objects from hiding counted rows.
+- Dependencies: `fastapi` 0.139.0 → 0.141.1, `prometheus-client` 0.25.0 →
+  0.26.0, `typer` 0.26.8 → 0.27.0, `ruff` 0.15.21 → 0.16.0, `pre-commit`
+  4.6.0 → 4.6.1.
+- Ruff's lint rule set is now declared with `select` instead of
+  `extend-select`. ruff 0.16.0 grew its *default* rule set from 59 to 413
+  rules; `extend-select` would have silently adopted all of them. The listed
+  rules are a superset of the pre-0.16 default, so the effective rule set is
+  unchanged.
+- Pinned GitHub Actions: `actions/checkout` 7.0.0 → 7.0.1,
+  `actions/setup-python` v6 → 7.0.0, `astral-sh/setup-uv` 8.3.2 → 9.0.0.
+- Container base image `python:3.14-slim` re-pinned from digest `b877e50` to
+  `cea0e60`.
 
 ## [4.1.1] - 2026-07-16
 

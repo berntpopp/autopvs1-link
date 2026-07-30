@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "autopvs1-link"
-version = "4.1.1"
+version = "4.1.2"
 description = "A unified server providing REST API and MCP interfaces for autopvs1.bgi.com PVS1 variant data"
 readme = "README.md"
 authors = [
@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "fastapi>=0.139.0,<1.0.0",
+    "fastapi>=0.141.1,<1.0.0",
     "uvicorn[standard]>=0.51.0,<1.0.0",
     "gunicorn>=26.0.0,<27.0.0",
     "pydantic>=2.13.4,<3.0.0",
@@ -36,13 +36,13 @@ dependencies = [
     "async-lru>=2.0.4,<3.0.0",
     "structlog>=26.1.0,<27.0.0",
     "asgi-correlation-id>=5.0.0,<6.0.0",
-    "prometheus-client>=0.21.0,<1.0.0",
+    "prometheus-client>=0.26.0,<1.0.0",
     "defusedxml>=0.7.1",
     "orjson>=3.10.0,<4.0.0",
     "beautifulsoup4>=4.15.0,<5.0.0",
     "lxml>=5.2.0,<7.0.0",
     "rich>=15.0.0,<16.0.0",
-    "typer>=0.26.8,<1.0.0",
+    "typer>=0.27.0,<1.0.0",
     "mcp[cli]>=1.28.1,<2.0.0",
     "fastmcp>=3.4.4,<4.0.0",
 ]
@@ -55,9 +55,9 @@ dev = [
     "pytest-mock>=3.14.0,<4.0.0",
     "pytest-xdist>=3.6.0,<4.0.0",
     "respx>=0.22.0,<1.0.0",
-    "ruff>=0.15.21,<1.0.0",
+    "ruff>=0.16.0,<1.0.0",
     "mypy>=2.3.0,<3.0.0",
-    "pre-commit>=4.0.0,<5.0.0",
+    "pre-commit>=4.6.1,<5.0.0",
     "types-defusedxml>=0.7.0.20260504",
 ]
 
@@ -78,7 +78,7 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-extend-select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "S", "T20", "SIM", "RUF"]
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "S", "T20", "SIM", "RUF"]
 ignore = ["S101", "E501"]
 
 [tool.ruff.format]
