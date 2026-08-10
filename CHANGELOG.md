@@ -6,6 +6,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.1.4] - 2026-08-10
+
+Consolidated Dependabot maintenance release. No REST or MCP behaviour change.
+
+### Security
+
+- Updated locked `cryptography` to 50.0.0, closing CVE-2026-69247 without
+  weakening the container's fail-closed HIGH/CRITICAL vulnerability policy.
+
+### Changed
+
+- Updated Uvicorn to 0.52.1, Typer to 0.27.1, FastMCP to 3.4.6 and Ruff to
+  the current 0.16.x release.
+- Re-pinned the container CI and release reusable workflows to the reviewed
+  `genefoundry-router` v0.7.4 commit.
+
 ## [4.1.3] - 2026-07-30
 
 CI now tests the interpreter the container actually ships. No runtime
