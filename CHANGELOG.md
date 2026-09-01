@@ -6,6 +6,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.1.6] - 2026-09-02
+
+- Deploy: declare the image's numeric uid:gid in docker/docker-compose.npm.yml so the fleet
+  controller can deploy the service; a guard test keeps `user` out of the release Compose files.
+
 ## [4.1.5] - 2026-08-31
 
 - Re-pinned the Python base image and all CI workflow dependencies to reviewed immutable revisions.
