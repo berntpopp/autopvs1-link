@@ -77,6 +77,29 @@ The production and NPM overlays publish **no** host ports and are digest-pinned:
 `AUTOPVS1_LINK_IMAGE` and refuse to render without it (`make docker-prod-config` substitutes a
 zeroed placeholder digest for the syntax check; real deploys export the verified digest).
 
+### Fleet deploy contract
+
+`docker/docker-compose.npm.yml` is the overlay the GeneFoundry fleet controller
+(`strato_v6_docker_npm`) actually deploys and validates; its runtime observer proves the
+effective container uid from `/proc`, so the overlay declares `user: "10001:10001"`
+numerically -- this image's own uid:gid from `docker/Dockerfile`, not a value copied from a
+sibling `-link` repo. `user` must **not** appear in the Compose files listed in
+`container-release.json` (`docker/docker-compose.yml`, `docker/docker-compose.prod.yml`); the
+shared release gate forbids it there. `tests/unit/test_deploy_overlay_user.py` guards both
+halves. Reproduce the controller's own check locally:
+
+```bash
+export AUTOPVS1_LINK_IMAGE="ghcr.io/berntpopp/autopvs1-link@sha256:$(printf '0%.0s' {1..64})"
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml \
+  -f docker/docker-compose.npm.yml config --format json > /tmp/autopvs1-link-rendered.json
+cd <path-to-strato_v6_docker_npm> && uv run python -c "
+import sys, json; sys.path.insert(0, 'scripts')
+from utils.deployment_preflight import canonical_projection
+p = canonical_projection(json.load(open('/tmp/autopvs1-link-rendered.json')), project='autopvs1-link')
+for n, s in p['services'].items(): print(n, 'user=', s.get('user'))
+print('PROJECTION OK')"
+```
+
 ## Egress policy in production
 
 Outbound network access is **denied by default** (`AUTOPVS1_LINK_API_EGRESS_MODE=disabled`).

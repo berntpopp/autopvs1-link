@@ -49,6 +49,31 @@ Primary areas:
 - AutoPVS1 returns clinical interpretations. Treat them as research-use
   data; never present as clinical decision support.
 
+## Fleet Deploy Contract
+
+- `docker/docker-compose.npm.yml` is the overlay the fleet controller
+  (`strato_v6_docker_npm`, `scripts/utils/deployment_preflight.py`) deploys and
+  validates. Its service declares `user: "10001:10001"` numerically -- this
+  image's own uid:gid from `docker/Dockerfile` (`groupadd --gid 10001` /
+  `useradd --uid 10001`), never copied from a sibling `-link` repo whose image
+  may use a different uid:gid.
+- `user` must **not** appear in the Compose files listed in
+  `container-release.json` (`docker/docker-compose.yml`,
+  `docker/docker-compose.prod.yml`) -- the shared release gate
+  (`container_release.py validate-compose`, `ALLOWED_SERVICE_KEYS`) forbids it
+  there and CI fails if it does.
+- `tests/unit/test_deploy_overlay_user.py` guards both halves of this split.
+- Release checklist this repo enforces (see `tests/unit/test_fleet_release_pins.py`
+  and `CHANGELOG.md`/`CITATION.cff` conventions): bump `version` in
+  `pyproject.toml` by one PATCH, `uv lock`, add a `## [x.y.z] - YYYY-MM-DD`
+  `CHANGELOG.md` heading, update `CITATION.cff` `version:` (this generated
+  file's `date-released` is NOT required to track the CHANGELOG date in this
+  repo -- leave it unless a test says otherwise), tag `vx.y.z`, then approve the
+  `release` GitHub Environment gate via
+  `gh api repos/berntpopp/autopvs1-link/actions/runs/<id>/pending_deployments`
+  (it can gate the run twice; `status: waiting` is the approval gate, not a
+  slow build).
+
 ## Commands
 
 Required checks before claiming completion:
