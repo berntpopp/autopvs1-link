@@ -63,6 +63,13 @@ Primary areas:
   (`container_release.py validate-compose`, `ALLOWED_SERVICE_KEYS`) forbids it
   there and CI fails if it does.
 - `tests/unit/test_deploy_overlay_user.py` guards both halves of this split.
+- `container-release.json` declares `deployed_compose_files` (the full
+  base+prod+npm list, in overlay order) so the shared reusable workflow's
+  `validate-deployed-overlay` gate (`container_release.py
+  validate-deployed-overlay`) checks the file set the controller actually
+  deploys, not the release-only `compose_files`. `container-release.yml` pins
+  that shared workflow at `genefoundry-router` `v0.8.5`
+  (`31ea81cee5475fc3655c047c63a89739948f99a9`).
 - Release checklist this repo enforces (see `tests/unit/test_fleet_release_pins.py`
   and `CHANGELOG.md`/`CITATION.cff` conventions): bump `version` in
   `pyproject.toml` by one PATCH, `uv lock`, add a `## [x.y.z] - YYYY-MM-DD`

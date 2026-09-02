@@ -100,6 +100,13 @@ for n, s in p['services'].items(): print(n, 'user=', s.get('user'))
 print('PROJECTION OK')"
 ```
 
+`container-release.json` declares `deployed_compose_files` as the full
+base+prod+npm list above, in overlay order, so the shared reusable release
+workflow's `validate-deployed-overlay` gate validates the file set the
+controller actually deploys rather than the release-only `compose_files`.
+`container-release.yml` pins that shared workflow at `genefoundry-router`
+`v0.8.5` (`31ea81cee5475fc3655c047c63a89739948f99a9`).
+
 ## Egress policy in production
 
 Outbound network access is **denied by default** (`AUTOPVS1_LINK_API_EGRESS_MODE=disabled`).
