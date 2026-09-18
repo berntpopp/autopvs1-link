@@ -42,10 +42,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TMPDIR=/tmp/autopvs1-link
 
 RUN apt-get update \
-    && apt-get install -y --only-upgrade --no-install-recommends \
-    openssl \
-    libssl3t64 \
-    openssl-provider-legacy \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
