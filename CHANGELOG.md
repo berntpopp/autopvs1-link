@@ -6,6 +6,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.1.7] - 2026-09-18
+
+- Consolidated dependency updates: bumped `gunicorn` to 26.2.0, `pydantic` to 2.13.5, `lxml` to 6.1.3, `ruff` to 0.16.8, `mypy` to 2.3.1.
+- Updated reusable container workflows to `genefoundry-router` v0.9.1 and `setup-uv` to v10.1.0.
+- Applied Debian security upgrades in base container image.
+- Configured Dependabot grouping for `uv` and `github-actions`.
+
 ## [4.1.6] - 2026-09-02
 
 - Deploy: declare the image's numeric uid:gid in docker/docker-compose.npm.yml so the fleet
