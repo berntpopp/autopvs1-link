@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.1.8] - 2026-10-03
+
+- Update PyJWT to 2.15.0 and virtualenv to 21.7.13; preserve the open bot targets for AnyIO, soupsieve, orjson, Typer, and Ruff.
+- Refresh the pinned Python 3.14 base image, GitHub Actions, and reusable container workflows.
+
+
 ## [4.1.7] - 2026-09-18
 
 - Consolidated dependency updates: bumped `gunicorn` to 26.2.0, `pydantic` to 2.13.5, `lxml` to 6.1.3, `ruff` to 0.16.8, `mypy` to 2.3.1.
