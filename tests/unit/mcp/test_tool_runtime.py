@@ -1434,7 +1434,7 @@ async def test_get_server_health_check_upstream_true_probes_and_reports_reachabl
         def __init__(self, *args, **kwargs) -> None:
             self.aclose_called = False
 
-        async def __aenter__(self) -> "_FakeClient":
+        async def __aenter__(self) -> _FakeClient:
             return self
 
         async def __aexit__(self, *args) -> None:
@@ -1477,7 +1477,7 @@ async def test_get_server_health_check_upstream_true_reports_unreachable_on_time
     class _FakeClient:
         def __init__(self, *args, **kwargs) -> None: ...
 
-        async def __aenter__(self) -> "_FakeClient":
+        async def __aenter__(self) -> _FakeClient:
             return self
 
         async def __aexit__(self, *args) -> None:

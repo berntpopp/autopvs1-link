@@ -5,7 +5,6 @@ import threading
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Optional
 
 import structlog
 
@@ -18,10 +17,10 @@ logger = structlog.get_logger()
 class ClientManager:
     """Singleton manager for AutoPVS1Client instances with proper lifecycle management."""
 
-    _instance: Optional["ClientManager"] = None
+    _instance: ClientManager | None = None
     _lock = threading.Lock()
 
-    def __new__(cls) -> "ClientManager":
+    def __new__(cls) -> ClientManager:
         """Create or return the singleton instance."""
         if cls._instance is None:
             with cls._lock:
@@ -59,7 +58,7 @@ class ClientManager:
         return self._client
 
     @asynccontextmanager
-    async def get_client_context(self) -> AsyncGenerator[AutoPVS1Client, None]:
+    async def get_client_context(self) -> AsyncGenerator[AutoPVS1Client]:
         """Get client instance with rate limiting and proper resource management."""
         # Implement basic rate limiting to be respectful
         await self._rate_limit()
@@ -131,7 +130,7 @@ async def get_client_manager() -> ClientManager:
     return _client_manager
 
 
-async def get_managed_client() -> AsyncGenerator[AutoPVS1Client, None]:
+async def get_managed_client() -> AsyncGenerator[AutoPVS1Client]:
     """Get managed client dependency for FastAPI with rate limiting."""
     client_manager = await get_client_manager()
     async with client_manager.get_client_context() as client:

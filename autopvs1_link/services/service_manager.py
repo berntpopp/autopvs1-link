@@ -2,7 +2,6 @@
 
 import asyncio
 import threading
-from typing import Optional
 
 import structlog
 
@@ -15,10 +14,10 @@ logger = structlog.get_logger()
 class ServiceManager:
     """Singleton manager for AutoPVS1Service instances with proper lifecycle management."""
 
-    _instance: Optional["ServiceManager"] = None
+    _instance: ServiceManager | None = None
     _lock = threading.Lock()
 
-    def __new__(cls) -> "ServiceManager":
+    def __new__(cls) -> ServiceManager:
         """Create or return the singleton instance."""
         if cls._instance is None:
             with cls._lock:

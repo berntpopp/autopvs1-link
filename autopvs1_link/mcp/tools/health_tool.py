@@ -58,7 +58,7 @@ async def _probe_upstream() -> tuple[bool, UpstreamStatus]:
                 "HEAD",
                 url,
             )
-    except (EgressDeniedError, httpx.TimeoutException, httpx.RequestError, httpx.HTTPError):
+    except EgressDeniedError, httpx.TimeoutException, httpx.RequestError, httpx.HTTPError:
         return False, "unreachable"
     # Any HTTP response code proves the host is up; 5xx still means we
     # reached the server but it's degraded — surface as reachable so the
