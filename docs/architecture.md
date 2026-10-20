@@ -50,7 +50,7 @@ The project follows a layered architecture with singleton managers for resource 
 
 ## Technology Stack
 
-- Python 3.12+ (3.13 / 3.14 supported).
+- Python 3.14+.
 - `uv` for dependency management, with a committed `uv.lock`.
 - `hatchling` build backend.
 - `ruff` for both lint and format (Black removed).

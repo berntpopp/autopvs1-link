@@ -149,7 +149,7 @@ README. Relocate content; never delete a real fact.
 - Use `uv` for dependency management; do not use direct `pip` installs.
 - Use modern Python typing: `list[str]`, `dict[str, int]`, `str | None`.
 - Format and lint Python with Ruff.
-- Type check with mypy targeting Python 3.12.
+- Type check with mypy targeting Python 3.14.
 - Keep FastAPI route behavior covered by route tests, service behavior
   covered by unit tests, and HTML parsing covered by fixture-driven tests.
 - Pre-commit ruff `rev` may drift from `uv.lock` ruff version. Accept the
