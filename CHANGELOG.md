@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.1.9] - 2026-10-20
+
+- Security: upgrade `mcp` to 1.30.0 to fix the unbounded session accumulation in the StreamableHTTP transport (Dependabot alert).
+- Changed: bump `fastapi` to 0.143.0, `pydantic` to 2.14.0, `mypy` to 2.4.0, `pytest-mock` to 3.16.0, `ruff` to 0.16.10.
+- Changed: bump `actions/upload-artifact` to v7.0.2 and `astral-sh/setup-uv` to v10.3.0; pin the reusable container workflows to `genefoundry-router` v0.10.4.
+
 ## [4.1.8] - 2026-10-03
 
 - Update PyJWT to 2.15.0 and virtualenv to 21.7.13; preserve the open bot targets for AnyIO, soupsieve, orjson, Typer, and Ruff.
