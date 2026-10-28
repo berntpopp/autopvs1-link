@@ -41,7 +41,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AUTOPVS1_LINK_TRANSPORT=unified \
     TMPDIR=/tmp/autopvs1-link
 
-RUN apt-get update \
+RUN mkdir -p "$TMPDIR" && apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
     curl \
