@@ -104,7 +104,7 @@ def test_error_envelope_sets_mcp_is_error_true_on_the_wire() -> None:
 
     mcp_result = result.to_mcp_result()
 
-    assert mcp_result.isError is True
+    assert mcp_result.is_error is True
     assert result.structured_content["success"] is False
 
 

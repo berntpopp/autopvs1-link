@@ -537,10 +537,10 @@ Guide a research-use AutoPVS1 CNV PVS1 workflow.
 
 - `genome_build` (required): Genome build, usually hg19 or hg38.
 
-Provide as a JSON string matching the following schema: {"type":"string"}
+Provide a value matching the following JSON schema: {"type":"string"}. Encode non-string values as JSON.
 - `cnv_id` (required): AutoPVS1 CNV ID such as 17-15000000-20000000-DEL.
 
-Provide as a JSON string matching the following schema: {"type":"string"}
+Provide a value matching the following JSON schema: {"type":"string"}. Encode non-string values as JSON.
 
 ### `classify_variant`
 
@@ -552,10 +552,10 @@ Guide a research-use AutoPVS1 SNV/indel PVS1 workflow.
 
 - `genome_build` (required): Genome build, usually hg19 or hg38.
 
-Provide as a JSON string matching the following schema: {"type":"string"}
+Provide a value matching the following JSON schema: {"type":"string"}. Encode non-string values as JSON.
 - `variant_id` (required): AutoPVS1 variant ID such as X-82763936-A-T.
 
-Provide as a JSON string matching the following schema: {"type":"string"}
+Provide a value matching the following JSON schema: {"type":"string"}. Encode non-string values as JSON.
 
 ### `pvs1_workflow_help`
 
@@ -567,7 +567,7 @@ Return concrete tool-chain guidance for one of three tasks: clinical_review, bat
 
 - `task` (required): One of clinical_review, batch_screen, or search_first.
 
-Provide as a JSON string matching the following schema: {"type":"string"}
+Provide a value matching the following JSON schema: {"type":"string"}. Encode non-string values as JSON.
 
 ## Resources
 
