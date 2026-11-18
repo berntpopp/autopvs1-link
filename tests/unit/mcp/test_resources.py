@@ -27,15 +27,15 @@ async def test_initialize_advertises_listchanged_false() -> None:
     from fastmcp.client import Client
 
     mcp = build_mcp_server()
-    async with Client(mcp) as client:
+    async with Client(mcp, mode="legacy") as client:
         caps = client.initialize_result.capabilities
         assert caps.tools is not None
-        assert caps.tools.listChanged is False
+        assert caps.tools.list_changed is False
         assert caps.resources is not None
-        assert caps.resources.listChanged is False
+        assert caps.resources.list_changed is False
         assert caps.resources.subscribe is False
         assert caps.prompts is not None
-        assert caps.prompts.listChanged is False
+        assert caps.prompts.list_changed is False
 
 
 @pytest.mark.asyncio

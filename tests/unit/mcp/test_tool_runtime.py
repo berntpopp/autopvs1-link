@@ -676,7 +676,7 @@ async def test_error_envelopes_set_is_error_true_on_wire(mocker) -> None:
     )
     # The wire-level CallToolResult.isError is what spec-aware clients read.
     mcp_result = result.to_mcp_result()
-    assert getattr(mcp_result, "isError", False) is True
+    assert mcp_result.is_error is True
     assert result.structured_content["success"] is False
     assert result.structured_content["error_subcode"] == "invalid_genome_build"
 
@@ -696,7 +696,7 @@ async def test_success_envelopes_remain_is_error_false(mocker) -> None:
     # for our successful envelope it's the (content, structured) tuple form
     # because we don't override the helper. Either way isError must not be true.
     mcp_result = result.to_mcp_result()
-    is_error = getattr(mcp_result, "isError", False) if hasattr(mcp_result, "isError") else False
+    is_error = getattr(mcp_result, "is_error", False)
     assert is_error is False
     assert result.structured_content["success"] is True
 
@@ -1401,8 +1401,8 @@ async def test_get_server_health_is_local_read_only_and_does_not_call_upstream(m
     health_tool = tools["get_server_health"]
 
     assert health_tool.annotations is not None
-    assert health_tool.annotations.readOnlyHint is True
-    assert health_tool.annotations.destructiveHint is False
+    assert health_tool.annotations.read_only_hint is True
+    assert health_tool.annotations.destructive_hint is False
 
     result = await mcp.call_tool("get_server_health", {})
 

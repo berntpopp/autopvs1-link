@@ -36,9 +36,10 @@ from fastmcp import Client
 from fastmcp.exceptions import ResourceError
 from mcp.shared.memory import create_client_server_memory_streams
 from mcp.shared.message import SessionMessage
-from mcp.types import INVALID_PARAMS, JSONRPCMessage, JSONRPCRequest
+from mcp.types import INVALID_PARAMS, JSONRPCNotification, JSONRPCRequest
 
 from autopvs1_link.mcp.facade import build_mcp_server
+from autopvs1_link.mcp.notfound_guard import _UNKNOWN_RESOURCE_MESSAGE
 from autopvs1_link.mcp.untrusted_content import FORBIDDEN_CODEPOINTS
 from autopvs1_link.models.autopvs1_models import (
     AutoPVS1Data,
@@ -282,7 +283,7 @@ async def test_unknown_prompt_no_reflection_to_caller_or_logs() -> None:
 # ---------------------------------------------------------------------------
 # (c) Malformed / control-char URI: the SDK-session validation log (root logger)
 # echoes the raw URI + code points. The caller-visible response is already the
-# fixed "Invalid request parameters", so only the log sink needs the scrub.
+# fixed "Invalid request parameters" (SDK v1) or the Layer-3 fixed message (SDK v2).
 # ---------------------------------------------------------------------------
 
 
@@ -309,11 +310,33 @@ async def test_malformed_uri_real_request_frame_and_logs_are_clean() -> None:
                         server_read,
                         server_write,
                         init_options,
-                        stateless=True,  # start Initialized: skip the handshake
                         raise_exceptions=False,
                     )
 
                 task_group.start_soon(_run)
+                # SDK v2 has no ``stateless`` shortcut: complete the legacy handshake.
+                await client_write.send(
+                    SessionMessage(
+                        message=JSONRPCRequest(
+                            jsonrpc="2.0",
+                            id=0,
+                            method="initialize",
+                            params={
+                                "protocolVersion": "2025-06-18",
+                                "capabilities": {},
+                                "clientInfo": {"name": "test", "version": "0"},
+                            },
+                        )
+                    )
+                )
+                await client_read.receive()
+                await client_write.send(
+                    SessionMessage(
+                        message=JSONRPCNotification(
+                            jsonrpc="2.0", method="notifications/initialized"
+                        )
+                    )
+                )
                 # The malformed URI is a plain string in params, so it bypasses
                 # AnyUrl validation until the session model_validates it into a
                 # ClientRequest — reproducing the real -32602 + log path.
@@ -323,21 +346,23 @@ async def test_malformed_uri_real_request_frame_and_logs_are_clean() -> None:
                     method="resources/read",
                     params={"uri": HOSTILE_MALFORMED_URI},
                 )
-                await client_write.send(SessionMessage(message=JSONRPCMessage(request)))
+                await client_write.send(SessionMessage(message=request))
                 with anyio.fail_after(5):
                     for _ in range(5):
                         message = await client_read.receive()
                         if isinstance(message, Exception):
                             raise message
-                        candidate = message.message.root
+                        candidate = message.message
                         if isinstance(candidate, mcp_types.JSONRPCError):
                             root = candidate
                             break
                 task_group.cancel_scope.cancel()
 
-    # Caller-visible -32602 frame: fixed message, no URI / code points.
+    # Caller-visible error frame: fixed message, no URI / code points. SDK v1
+    # rejected the URI at session validation (-32602); SDK v2 passes it to the
+    # handler, where the Layer-3 backstop answers with the fixed message.
     assert root is not None, "expected a JSON-RPC error response"
-    assert root.error.code == INVALID_PARAMS
+    assert root.error.code == INVALID_PARAMS or root.error.message == _UNKNOWN_RESOURCE_MESSAGE
     _assert_clean_text(root.error.message, where="jsonrpc-error")
     if isinstance(root.error.data, str):
         _assert_clean_text(root.error.data, where="jsonrpc-error-data")

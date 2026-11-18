@@ -6,6 +6,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-11-18
+
+### Changed
+
+- Upgrade FastMCP 3.4 → 4.2.2 and MCP SDK 1.x → 2.x; supports the 2026-07-28
+  sessionless protocol era alongside the legacy handshake.
+- Not-found reflection guard Layer 3 (protocol backstop) ported to the SDK v2
+  `get_request_handler`/`add_request_handler` API; `mcp.types` usages moved to
+  snake_case fields; `httpx2`/`httpcore2` loggers added to third-party suppression.
+- New test drives `server/discover` → `tools/list` → `tools/call` over the modern era.
+
 ## [4.1.14] - 2026-11-13
 
 ### Changed

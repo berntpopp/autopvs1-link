@@ -171,9 +171,9 @@ async def test_data_tools_have_titles_and_annotations_and_no_output_schema() -> 
         # envelope shape is verified via call_tool in test_tool_runtime instead.
         assert tool.output_schema is None
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.destructiveHint is False
-        assert tool.annotations.idempotentHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.destructive_hint is False
+        assert tool.annotations.idempotent_hint is True
 
 
 @pytest.mark.asyncio

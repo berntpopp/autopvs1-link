@@ -55,8 +55,8 @@ class ErrorToolResult(ToolResult):
     def to_mcp_result(self) -> CallToolResult:
         return CallToolResult(
             content=self.content,
-            structuredContent=self.structured_content,
-            isError=True,
+            structured_content=self.structured_content,
+            is_error=True,
             _meta=self.meta,
         )
 
