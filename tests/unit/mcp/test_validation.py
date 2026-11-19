@@ -11,6 +11,7 @@ from autopvs1_link.mcp.validation import (
     _encode_cursor,
     classify_variant_input,
     normalize_cnv_id,
+    normalize_genome_build,
     normalize_genome_builds,
     normalize_limit_cursor,
     normalize_search_query,
@@ -110,6 +111,24 @@ def test_normalize_cnv_id_rejects_invalid_interval() -> None:
 
     assert exc_info.value.code == "invalid_cnv_id"
     assert "start must be less than end" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("hg38", "hg38"), ("GRCh38", "hg38"), (" grch37 ", "hg19"), ("HG19", "hg19")],
+)
+def test_normalize_genome_build_accepts_grch_aliases(raw: str, expected: str) -> None:
+    # AutoPVS1 hg38 IS GRCh38; fleet tools say GRCh38, so the alias must not be rejected (#183).
+    assert normalize_genome_build(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["b38", "GRCh39", "", None])
+def test_normalize_genome_build_rejection_names_field_and_values(raw: object) -> None:
+    with pytest.raises(MCPInputError) as exc_info:
+        normalize_genome_build(raw)
+    message = str(exc_info.value)
+    assert exc_info.value.code == "invalid_genome_build"
+    assert all(token in message for token in ("genome_build", "hg38", "hg19", "GRCh38"))
 
 
 def test_normalize_genome_builds_defaults_to_hg38() -> None:

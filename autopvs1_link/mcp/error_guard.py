@@ -25,6 +25,20 @@ from autopvs1_link.mcp.untrusted_content import sanitize_message
 logger = structlog.get_logger()
 
 
+def _offending_fields(exc: BaseException) -> list[str]:
+    """Top-level argument names from the pydantic error behind ``exc`` (walks ``__cause__``)."""
+    err: BaseException | None = exc
+    while err is not None:
+        errors_fn = getattr(err, "errors", None)
+        if callable(errors_fn):
+            try:
+                return list(dict.fromkeys(str(e["loc"][0]) for e in errors_fn() if e.get("loc")))
+            except Exception:
+                return []
+        err = err.__cause__
+    return []
+
+
 class ArgumentValidationGuard(Middleware):
     """Convert FastMCP arg-validation failures into a fixed invalid_input envelope."""
 
@@ -40,16 +54,23 @@ class ArgumentValidationGuard(Middleware):
             # defensively; the offending ARGUMENT name is never surfaced.
             raw_name = getattr(getattr(context, "message", None), "name", None)
             tool_name = sanitize_message(raw_name) if isinstance(raw_name, str) else None
-            logger.warning("tool argument validation failed", error_type=type(exc).__name__)
             # Name the VALID parameters (safe, author-declared identifiers) so the
             # model can self-correct — MCP 2025-11-25 SEP-1303 requires a tool
-            # execution error to carry actionable feedback. We NEVER echo the
-            # offending argument name (it is caller-controlled and could carry
-            # injection prose / control code points); the allowed set is enough.
+            # execution error to carry actionable feedback. An offending name is
+            # echoed/logged ONLY when it is a declared parameter: an unknown key
+            # is caller-controlled and could carry injection prose / code points.
             allowed = await self._valid_argument_names(context, raw_name)
+            fields = [f for f in _offending_fields(exc) if f in allowed]
+            logger.warning(
+                "tool argument validation failed",
+                tool=tool_name,
+                error_type=type(exc).__name__,
+                fields=fields,
+            )
             if allowed:
+                problem = f" Check: {', '.join(fields)}." if fields else ""
                 message = (
-                    "One or more tool arguments are missing or invalid. Valid "
+                    f"One or more tool arguments are missing or invalid.{problem} Valid "
                     f"argument names: {', '.join(allowed)}."
                 )
                 allowed_values = allowed

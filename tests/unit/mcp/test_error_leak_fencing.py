@@ -551,3 +551,22 @@ async def test_hostile_top_level_arg_name_is_fenced(tool_name: str) -> None:
     assert "IGNORE_ALL_PREVIOUS_INSTRUCTIONS" not in text
     _assert_no_forbidden_codepoints(structured)
     _assert_no_forbidden_codepoints(json.loads(text))
+
+
+async def test_arg_validation_names_and_logs_declared_field_only() -> None:
+    """A missing declared argument is named (message + log); an unknown key never is (#183)."""
+    from structlog.testing import capture_logs
+
+    mcp = build_mcp_server()
+    with capture_logs() as logs:
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "get_variant_pvs1_data",
+                {_HOSTILE_ARG: "hg38", "variant_id": "X-1-A-T"},
+                raise_on_error=False,
+            )
+    assert "Check: genome_build." in result.structured_content["message"]
+    (line,) = [e for e in logs if e.get("event") == "tool argument validation failed"]
+    assert line["fields"] == ["genome_build"]
+    assert line["tool"] == "get_variant_pvs1_data"
+    assert "delete_everything" not in repr(logs)

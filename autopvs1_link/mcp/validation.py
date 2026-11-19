@@ -128,21 +128,24 @@ COLON_CNV_RE = re.compile(
 CNV_FORMAT_SUGGESTION = "Use AutoPVS1 CNV format such as 17-15000000-20000000-DEL."
 
 
+# AutoPVS1 serves hg19/hg38 only; GRCh37/GRCh38 name the same assemblies (fleet-wide names).
+_GENOME_BUILD_ALIASES = {"hg19": "hg19", "hg38": "hg38", "grch37": "hg19", "grch38": "hg38"}
+
+
+def canonical_genome_build(value: object) -> str | None:
+    """``hg19``/``hg38`` for a recognized build or alias (case-insensitive), else ``None``."""
+    return _GENOME_BUILD_ALIASES.get(value.strip().lower()) if isinstance(value, str) else None
+
+
 def normalize_genome_build(value: object) -> str:
-    if not isinstance(value, str):
+    build = canonical_genome_build(value)
+    if build is None:
         raise MCPInputError(
             code="invalid_genome_build",
-            message="Genome build must be hg19 or hg38.",
+            message="genome_build must be hg38 or hg19 (GRCh38 and GRCh37 are accepted aliases).",
             suggestions=["Use genome_build='hg38' unless the source variant coordinates are hg19."],
         )
-    normalized = value.strip()
-    if normalized not in VALID_GENOME_BUILDS:
-        raise MCPInputError(
-            code="invalid_genome_build",
-            message="Genome build must be hg19 or hg38.",
-            suggestions=["Use genome_build='hg38' unless the source variant coordinates are hg19."],
-        )
-    return normalized
+    return build
 
 
 def normalize_genome_builds(
@@ -381,6 +384,4 @@ def safe_echo_cnv_id(cnv_id: str) -> str:
 
 def safe_echo_genome_build(genome_build: str) -> str:
     """Reflect a bulk genome_build only if it is a recognized build."""
-    if isinstance(genome_build, str) and genome_build.strip() in VALID_GENOME_BUILDS:
-        return genome_build
-    return ECHO_REDACTED
+    return canonical_genome_build(genome_build) or ECHO_REDACTED
