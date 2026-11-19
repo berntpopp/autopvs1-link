@@ -6,6 +6,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.2.2] - 2026-11-19
+
+### Fixed
+
+- `genome_build` accepts `GRCh38` / `GRCh37` (case-insensitive) as aliases for `hg38` / `hg19`,
+  the names other fleet tools use; they were rejected as `invalid_genome_build`. An unknown build's
+  error names the field and the supported values (#183).
+- An argument-validation error now names the offending argument when it is a declared parameter
+  (e.g. a missing `genome_build`), and the `tool argument validation failed` log line carries the
+  tool and those field names. Unknown argument names are still never echoed or logged (#183).
+
 ## [4.2.1] - 2026-11-18
 
 ### Security
