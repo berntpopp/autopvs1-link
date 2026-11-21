@@ -33,7 +33,11 @@ from autopvs1_link.mcp.tools.mode_errors import (
     invalid_mode_envelope,
 )
 from autopvs1_link.mcp.untrusted_content import UntrustedTextLimitError
-from autopvs1_link.mcp.upstream_errors import http_status_error_code, is_retryable_status
+from autopvs1_link.mcp.upstream_errors import (
+    PARSE_ERROR_SUGGESTION,
+    http_status_error_code,
+    is_retryable_status,
+)
 from autopvs1_link.mcp.validation import normalize_genome_build
 
 RESPONSE_MODE_SCHEMA = {"type": "string", "enum": ["ids_only", "summary", "standard", "full"]}
@@ -211,9 +215,10 @@ def register(mcp: FastMCP) -> None:
         except UpstreamFormatError:
             return error_envelope(
                 code="parse_error",
-                message="AutoPVS1 variant HTML could not be parsed into the expected fields.",
+                message="AutoPVS1 returned the variant page, but this server could not parse its layout "
+                "(a parser gap, not an upstream outage).",
                 retryable=False,
-                suggestions=["Retry after confirming the variant exists in AutoPVS1."],
+                suggestions=[PARSE_ERROR_SUGGESTION],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )
@@ -232,9 +237,10 @@ def register(mcp: FastMCP) -> None:
         except ValueError:
             return error_envelope(
                 code="parse_error",
-                message="AutoPVS1 variant HTML could not be parsed into the expected fields.",
+                message="AutoPVS1 returned the variant page, but this server could not parse its layout "
+                "(a parser gap, not an upstream outage).",
                 retryable=False,
-                suggestions=["Retry after confirming the variant exists in AutoPVS1."],
+                suggestions=[PARSE_ERROR_SUGGESTION],
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
             )

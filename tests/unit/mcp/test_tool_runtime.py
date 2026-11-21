@@ -135,8 +135,12 @@ async def test_unrecognized_scraped_strength_returns_parse_error(mocker) -> None
         {"variant_id": "1-1-A-G", "genome_build": "hg38"},
     )
     assert result.structured_content["error_subcode"] == "parse_error"
+    assert result.structured_content["error_code"] == "internal"
     assert result.structured_content["retryable"] is False
     assert "Bananas" not in result.content[0].text
+    guidance = [result.structured_content["recovery_action"], result.structured_content["message"]]
+    guidance += result.structured_content["_meta"]["next_actions"]
+    assert not any("retry" in line.lower() for line in guidance)
 
 
 def _cnv_result() -> AutoPVS1CNVData:

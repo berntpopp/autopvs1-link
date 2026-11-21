@@ -25,7 +25,7 @@ from autopvs1_link.mcp.untrusted_content import (
     sanitize_error_details,
     sanitize_message,
 )
-from autopvs1_link.mcp.upstream_errors import http_status_error_code
+from autopvs1_link.mcp.upstream_errors import PARSE_ERROR_SUGGESTION, http_status_error_code
 from autopvs1_link.mcp.upstream_errors import is_retryable_status as _retryable
 from autopvs1_link.mcp.validation import normalize_cnv_id, normalize_genome_build
 
@@ -151,9 +151,10 @@ async def run_variant_pvs1(
             [],
             _err(
                 "parse_error",
-                "AutoPVS1 variant HTML could not be parsed into the expected fields.",
+                "AutoPVS1 returned the variant page, but this server could not parse its layout "
+                "(a parser gap, not an upstream outage).",
                 False,
-                ["Retry after confirming the variant exists in AutoPVS1."],
+                [PARSE_ERROR_SUGGESTION],
             ),
         )
     except UntrustedTextLimitError:
@@ -174,9 +175,10 @@ async def run_variant_pvs1(
             [],
             _err(
                 "parse_error",
-                "AutoPVS1 variant HTML could not be parsed into the expected fields.",
+                "AutoPVS1 returned the variant page, but this server could not parse its layout "
+                "(a parser gap, not an upstream outage).",
                 False,
-                ["Retry after confirming the variant exists in AutoPVS1."],
+                [PARSE_ERROR_SUGGESTION],
             ),
         )
 
@@ -257,9 +259,10 @@ async def run_cnv_pvs1(
             [],
             _err(
                 "parse_error",
-                "AutoPVS1 CNV HTML could not be parsed into the expected fields.",
+                "AutoPVS1 returned the CNV page, but this server could not parse its layout "
+                "(a parser gap, not an upstream outage).",
                 False,
-                ["Retry after confirming the CNV exists in AutoPVS1."],
+                [PARSE_ERROR_SUGGESTION],
             ),
         )
     except UntrustedTextLimitError:
@@ -280,8 +283,9 @@ async def run_cnv_pvs1(
             [],
             _err(
                 "parse_error",
-                "AutoPVS1 CNV HTML could not be parsed into the expected fields.",
+                "AutoPVS1 returned the CNV page, but this server could not parse its layout "
+                "(a parser gap, not an upstream outage).",
                 False,
-                ["Retry after confirming the CNV exists in AutoPVS1."],
+                [PARSE_ERROR_SUGGESTION],
             ),
         )

@@ -245,6 +245,32 @@ class TestPVS1FlowchartParsing:
         assert "important warning" not in flowchart.notes
 
 
+class TestGeneSpecificCriteriaParsing:
+    """AutoPVS1 replaces the flowchart tree with a ClinGen VCEP gene rule for CDH1/PTEN (#185)."""
+
+    @pytest.mark.parametrize(
+        ("fixture", "variant_id", "rule", "strength"),
+        [
+            ("variant_hg38_CDH1_16-68821999-A-C.html", "16-68821999-A-C", "CDH1", "Strong"),
+            ("variant_hg38_PTEN_10-87933147-C-T.html", "10-87933147-C-T", "PTEN", "VeryStrong"),
+        ],
+    )
+    def test_gene_specific_criteria_page_parses(self, client, fixture, variant_id, rule, strength):
+        soup = BeautifulSoup(load_fixture(fixture), "lxml")
+        data = client._build_variant_data(soup, "hg38", variant_id)
+
+        flowchart = data.pvs1_flowchart
+        assert flowchart.final_strength == strength
+        assert flowchart.final_strength_inferred is False
+        assert flowchart.preliminary_decision_path == rule
+        [step] = flowchart.decision_tree
+        assert step.code.startswith(f"{rule} gene-specific criteria: ")
+        assert strength in step.code
+        assert "PVS1 Flowchart" not in step.code
+        assert data.variant_info.gene_symbol == rule
+        assert data.disease_mechanisms
+
+
 class TestDiseaseMechanismParsing:
     """Test disease mechanism table parsing."""
 
