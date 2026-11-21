@@ -21,3 +21,11 @@ def http_status_error_code(status_code: int) -> str:
 def is_retryable_status(status_code: int) -> bool:
     """True for transient upstream statuses a caller may retry (408, 429, 5xx)."""
     return status_code in {408, 429} or status_code >= 500
+
+
+# A delivered page we cannot parse fails identically on every call, so the
+# suggestion must not invite a retry (#185).
+PARSE_ERROR_SUGGESTION = (
+    "Do not repeat the call: the same page fails the same way until the parser is "
+    "extended. Report the input and assess PVS1 from another source meanwhile."
+)

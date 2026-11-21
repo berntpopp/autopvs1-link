@@ -35,7 +35,7 @@ KNOWN_ERROR_CODES: dict[str, str] = {
     "invalid_response_mode": "response_mode not a documented enum value.",
     "invalid_meta_mode": "meta_mode not a documented enum value.",
     "not_found": "Upstream returned 404 for the requested ID.",
-    "parse_error": "Upstream HTML did not match expected schema.",
+    "parse_error": "Upstream page was delivered but its HTML layout is not supported.",
     "upstream_timeout": "Upstream timed out; retry with backoff.",
     "upstream_unavailable": "Upstream unreachable or HTTP 5xx.",
     "rate_limited": "Upstream returned HTTP 429; back off before retrying.",
@@ -98,14 +98,15 @@ _CANONICAL_BY_SUBCODE: dict[str, str] = {
     "requires_disambiguation": "ambiguous_query",
     # upstream / resolver / policy egress -> upstream_unavailable
     "not_found": "not_found",
-    "parse_error": "upstream_unavailable",
     "upstream_timeout": "upstream_unavailable",
     "upstream_unavailable": "upstream_unavailable",
     "external_resolver_unavailable": "upstream_unavailable",
     "external_egress_disabled": "upstream_unavailable",
     # HTTP 429 -> rate_limited (throttle, not outage): callers branch on it.
     "rate_limited": "rate_limited",
-    # server-side conditions the caller cannot fix via input -> internal
+    # server-side conditions the caller cannot fix via input -> internal.
+    # parse_error: the page WAS delivered, so it is not an upstream outage (#185).
+    "parse_error": "internal",
     "destructive_disabled": "internal",
     "internal_error": "internal",
     "untrusted_text_limit_exceeded": "internal",
@@ -181,7 +182,7 @@ ERROR_NEXT_ACTIONS: dict[str, list[str]] = {
         "Space out calls (~1 req/s) or batch via the bulk tools to stay under the limit.",
     ],
     "parse_error": [
-        "Confirm the identifier exists in AutoPVS1; the HTML schema may have changed for new edge cases.",
+        "Do not repeat the call: AutoPVS1 answered, but its page layout for this input is unsupported.",
         "Report the failing input so the parser can be adjusted.",
     ],
     "destructive_disabled": [

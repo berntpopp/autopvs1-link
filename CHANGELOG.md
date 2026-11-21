@@ -6,6 +6,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.2.3] - 2026-11-21
+
+### Fixed
+
+- `get_variant_pvs1_data` (and the bulk/CNV paths through the same parser) parses AutoPVS1's
+  gene-specific-criteria page, which replaces the flowchart tree for CDH1 (canonical splice sites,
+  `Strong`) and PTEN (truncations 5' of c.1121, `VeryStrong`). These variants, e.g. hg38
+  `16-68821999-A-C` (CDH1 c.1712-2A>C), failed with `parse_error`. The rule text is returned as the
+  single `decision_tree` step and `preliminary_decision_path` is the gene (#185).
+- `parse_error` now canonicalises to `error_code: internal` instead of `upstream_unavailable`: the
+  page was delivered, so it is a parser gap, not an outage. Its message and recovery guidance no
+  longer suggest a retry (#185).
+
 ## [4.2.2] - 2026-11-19
 
 ### Fixed

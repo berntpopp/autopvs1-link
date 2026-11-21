@@ -127,3 +127,11 @@ def test_canonical_error_code_backstops_an_unmapped_code_to_internal() -> None:
 def test_known_warning_codes_messages_are_one_line_strings() -> None:
     for code, message in KNOWN_WARNING_CODES.items():
         assert isinstance(message, str) and "\n" not in message, code
+
+
+def test_parse_error_is_not_reported_as_upstream_outage() -> None:
+    """A delivered page we cannot parse is a server-side gap, not an outage (#185)."""
+    from autopvs1_link.mcp.registries import canonical_error_code, next_actions_for
+
+    assert canonical_error_code("parse_error") == "internal"
+    assert not any("retry" in action.lower() for action in next_actions_for("parse_error") or [])

@@ -186,6 +186,29 @@ def _infer_terminal_strength(flowchart_codes: list[Tag]) -> str:
     return ""
 
 
+def _parse_gene_specific_criteria(flowchart_col: Tag) -> tuple[str, str, str] | None:
+    """Return (rule, strength, text) when AutoPVS1 shows a gene rule instead of a tree.
+
+    For CDH1 and PTEN AutoPVS1 skips the flowchart and prints
+    ``<a>GENE gene-specific criteria</a>: ... <b>[PVS1 ]Strength</b>`` (#185).
+    """
+    link = flowchart_col.find("a", string=re.compile(r"gene-specific criteria", re.IGNORECASE))
+    bolds = flowchart_col.find_all("b")
+    if not isinstance(link, Tag) or not bolds:
+        return None
+    strength = _match_strength_candidate(
+        re.sub(r"^PVS1\s+", "", _collapse_html_text(bolds[-1]), flags=re.IGNORECASE)
+    )
+    if not strength:
+        return None
+    col_copy = BeautifulSoup(str(flowchart_col), "lxml")
+    for heading in col_copy.find_all("h2"):
+        heading.decompose()
+    rule = _collapse_html_text(link).split()[0]
+    # _collapse_html_text joins tags with a space; drop it before the "criteria:" colon.
+    return rule, strength, re.sub(r"\s+:", ":", _collapse_html_text(col_copy))
+
+
 def _is_invalid_clinvar_sentinel(label: str, url: str) -> bool:
     """Return true for AutoPVS1 ClinVar sentinel URLs that are not citations."""
     return label == "ClinVar" and url.rstrip("/").endswith("/variation/na")
@@ -326,7 +349,14 @@ def parse_pvs1_flowchart(soup: BeautifulSoup) -> PVS1Flowchart:
         final_strength = _infer_terminal_strength(flowchart_codes)
         final_strength_inferred = bool(final_strength)
 
+    gene_rule = (
+        None if final_strength or flowchart_codes else _parse_gene_specific_criteria(flowchart_col)
+    )
     decision_tree = []
+    if gene_rule is not None:
+        preliminary_path, final_strength, rule_text = gene_rule
+        decision_tree.append(FlowchartStep(code=rule_text))
+
     for code in flowchart_codes:
         step = _flowchart_step_from_code(code)
         if step is not None:
