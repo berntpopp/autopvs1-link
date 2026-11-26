@@ -24,7 +24,12 @@ from autopvs1_link.mcp.registries import (
     capabilities_version,
     next_actions_for,
 )
-from autopvs1_link.mcp.telemetry import get_call_telemetry
+from autopvs1_link.mcp.telemetry import (
+    call_elapsed_ms,
+    get_call_telemetry,
+    get_retrieved_at,
+    utc_now,
+)
 from autopvs1_link.mcp.untrusted_content import sanitize_error_details, sanitize_message
 
 
@@ -141,8 +146,9 @@ class MCPMeta(BaseModel):
     ``elapsed_ms`` and ``cache_status`` echo the LAST upstream call's
     wall-clock time and cache outcome (``hit`` | ``miss`` | ``coalesced``
     | ``bypass``). Populated by the cache wrapper via the telemetry
-    ContextVar; both drop from the wire when the tool made no upstream
-    call (e.g. ``get_server_health`` or ``get_server_capabilities``).
+    ContextVar. When the tool made no upstream call (e.g.
+    ``get_server_health``), ``cache_status`` drops from the wire and
+    ``elapsed_ms`` is the call's own wall-clock.
 
     ``cost_tier`` is a coarse latency hint sourced from
     :data:`autopvs1_link.mcp.cost_tiers.TOOL_COST_TIERS`. The same value
@@ -203,6 +209,10 @@ class MCPMeta(BaseModel):
     cached_count: int | None = None
     uncached_count: int | None = None
     upstream: UpstreamProvenance | None = None
+    # Response-Envelope v1.2 provenance; set on every result that carries upstream data.
+    source: str | None = None
+    data_version: str | None = None
+    retrieved_at: str | None = None
 
 
 def _dump_warning(warning: MCPWarning) -> dict[str, Any]:
@@ -263,7 +273,9 @@ def _strip_none_telemetry_fields(payload: dict[str, Any]) -> dict[str, Any]:
         for key in (
             "tool",
             "effective_chars",
-            "elapsed_ms",
+            "source",
+            "data_version",
+            "retrieved_at",
             "cache_status",
             "cost_tier",
             "rate_limit_floor_ms",
@@ -410,12 +422,20 @@ def ok_envelope(
         cold_latency_ms_for(tool_name) if cache_status in ("miss", "coalesced") else None
     )
     upstream = _upstream_provenance() if cost_tier == SCRAPE_TIER else None
+    if elapsed_ms is None:  # no upstream call: the call's own wall-clock
+        elapsed_ms = call_elapsed_ms()
+    # AutoPVS1 publishes no release identifier; a result that reached no upstream
+    # (e.g. every bulk item refused) is dated by this response.
+    data_tool = cost_tier == SCRAPE_TIER
     meta = MCPMeta(
+        source="autopvs1" if data_tool else None,
+        data_version="live" if data_tool else None,
+        retrieved_at=(get_retrieved_at() or utc_now()) if data_tool else None,
         tool=tool_name,
         capabilities_version=capabilities_version(),
         warnings=warnings or [],
         effective_chars=effective_chars,
-        elapsed_ms=round(elapsed_ms, 2) if elapsed_ms is not None else None,
+        elapsed_ms=round(elapsed_ms, 2),
         cache_status=cache_status,
         cost_tier=cost_tier,
         rate_limit_floor_ms=rate_limit_floor_ms,
@@ -510,6 +530,7 @@ def error_envelope(
         tool=tool_name,
         capabilities_version=capabilities_version(),
         warnings=warnings or [],
+        elapsed_ms=round(call_elapsed_ms(), 2),
         cost_tier=cost_tier,
         rate_limit_floor_ms=rate_limit_floor_ms,
         retry_after_ms=retry_after_ms,

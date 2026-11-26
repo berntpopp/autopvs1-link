@@ -56,6 +56,7 @@ from mcp.shared.exceptions import MCPError
 from mcp_types import INVALID_PARAMS, METHOD_NOT_FOUND
 
 from autopvs1_link.mcp.envelope import ErrorToolResult, error_envelope
+from autopvs1_link.mcp.telemetry import mark_call_started
 
 logger = structlog.get_logger()
 
@@ -110,6 +111,7 @@ class NotFoundGuard(Middleware):
         fixed, name-free envelope. Otherwise defer to the chain (arg-validation
         guard + the tool body).
         """
+        mark_call_started()  # outermost tool middleware: _meta.elapsed_ms starts here
         fctx = getattr(context, "fastmcp_context", None)
         name = getattr(getattr(context, "message", None), "name", None)
         if fctx is not None and isinstance(name, str):

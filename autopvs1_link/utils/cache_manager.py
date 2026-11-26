@@ -12,7 +12,7 @@ import structlog
 from async_lru import AlruCacheLoopResetWarning, alru_cache
 
 from autopvs1_link.config import settings
-from autopvs1_link.mcp.telemetry import record_upstream_call
+from autopvs1_link.mcp.telemetry import record_upstream_call, utc_now
 
 logger = structlog.get_logger()
 
@@ -174,8 +174,13 @@ class AdvancedCacheManager:
             ttl = settings.cache.ttl_seconds
 
         def decorator(func: Callable) -> Callable:
-            # Create the base cache
-            cached_func = alru_cache(maxsize=maxsize, ttl=ttl)(func)
+            # The fetch time is cached WITH the value, so a hit reports when the
+            # entry was fetched (Response-Envelope v1.2), not when it was read.
+            async def stamped(*args, **kwargs) -> tuple[Any, str]:
+                fetched_at = utc_now()
+                return await func(*args, **kwargs), fetched_at
+
+            cached_func = alru_cache(maxsize=maxsize, ttl=ttl)(stamped)
             method_name = func.__name__
 
             # Per-method coalesce tracker. ``async_lru`` shares an in-flight
@@ -197,11 +202,12 @@ class AdvancedCacheManager:
                     # the telemetry CV so meta.elapsed_ms is populated regardless
                     # of whether caching is on.
                     bypass_start = time.perf_counter()
+                    fetched_at = utc_now()
                     try:
                         result = await func(*args, **kwargs)
                     finally:
                         elapsed_ms = (time.perf_counter() - bypass_start) * 1000.0
-                        record_upstream_call(elapsed_ms, "bypass")
+                        record_upstream_call(elapsed_ms, "bypass", fetched_at)
                     return result
 
                 # Generate cache key
@@ -229,7 +235,7 @@ class AdvancedCacheManager:
                             "ignore",
                             category=AlruCacheLoopResetWarning,
                         )
-                        result = await cached_func(*args, **kwargs)
+                        result, fetched_at = await cached_func(*args, **kwargs)
                     cache_info_after = cached_func.cache_info()
                 except Exception as e:
                     execution_time = time.time() - start_time
@@ -277,7 +283,7 @@ class AdvancedCacheManager:
                 else:
                     status = "hit"
                     self._record_hit(method_name, cache_key, execution_time)
-                record_upstream_call(elapsed_ms, status)
+                record_upstream_call(elapsed_ms, status, fetched_at)
 
                 # Check for evictions
                 if cache_info_after.misses > cache_info_before.misses + 1:
