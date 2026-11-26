@@ -6,6 +6,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-11-26
+
+### Fixed
+
+- `get_variant_pvs1_data` lists `hg19` as the first `genome_build` example, and the bulk
+  example uses `hg19`, so the first examples describe one variant: `X-82763936-A-T` is an
+  hg19 coordinate and returns a PVS1 verdict there (#194).
+- `search_variants` answers an HGNC id, Ensembl gene id or NCBI Gene id with `invalid_input`
+  (`field`, `allowed_values` and `hgnc_resolve_symbol` in `_meta.next_commands`) instead of an
+  empty success; AutoPVS1 search matches gene symbols only. Upstream is not called.
+- `search_variants` `_meta.pagination` also carries `next_cursor`, as Response-Envelope
+  Standard v1 §5 asks.
+
 ## [4.3.1] - 2026-11-26
 
 ### Fixed

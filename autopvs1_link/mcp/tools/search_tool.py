@@ -170,6 +170,7 @@ def register(mcp: FastMCP) -> None:
                 pagination={
                     "total_count": data.total_count,
                     "has_more": data.pagination.has_more,
+                    "next_cursor": data.pagination.next_cursor,
                 },
                 next_commands=search_next_page(
                     {
@@ -191,6 +192,9 @@ def register(mcp: FastMCP) -> None:
                 details=exc.details or None,
                 meta_mode=normalized_meta_mode,
                 tool_name=_TOOL_NAME,
+                field=exc.field,
+                allowed_values=exc.allowed_values,
+                next_commands=exc.next_commands,
             )
         except EgressDeniedError:
             return external_egress_disabled_envelope(

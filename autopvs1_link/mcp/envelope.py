@@ -479,6 +479,8 @@ def error_envelope(
     tool_name: str | None = None,
     retry_after_ms: int | None = None,
     allowed_values: list[str] | None = None,
+    field: str | None = None,
+    next_commands: list[dict[str, Any]] | None = None,
 ) -> ErrorToolResult:
     """Return a failed MCP result that flips ``CallToolResult.isError=true``.
 
@@ -535,7 +537,7 @@ def error_envelope(
         rate_limit_floor_ms=rate_limit_floor_ms,
         retry_after_ms=retry_after_ms,
         next_actions=next_actions,
-        next_commands=error_next_commands(code, details),
+        next_commands=next_commands or error_next_commands(code, details),
     )
     # Response-Envelope Standard v1: ``error_code`` is a closed six-value enum.
     # The granular ``code`` (invalid_variant_id, upstream_timeout, ...) stays on
@@ -563,6 +565,8 @@ def error_envelope(
     payload["_meta"] = meta.model_dump(mode="json")
     # ``allowed_values`` names the parameters/values the caller may use — the
     # actionable structured field the Behaviour gate looks for on an input error.
+    if field:
+        payload["field"] = field
     if allowed_values:
         payload["allowed_values"] = allowed_values
     if suggestions:
