@@ -6,6 +6,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-11-26
+
+### Fixed
+
+- `python server.py` (and so `make dev`) passes its command-line arguments on to the `server`
+  command. `--transport`, `--host` and `--port` were dropped before, so `make dev` bound
+  `0.0.0.0:8000` instead of the `127.0.0.1` it names. Without arguments the behaviour is
+  unchanged.
+
 ## [4.3.0] - 2026-11-26
 
 ### Added
