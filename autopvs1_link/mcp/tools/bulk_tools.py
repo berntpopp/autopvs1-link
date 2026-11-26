@@ -77,7 +77,7 @@ def register(mcp: FastMCP) -> None:
                     f"List of 1 to {BULK_MAX_ITEMS} variant requests. Each item: "
                     "{genome_build: hg19|hg38, variant_id: ...}."
                 ),
-                examples=[[{"genome_build": "hg38", "variant_id": "X-82763936-A-T"}]],
+                examples=[[{"genome_build": "hg19", "variant_id": "X-82763936-A-T"}]],
                 json_schema_extra={
                     "type": "array",
                     "items": VARIANT_ITEM_SCHEMA,

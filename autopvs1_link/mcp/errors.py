@@ -52,10 +52,16 @@ class MCPInputError(MCPToolError):
         suggestions: list[str] | None = None,
         details: dict[str, Any] | None = None,
         retryable: bool = False,
+        field: str | None = None,
+        allowed_values: list[str] | None = None,
+        next_commands: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(message, code=code, details=details)
         self.suggestions = suggestions or []
         self.retryable = retryable
+        self.field = field
+        self.allowed_values = allowed_values
+        self.next_commands = next_commands
 
     def to_envelope(self) -> ErrorToolResult:
         return error_envelope(
@@ -64,4 +70,7 @@ class MCPInputError(MCPToolError):
             retryable=self.retryable,
             suggestions=self.suggestions,
             details=self.details or None,
+            field=self.field,
+            allowed_values=self.allowed_values,
+            next_commands=self.next_commands,
         )

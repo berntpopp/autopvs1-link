@@ -62,7 +62,7 @@ def register(mcp: FastMCP) -> None:
             str,
             Field(
                 description="Genome build: hg19 or hg38.",
-                examples=["hg38", "hg19"],
+                examples=["hg19", "hg38"],
                 json_schema_extra={"enum": ["hg19", "hg38"]},
             ),
         ],

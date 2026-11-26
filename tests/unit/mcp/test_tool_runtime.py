@@ -530,6 +530,42 @@ async def test_search_whitespace_returns_invalid_search_query(mocker) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("gene_id", ["HGNC:1100", "ENSG00000012048", "NCBIGene:672"])
+async def test_search_gene_id_is_rejected_with_hgnc_converter(mocker, gene_id: str) -> None:
+    fake = AsyncMock()
+    mocker.patch("autopvs1_link.mcp.service_adapters.search_variants", new=fake)
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": gene_id})
+
+    fake.assert_not_awaited()
+    env = result.structured_content
+    assert env["error_code"] == "invalid_input"
+    assert env["field"] == "query"
+    assert env["allowed_values"]
+    assert env["_meta"]["next_commands"][0] == {
+        "tool": "hgnc_resolve_symbol",
+        "arguments": {"query": gene_id},
+        "reason": "Convert the gene id to its approved symbol.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_last_page_reports_null_next_cursor(mocker) -> None:
+    parsed = AutoPVS1SearchResults(query="MYH9", genome_version="hg38", results=[])
+    mocker.patch(
+        "autopvs1_link.mcp.service_adapters.search_variants", new=AsyncMock(return_value=parsed)
+    )
+
+    mcp = build_mcp_server()
+    result = await mcp.call_tool("search_variants", {"query": "MYH9", "genome_build": "hg38"})
+
+    pagination = result.structured_content["_meta"]["pagination"]
+    assert pagination["has_more"] is False
+    assert "next_cursor" in pagination and pagination["next_cursor"] is None
+
+
+@pytest.mark.asyncio
 async def test_search_default_build_warns_that_hg38_was_assumed(mocker) -> None:
     parsed = AutoPVS1SearchResults(query="MYH9", genome_version="hg38", results=[])
     fake = AsyncMock(return_value=parsed)
@@ -1639,6 +1675,7 @@ async def test_search_variants_wire_returns_pagination_block_with_five_fields(mo
     assert pagination_one["has_more"] is True
     assert pagination_one["offset"] == 0
     assert pagination_one["total_count_kind"] == "upstream_page"
+    assert data_one["_meta"]["pagination"]["next_cursor"] == pagination_one["next_cursor"]
 
     # Round-trip: passing the opaque next_cursor back yields page 2.
     page_two = await mcp.call_tool(

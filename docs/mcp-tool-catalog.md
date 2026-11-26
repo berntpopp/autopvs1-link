@@ -249,8 +249,8 @@ not clinical decision support.
         "hg38"
       ],
       "examples": [
-        "hg38",
-        "hg19"
+        "hg19",
+        "hg38"
       ],
       "type": "string"
     },
@@ -365,7 +365,7 @@ Aggregated codes carry ``count`` (distinct items) and the sorted
       "examples": [
         [
           {
-            "genome_build": "hg38",
+            "genome_build": "hg19",
             "variant_id": "X-82763936-A-T"
           }
         ]

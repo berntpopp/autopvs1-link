@@ -134,6 +134,18 @@ async def test_data_tools_use_direct_arguments_for_llm_discovery() -> None:
 
 
 @pytest.mark.asyncio
+async def test_variant_tool_first_examples_describe_one_variant() -> None:
+    """#194: the first build example and the first variant example must match (hg19)."""
+    mcp: FastMCP = build_mcp_server()
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    props = tools["get_variant_pvs1_data"].parameters["properties"]
+    assert props["genome_build"]["examples"][0] == "hg19"
+    assert props["variant_id"]["examples"][0] == "X-82763936-A-T"
+    bulk = tools["get_variants_pvs1_data_bulk"].parameters["properties"]["items"]
+    assert bulk["examples"][0] == [{"genome_build": "hg19", "variant_id": "X-82763936-A-T"}]
+
+
 async def test_search_variants_parameters_use_clean_runtime_annotations() -> None:
     mcp: FastMCP = build_mcp_server()
     tools = {tool.name: tool for tool in await mcp.list_tools()}

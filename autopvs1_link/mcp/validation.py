@@ -245,6 +245,12 @@ def normalize_cnv_id(cnv_id: str) -> str:
     return value
 
 
+# Gene id forms AutoPVS1 search does not match (it takes a symbol or variant text); an
+# empty success for them would read as "no variants". hgnc_resolve_symbol converts all three.
+_FOREIGN_GENE_ID_RE = re.compile(r"(HGNC:\d+|ENSG\d+(\.\d+)?|NCBIGene:\d+)", re.I | re.A)
+SEARCH_QUERY_FORMS = ["gene symbol, e.g. BRCA1", "HGVS text or partial variant id, e.g. 17-4312"]
+
+
 def normalize_search_query(query: object) -> str:
     if not isinstance(query, str):
         raise MCPInputError(
@@ -269,6 +275,23 @@ def normalize_search_query(query: object) -> str:
             message="Search query must not be empty.",
             suggestions=[
                 "Search by gene symbol, partial AutoPVS1 variant ID, or upstream-supported query."
+            ],
+        )
+    if _FOREIGN_GENE_ID_RE.fullmatch(value):
+        raise MCPInputError(
+            code="invalid_search_query",
+            message=(
+                f"AutoPVS1 search matches gene symbols, not gene ids such as {value!r}. "
+                "Resolve the id to its symbol with hgnc_resolve_symbol, then search by symbol."
+            ),
+            field="query",
+            allowed_values=SEARCH_QUERY_FORMS,
+            next_commands=[
+                {
+                    "tool": "hgnc_resolve_symbol",
+                    "arguments": {"query": value},
+                    "reason": "Convert the gene id to its approved symbol.",
+                }
             ],
         )
     return value
