@@ -6,6 +6,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-11-26
+
+### Added
+
+- Response-Envelope v1.2 provenance: every successful data result carries `_meta.source`
+  (`autopvs1`), `_meta.data_version` (`live`; AutoPVS1 publishes no release identifier) and
+  `_meta.retrieved_at` (UTC). The fetch time is cached with the value, so a cache hit reports
+  the time of the fetch that filled the entry; a bulk call reports its oldest fetch.
+- `_meta.elapsed_ms` is on every envelope, including errors and tools that make no upstream
+  call, where it is the call's own wall-clock (Response-Envelope v1, section 4).
+
+### Tests
+
+- Every data tool result is validated against the published envelope JSON Schema v1.2.0,
+  vendored with a pinned SHA-256 (`tests/conformance/envelope-v1.2.schema.json`).
+- Re-vendored the behaviour gate, which now checks the provenance rule.
+
 ## [4.2.3] - 2026-11-21
 
 ### Fixed

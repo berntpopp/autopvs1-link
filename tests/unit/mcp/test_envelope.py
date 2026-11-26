@@ -90,19 +90,19 @@ def test_ok_envelope_meta_echoes_telemetry_when_upstream_call_happened() -> None
     assert envelope["_meta"]["cache_status"] == "hit"
 
 
-def test_ok_envelope_meta_drops_telemetry_for_no_upstream_call_tools() -> None:
-    """Cheap tools (no service-adapter call) must NOT echo elapsed_ms.
+def test_ok_envelope_meta_for_no_upstream_call_tools() -> None:
+    """Cheap tools (no service-adapter call) echo no cache_status and no provenance.
 
-    A ``None`` ContextVar default + ``exclude_none`` keeps the wire clean
-    so callers don't see misleading 0ms readings for tools that never
-    touched the upstream.
+    ``elapsed_ms`` is always present (Response-Envelope v1 section 4): without an
+    upstream call it is the call's own wall-clock.
     """
     from autopvs1_link.mcp.telemetry import reset_call_telemetry
 
     reset_call_telemetry()
     envelope = ok_envelope(ClearCacheData(cleared=True, message="cleared"))
-    assert "elapsed_ms" not in envelope["_meta"]
+    assert isinstance(envelope["_meta"]["elapsed_ms"], float)
     assert "cache_status" not in envelope["_meta"]
+    assert "retrieved_at" not in envelope["_meta"]
 
 
 def test_ok_envelope_meta_echoes_effective_chars_count() -> None:
